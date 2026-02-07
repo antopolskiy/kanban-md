@@ -137,6 +137,48 @@ func OverviewTable(s board.Overview) {
 	}
 }
 
+// MetricsTable renders flow metrics as a formatted dashboard.
+func MetricsTable(m board.Metrics) {
+	fmt.Fprintln(os.Stdout, lipgloss.NewStyle().Bold(true).Render("Flow Metrics"))
+	fmt.Fprintln(os.Stdout)
+
+	printField("Throughput 7d", strconv.Itoa(m.Throughput7d)+" tasks")
+	printField("Throughput 30d", strconv.Itoa(m.Throughput30d)+" tasks")
+	printField("Avg lead time", formatOptionalHours(m.AvgLeadTimeHours))
+	printField("Avg cycle time", formatOptionalHours(m.AvgCycleTimeHours))
+	printField("Flow efficiency", formatOptionalPercent(m.FlowEfficiency))
+
+	if len(m.AgingItems) > 0 {
+		fmt.Fprintln(os.Stdout)
+		agingHeader := fmt.Sprintf("%-6s %-16s %-40s %10s", "ID", "STATUS", "TITLE", "AGE")
+		fmt.Fprintln(os.Stdout, headerStyle.Render(agingHeader))
+		for _, a := range m.AgingItems {
+			title := a.Title
+			const maxTitle = 38
+			if len(title) > maxTitle {
+				title = title[:maxTitle-3] + "..."
+			}
+			fmt.Fprintf(os.Stdout, "%-6d %-16s %-40s %10s\n",
+				a.ID, a.Status, title, FormatDuration(time.Duration(a.AgeHours*float64(time.Hour))))
+		}
+	}
+}
+
+func formatOptionalHours(h *float64) string {
+	if h == nil {
+		return dimStyle.Render("--")
+	}
+	return FormatDuration(time.Duration(*h * float64(time.Hour)))
+}
+
+func formatOptionalPercent(f *float64) string {
+	if f == nil {
+		return dimStyle.Render("--")
+	}
+	const percentMultiplier = 100
+	return fmt.Sprintf("%.1f%%", *f*percentMultiplier)
+}
+
 // Messagef prints a simple formatted message line.
 func Messagef(format string, args ...interface{}) {
 	fmt.Fprintf(os.Stdout, format+"\n", args...)
