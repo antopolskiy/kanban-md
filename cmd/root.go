@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -160,4 +162,72 @@ func logActivity(cfg *config.Config, action string, taskID int, detail string) {
 	if err := board.AppendLog(cfg.Dir(), entry); err != nil {
 		fmt.Fprintf(os.Stderr, "Warning: failed to write activity log: %v\n", err)
 	}
+}
+
+// parseIDs splits a comma-separated ID string into deduplicated int IDs.
+func parseIDs(arg string) ([]int, error) {
+	parts := strings.Split(arg, ",")
+	seen := make(map[int]bool, len(parts))
+	ids := make([]int, 0, len(parts))
+	for _, p := range parts {
+		p = strings.TrimSpace(p)
+		if p == "" {
+			continue
+		}
+		id, err := strconv.Atoi(p)
+		if err != nil {
+			return nil, task.ValidateTaskID(p)
+		}
+		if !seen[id] {
+			ids = append(ids, id)
+			seen[id] = true
+		}
+	}
+	if len(ids) == 0 {
+		return nil, clierr.New(clierr.InvalidTaskID, "no valid task IDs provided")
+	}
+	return ids, nil
+}
+
+// runBatch executes fn for each ID and collects results. Returns a SilentError
+// with exit code 1 if any operation failed (after outputting results).
+func runBatch(ids []int, fn func(int) error) error {
+	results := make([]output.BatchResult, 0, len(ids))
+	anyFailed := false
+
+	for _, id := range ids {
+		err := fn(id)
+		if err != nil {
+			anyFailed = true
+			var cliErr *clierr.Error
+			if errors.As(err, &cliErr) {
+				results = append(results, output.BatchResult{ID: id, OK: false, Error: cliErr.Message, Code: cliErr.Code})
+			} else {
+				results = append(results, output.BatchResult{ID: id, OK: false, Error: err.Error()})
+			}
+		} else {
+			results = append(results, output.BatchResult{ID: id, OK: true})
+		}
+	}
+
+	if outputFormat() == output.FormatJSON {
+		if err := output.JSON(results); err != nil {
+			return err
+		}
+	} else {
+		var succeeded int
+		for _, r := range results {
+			if r.OK {
+				succeeded++
+			} else {
+				fmt.Fprintf(os.Stderr, "Error: task #%d: %s\n", r.ID, r.Error)
+			}
+		}
+		output.Messagef("Completed %d/%d operations", succeeded, len(ids))
+	}
+
+	if anyFailed {
+		return &clierr.SilentError{Code: 1}
+	}
+	return nil
 }

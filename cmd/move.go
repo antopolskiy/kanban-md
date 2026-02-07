@@ -3,7 +3,6 @@ package cmd
 import (
 	"fmt"
 	"os"
-	"strconv"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -16,10 +15,11 @@ import (
 )
 
 var moveCmd = &cobra.Command{
-	Use:   "move ID [STATUS]",
+	Use:   "move ID[,ID,...] [STATUS]",
 	Short: "Move a task to a different status",
 	Long: `Changes the status of a task. Provide the new status directly,
-or use --next/--prev to move along the configured status order.`,
+or use --next/--prev to move along the configured status order.
+Multiple IDs can be provided as a comma-separated list.`,
 	Args: cobra.RangeArgs(1, 2), //nolint:mnd // 1 or 2 positional args
 	RunE: runMove,
 }
@@ -32,9 +32,9 @@ func init() {
 }
 
 func runMove(cmd *cobra.Command, args []string) error {
-	id, err := strconv.Atoi(args[0])
+	ids, err := parseIDs(args[0])
 	if err != nil {
-		return task.ValidateTaskID(args[0])
+		return err
 	}
 
 	cfg, err := loadConfig()
@@ -42,6 +42,20 @@ func runMove(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	// Single ID: preserve exact current behavior.
+	if len(ids) == 1 {
+		return moveSingleTask(cfg, ids[0], cmd, args)
+	}
+
+	// Batch mode.
+	force, _ := cmd.Flags().GetBool("force")
+	return runBatch(ids, func(id int) error {
+		return moveSingleCore(cfg, id, cmd, args, force)
+	})
+}
+
+// moveSingleTask handles a single task move with full output.
+func moveSingleTask(cfg *config.Config, id int, cmd *cobra.Command, args []string) error {
 	path, err := task.FindByID(cfg.TasksPath(), id)
 	if err != nil {
 		return err
@@ -90,6 +104,44 @@ func runMove(cmd *cobra.Command, args []string) error {
 	}
 
 	output.Messagef("Moved task #%d: %s → %s", id, oldStatus, newStatus)
+	return nil
+}
+
+// moveSingleCore performs the core move logic without output (for batch mode).
+func moveSingleCore(cfg *config.Config, id int, cmd *cobra.Command, args []string, force bool) error {
+	path, err := task.FindByID(cfg.TasksPath(), id)
+	if err != nil {
+		return err
+	}
+
+	t, err := task.Read(path)
+	if err != nil {
+		return err
+	}
+
+	newStatus, err := resolveTargetStatus(cmd, args, t, cfg)
+	if err != nil {
+		return err
+	}
+
+	if t.Status == newStatus {
+		return nil // idempotent
+	}
+
+	if err := enforceWIPLimit(cfg, t.Status, newStatus, force); err != nil {
+		return err
+	}
+
+	oldStatus := t.Status
+	t.Status = newStatus
+	updateTimestamps(t, oldStatus, newStatus, cfg)
+	t.Updated = time.Now()
+
+	if err := task.Write(path, t); err != nil {
+		return fmt.Errorf("writing task: %w", err)
+	}
+
+	logActivity(cfg, "move", id, oldStatus+" -> "+newStatus)
 	return nil
 }
 

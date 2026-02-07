@@ -190,6 +190,7 @@ Modify an existing task.
 
 ```bash
 kanban-md edit ID [FLAGS]
+kanban-md edit 1,2,3 --priority high  # batch edit
 ```
 
 | Flag | Description |
@@ -213,12 +214,14 @@ Change a task's status.
 kanban-md move ID [STATUS]
 kanban-md move ID --next
 kanban-md move ID --prev
+kanban-md move 1,2,3 todo          # batch move
 ```
 
 | Flag | Description |
 |------|-------------|
 | `--next` | Advance to next status in the configured order |
 | `--prev` | Move back to previous status |
+| `--force` | Override WIP limit |
 
 ### `delete`
 
@@ -226,9 +229,10 @@ Delete a task. Aliases: `rm`.
 
 ```bash
 kanban-md delete ID [--force]
+kanban-md delete 1,2,3 --force     # batch delete
 ```
 
-Prompts for confirmation in interactive terminals. Use `--force` to skip the prompt (required in non-interactive contexts like scripts).
+Prompts for confirmation in interactive terminals. Use `--force` to skip the prompt (required in non-interactive contexts like scripts). Batch delete always requires `--force`.
 
 ### `config`
 

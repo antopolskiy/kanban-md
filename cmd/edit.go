@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strconv"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -17,11 +16,12 @@ import (
 )
 
 var editCmd = &cobra.Command{
-	Use:   "edit ID",
+	Use:   "edit ID[,ID,...]",
 	Short: "Edit a task",
-	Long:  `Modifies fields of an existing task. Only specified fields are changed.`,
-	Args:  cobra.ExactArgs(1),
-	RunE:  runEdit,
+	Long: `Modifies fields of an existing task. Only specified fields are changed.
+Multiple IDs can be provided as a comma-separated list.`,
+	Args: cobra.ExactArgs(1),
+	RunE: runEdit,
 }
 
 func init() {
@@ -49,9 +49,9 @@ func init() {
 }
 
 func runEdit(cmd *cobra.Command, args []string) error {
-	id, err := strconv.Atoi(args[0])
+	ids, err := parseIDs(args[0])
 	if err != nil {
-		return task.ValidateTaskID(args[0])
+		return err
 	}
 
 	cfg, err := loadConfig()
@@ -59,6 +59,19 @@ func runEdit(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	// Single ID: preserve exact current behavior.
+	if len(ids) == 1 {
+		return editSingleTask(cfg, ids[0], cmd)
+	}
+
+	// Batch mode.
+	return runBatch(ids, func(id int) error {
+		return editSingleCore(cfg, id, cmd)
+	})
+}
+
+// editSingleTask handles a single task edit with full output.
+func editSingleTask(cfg *config.Config, id int, cmd *cobra.Command) error {
 	path, err := task.FindByID(cfg.TasksPath(), id)
 	if err != nil {
 		return err
@@ -108,6 +121,49 @@ func runEdit(cmd *cobra.Command, args []string) error {
 	}
 
 	output.Messagef("Updated task #%d: %s", t.ID, t.Title)
+	return nil
+}
+
+// editSingleCore performs the core edit logic without output (for batch mode).
+func editSingleCore(cfg *config.Config, id int, cmd *cobra.Command) error {
+	path, err := task.FindByID(cfg.TasksPath(), id)
+	if err != nil {
+		return err
+	}
+
+	t, err := task.Read(path)
+	if err != nil {
+		return err
+	}
+
+	oldTitle := t.Title
+	oldStatus := t.Status
+	wasBlocked := t.Blocked
+	changed, err := applyEditFlags(cmd, t, cfg)
+	if err != nil {
+		return err
+	}
+	if !changed {
+		return clierr.New(clierr.NoChanges, "no changes specified")
+	}
+
+	if err = validateEditDeps(cfg, t); err != nil {
+		return err
+	}
+
+	if t.Status != oldStatus {
+		if err = enforceWIPLimit(cfg, oldStatus, t.Status, false); err != nil {
+			return err
+		}
+	}
+
+	t.Updated = time.Now()
+
+	if _, err = writeAndRename(path, t, oldTitle); err != nil {
+		return err
+	}
+
+	logEditActivity(cfg, t, wasBlocked)
 	return nil
 }
 
