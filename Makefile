@@ -8,7 +8,7 @@ all: mod build lint test
 
 .PHONY: precommit
 precommit: ## validate the branch before commit
-precommit: all vuln
+precommit: all
 
 .PHONY: ci
 ci: ## CI build pipeline
@@ -22,8 +22,7 @@ help:
 clean: ## remove files created during build pipeline
 	rm -rf dist
 	rm -f coverage.*
-	rm -f '"$(shell go env GOCACHE)/../golangci-lint"'
-	go clean -i -cache -testcache -modcache -fuzzcache -x
+	go clean -i -cache -testcache -fuzzcache -x
 
 .PHONY: run
 run: ## go run
@@ -34,20 +33,12 @@ mod: ## go mod tidy
 	go mod tidy
 
 .PHONY: build
-build: ## goreleaser build
-	go tool goreleaser build --clean --single-target --snapshot
-
-.PHONY: spell
-spell: ## misspell
-	go tool misspell -error -locale=US -w **.md
+build: ## go build
+	go build -o dist/kanban-md .
 
 .PHONY: lint
 lint: ## golangci-lint
-	go tool golangci-lint run --fix
-
-.PHONY: vuln
-vuln: ## govulncheck
-	go tool govulncheck ./...
+	golangci-lint run --fix
 
 ifeq ($(CGO_ENABLED),0)
 RACE_OPT =

@@ -28,22 +28,20 @@ jobs:
           go-version: '1.25'
           check-latest: true
 
-      - name: Build
-        run: make ci
-        env:
-          SKIP_DOCKER: ${{ (runner.os == 'macOS' || runner.os == 'Windows') }}
+      - name: Install golangci-lint
+        uses: golangci/golangci-lint-action@v7
+        with:
+          args: --fix
+
+      - name: Build and test
+        run: |
+          make mod build test
+
+      - name: Check for uncommitted changes
+        run: make diff
 
       - name: Upload coverage
         uses: actions/upload-artifact@v4
         with:
           name: coverage-${{ matrix.os }}
           path: coverage.*
-
-      - run: go tool goreleaser release --clean --snapshot
-        if: ${{ runner.os == 'Linux' }}
-
-      - name: Upload dist
-        uses: actions/upload-artifact@v4
-        with:
-          name: dist-${{ matrix.os }}
-          path: dist

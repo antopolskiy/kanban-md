@@ -18,19 +18,14 @@ archives:
       - goos: windows
         formats:
           - zip
-dockers:
-  - image_templates:
-    - "ghcr.io/antopolskiy/kanban-md:latest"
-    - "ghcr.io/antopolskiy/kanban-md:{{ .Major }}"
-    - "ghcr.io/antopolskiy/kanban-md:{{ .Major }}.{{ .Minor }}"
-    - "ghcr.io/antopolskiy/kanban-md:{{ .Major }}.{{ .Minor }}.{{ .Patch }}"
-    build_flag_templates:
-    - "--pull"
-    - "--label=org.opencontainers.image.created={{.Date}}"
-    - "--label=org.opencontainers.image.name={{.ProjectName}}"
-    - "--label=org.opencontainers.image.revision={{.FullCommit}}"
-    - "--label=org.opencontainers.image.version={{.Version}}"
-    - "--label=org.opencontainers.image.source={{.GitURL}}"
+homebrew_casks:
+  - repository:
+      owner: antopolskiy
+      name: homebrew-tap
+      token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
+    homepage: https://github.com/antopolskiy/kanban-md
+    description: A file-based Kanban tool powered by Markdown
+    license: MIT
 release:
   github:
   name_template: "{{.Version}}"
