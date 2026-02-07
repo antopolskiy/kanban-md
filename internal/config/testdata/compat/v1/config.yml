@@ -1,0 +1,20 @@
+version: 1
+board:
+    name: Test Project
+    description: A project for testing compatibility
+tasks_dir: tasks
+statuses:
+    - backlog
+    - todo
+    - in-progress
+    - review
+    - done
+priorities:
+    - low
+    - medium
+    - high
+    - critical
+defaults:
+    status: backlog
+    priority: medium
+next_id: 4

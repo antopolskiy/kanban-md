@@ -146,6 +146,11 @@ func Load(dir string) (*Config, error) {
 
 	cfg.dir = absDir
 
+	// Migrate old config versions forward before validating.
+	if err := migrate(&cfg); err != nil {
+		return nil, err
+	}
+
 	if err := cfg.Validate(); err != nil {
 		return nil, err
 	}
