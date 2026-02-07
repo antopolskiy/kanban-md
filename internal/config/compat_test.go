@@ -158,7 +158,7 @@ func TestCompatV1TasksReadable(t *testing.T) {
 		t.Fatalf("reading fixture dir: %v", err)
 	}
 
-	const expectedFiles = 4
+	const expectedFiles = 5
 	if len(entries) != expectedFiles {
 		t.Fatalf("expected %d fixture task files, got %d", expectedFiles, len(entries))
 	}

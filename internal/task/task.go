@@ -15,6 +15,8 @@ type Task struct {
 	Priority    string     `yaml:"priority" json:"priority"`
 	Created     time.Time  `yaml:"created" json:"created"`
 	Updated     time.Time  `yaml:"updated" json:"updated"`
+	Started     *time.Time `yaml:"started,omitempty" json:"started,omitempty"`
+	Completed   *time.Time `yaml:"completed,omitempty" json:"completed,omitempty"`
 	Assignee    string     `yaml:"assignee,omitempty" json:"assignee,omitempty"`
 	Tags        []string   `yaml:"tags,omitempty" json:"tags,omitempty"`
 	Due         *date.Date `yaml:"due,omitempty" json:"due,omitempty"`

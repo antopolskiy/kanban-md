@@ -35,6 +35,10 @@ func init() {
 	editCmd.Flags().Bool("clear-due", false, "clear due date")
 	editCmd.Flags().String("estimate", "", "new time estimate")
 	editCmd.Flags().String("body", "", "new body text")
+	editCmd.Flags().String("started", "", "set started date (YYYY-MM-DD)")
+	editCmd.Flags().Bool("clear-started", false, "clear started timestamp")
+	editCmd.Flags().String("completed", "", "set completed date (YYYY-MM-DD)")
+	editCmd.Flags().Bool("clear-completed", false, "clear completed timestamp")
 	editCmd.Flags().Int("parent", 0, "set parent task ID")
 	editCmd.Flags().Bool("clear-parent", false, "clear parent")
 	editCmd.Flags().IntSlice("add-dep", nil, "add dependency task IDs")
@@ -118,6 +122,31 @@ func runEdit(cmd *cobra.Command, args []string) error {
 }
 
 func applyEditFlags(cmd *cobra.Command, t *task.Task, cfg *config.Config) (bool, error) {
+	changed, err := applySimpleEditFlags(cmd, t, cfg)
+	if err != nil {
+		return false, err
+	}
+
+	// Apply grouped flag helpers, each returning (bool, error).
+	for _, fn := range []func(*cobra.Command, *task.Task) (bool, error){
+		applyTimestampFlags,
+		applyTagDueFlags,
+		applyDepFlags,
+		applyBlockFlags,
+	} {
+		c, fnErr := fn(cmd, t)
+		if fnErr != nil {
+			return false, fnErr
+		}
+		if c {
+			changed = true
+		}
+	}
+
+	return changed, nil
+}
+
+func applySimpleEditFlags(cmd *cobra.Command, t *task.Task, cfg *config.Config) (bool, error) {
 	changed := false
 
 	if v, _ := cmd.Flags().GetString("title"); v != "" {
@@ -142,14 +171,6 @@ func applyEditFlags(cmd *cobra.Command, t *task.Task, cfg *config.Config) (bool,
 		t.Assignee = v
 		changed = true
 	}
-	tagDueChanged, err := applyTagDueFlags(cmd, t)
-	if err != nil {
-		return false, err
-	}
-	if tagDueChanged {
-		changed = true
-	}
-
 	if v, _ := cmd.Flags().GetString("estimate"); v != "" {
 		t.Estimate = v
 		changed = true
@@ -159,19 +180,50 @@ func applyEditFlags(cmd *cobra.Command, t *task.Task, cfg *config.Config) (bool,
 		changed = true
 	}
 
-	depChanged, err := applyDepFlags(cmd, t)
-	if err != nil {
-		return false, err
+	return changed, nil
+}
+
+func applyTimestampFlags(cmd *cobra.Command, t *task.Task) (bool, error) {
+	changed := false
+
+	startedSet := cmd.Flags().Changed("started")
+	clearStarted, _ := cmd.Flags().GetBool("clear-started")
+	completedSet := cmd.Flags().Changed("completed")
+	clearCompleted, _ := cmd.Flags().GetBool("clear-completed")
+
+	if startedSet && clearStarted {
+		return false, errors.New("cannot use --started and --clear-started together")
 	}
-	if depChanged {
-		changed = true
+	if completedSet && clearCompleted {
+		return false, errors.New("cannot use --completed and --clear-completed together")
 	}
 
-	blockChanged, err := applyBlockFlags(cmd, t)
-	if err != nil {
-		return false, err
+	if startedSet {
+		v, _ := cmd.Flags().GetString("started")
+		d, err := date.Parse(v)
+		if err != nil {
+			return false, fmt.Errorf("invalid started date: %w", err)
+		}
+		ts := d.Time
+		t.Started = &ts
+		changed = true
 	}
-	if blockChanged {
+	if clearStarted {
+		t.Started = nil
+		changed = true
+	}
+	if completedSet {
+		v, _ := cmd.Flags().GetString("completed")
+		d, err := date.Parse(v)
+		if err != nil {
+			return false, fmt.Errorf("invalid completed date: %w", err)
+		}
+		ts := d.Time
+		t.Completed = &ts
+		changed = true
+	}
+	if clearCompleted {
+		t.Completed = nil
 		changed = true
 	}
 

@@ -75,7 +75,9 @@ func runMove(cmd *cobra.Command, args []string) error {
 
 	oldStatus := t.Status
 	t.Status = newStatus
-	t.Updated = time.Now()
+	now := time.Now()
+	updateTimestamps(t, oldStatus, newStatus, cfg)
+	t.Updated = now
 
 	if err := task.Write(path, t); err != nil {
 		return fmt.Errorf("writing task: %w", err)
@@ -145,6 +147,29 @@ func enforceWIPLimit(cfg *config.Config, currentStatus, targetStatus string, for
 type moveResult struct {
 	*task.Task
 	Changed bool `json:"changed"`
+}
+
+// updateTimestamps sets Started and Completed based on the status transition.
+func updateTimestamps(t *task.Task, oldStatus, newStatus string, cfg *config.Config) {
+	now := time.Now()
+	initialStatus := cfg.Statuses[0]
+
+	// Set Started on first move out of initial status (never overwrite).
+	if t.Started == nil && oldStatus == initialStatus && newStatus != initialStatus {
+		t.Started = &now
+	}
+
+	// Set/clear Completed based on terminal status.
+	if cfg.IsTerminalStatus(newStatus) {
+		t.Completed = &now
+		// Direct move to terminal: also set Started if nil.
+		if t.Started == nil {
+			t.Started = &now
+		}
+	} else if cfg.IsTerminalStatus(oldStatus) {
+		// Reopening: clear Completed, preserve Started.
+		t.Completed = nil
+	}
 }
 
 func outputMoveResult(t *task.Task, changed bool) error {

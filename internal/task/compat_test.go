@@ -159,6 +159,47 @@ func TestCompatV1TaskBlockedFields(t *testing.T) {
 	}
 }
 
+func TestCompatV1TaskWithTimestamps(t *testing.T) {
+	path := filepath.Join(v1FixtureDir, "005-with-timestamps.md")
+	tk, err := Read(path)
+	if err != nil {
+		t.Fatalf("Read() v1 task with timestamps: %v", err)
+	}
+
+	if tk.ID != 5 {
+		t.Errorf("ID = %d, want 5", tk.ID)
+	}
+	if tk.Started == nil {
+		t.Fatal("Started is nil, want non-nil")
+	}
+	if tk.Completed == nil {
+		t.Fatal("Completed is nil, want non-nil")
+	}
+	// Verify the dates parsed correctly.
+	if tk.Started.Year() != 2026 || tk.Started.Month() != 1 || tk.Started.Day() != 20 {
+		t.Errorf("Started = %v, want 2026-01-20", tk.Started)
+	}
+	if tk.Completed.Year() != 2026 || tk.Completed.Month() != 2 || tk.Completed.Day() != 1 {
+		t.Errorf("Completed = %v, want 2026-02-01", tk.Completed)
+	}
+}
+
+func TestCompatV1TaskWithoutTimestamps(t *testing.T) {
+	path := filepath.Join(v1FixtureDir, "002-design-api.md")
+	tk, err := Read(path)
+	if err != nil {
+		t.Fatalf("Read() v1 task: %v", err)
+	}
+
+	// Tasks without timestamp fields should have nil Started/Completed.
+	if tk.Started != nil {
+		t.Errorf("Started = %v, want nil", tk.Started)
+	}
+	if tk.Completed != nil {
+		t.Errorf("Completed = %v, want nil", tk.Completed)
+	}
+}
+
 func TestCompatV1TaskMinimalNotBlocked(t *testing.T) {
 	path := filepath.Join(v1FixtureDir, "002-design-api.md")
 	tk, err := Read(path)

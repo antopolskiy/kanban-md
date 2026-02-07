@@ -5,6 +5,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/charmbracelet/lipgloss"
 
@@ -92,6 +93,16 @@ func TaskDetail(t *task.Task) {
 	printField("Estimate", stringOrDash(t.Estimate))
 	printField("Created", t.Created.Format("2006-01-02 15:04"))
 	printField("Updated", t.Updated.Format("2006-01-02 15:04"))
+	if t.Started != nil {
+		printField("Started", t.Started.Format("2006-01-02 15:04"))
+	}
+	if t.Completed != nil {
+		printField("Completed", t.Completed.Format("2006-01-02 15:04"))
+		printField("Lead time", FormatDuration(t.Completed.Sub(t.Created)))
+		if t.Started != nil {
+			printField("Cycle time", FormatDuration(t.Completed.Sub(*t.Started)))
+		}
+	}
 
 	if t.Body != "" {
 		fmt.Fprintln(os.Stdout)
@@ -106,6 +117,18 @@ func Messagef(format string, args ...interface{}) {
 
 func printField(label, value string) {
 	fmt.Fprintf(os.Stdout, "  %-12s %s\n", label+":", value)
+}
+
+// FormatDuration renders a duration as human-readable "Xd Yh" or "Xh Ym".
+func FormatDuration(d time.Duration) string {
+	const hoursPerDay = 24
+	days := int(d.Hours()) / hoursPerDay
+	hours := int(d.Hours()) % hoursPerDay
+	if days > 0 {
+		return strconv.Itoa(days) + "d " + strconv.Itoa(hours) + "h"
+	}
+	minutes := int(d.Minutes()) % 60 //nolint:mnd // 60 minutes per hour
+	return strconv.Itoa(hours) + "h " + strconv.Itoa(minutes) + "m"
 }
 
 func stringOrDash(s string) string {

@@ -863,6 +863,188 @@ func TestInitWithWIPLimits(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
+// Timestamp tests
+// ---------------------------------------------------------------------------
+
+func TestMoveStartedTimestamp(t *testing.T) {
+	kanbanDir := initBoard(t)
+	mustCreateTask(t, kanbanDir, "Task A")
+
+	// Move from backlog (initial) to todo — should set started.
+	var task map[string]interface{}
+	r := runKanbanJSON(t, kanbanDir, &task, "move", "1", "todo")
+	if r.exitCode != 0 {
+		t.Fatalf("move failed: %s", r.stderr)
+	}
+	if task["started"] == nil {
+		t.Error("started should be set on first move from initial status")
+	}
+}
+
+func TestMoveCompletedTimestamp(t *testing.T) {
+	kanbanDir := initBoard(t)
+	mustCreateTask(t, kanbanDir, "Task A")
+	runKanban(t, kanbanDir, "--json", "move", "1", "todo")
+
+	// Move to done (terminal) — should set completed.
+	var task map[string]interface{}
+	r := runKanbanJSON(t, kanbanDir, &task, "move", "1", "done")
+	if r.exitCode != 0 {
+		t.Fatalf("move failed: %s", r.stderr)
+	}
+	if task["completed"] == nil {
+		t.Error("completed should be set on move to terminal status")
+	}
+}
+
+func TestMoveBackClearsCompleted(t *testing.T) {
+	kanbanDir := initBoard(t)
+	mustCreateTask(t, kanbanDir, "Task A")
+	runKanban(t, kanbanDir, "--json", "move", "1", "done")
+
+	// Move back from done — should clear completed.
+	var task map[string]interface{}
+	r := runKanbanJSON(t, kanbanDir, &task, "move", "1", "review")
+	if r.exitCode != 0 {
+		t.Fatalf("move failed: %s", r.stderr)
+	}
+	if task["completed"] != nil {
+		t.Error("completed should be cleared when moving back from terminal")
+	}
+	if task["started"] == nil {
+		t.Error("started should be preserved when moving back from terminal")
+	}
+}
+
+func TestMoveStartedNeverOverwritten(t *testing.T) {
+	kanbanDir := initBoard(t)
+	mustCreateTask(t, kanbanDir, "Task A")
+
+	// First move: backlog -> todo (sets started).
+	var first map[string]interface{}
+	runKanbanJSON(t, kanbanDir, &first, "move", "1", "todo")
+	started1 := first["started"]
+
+	// Second move: todo -> in-progress (should NOT change started).
+	var second map[string]interface{}
+	runKanbanJSON(t, kanbanDir, &second, "move", "1", "in-progress")
+	started2 := second["started"]
+
+	if started1 != started2 {
+		t.Errorf("started changed: %v → %v", started1, started2)
+	}
+}
+
+func TestMoveDirectToTerminal(t *testing.T) {
+	kanbanDir := initBoard(t)
+	mustCreateTask(t, kanbanDir, "Task A")
+
+	// Move directly from backlog to done.
+	var task map[string]interface{}
+	r := runKanbanJSON(t, kanbanDir, &task, "move", "1", "done")
+	if r.exitCode != 0 {
+		t.Fatalf("move failed: %s", r.stderr)
+	}
+	if task["started"] == nil {
+		t.Error("started should be set on direct move to terminal")
+	}
+	if task["completed"] == nil {
+		t.Error("completed should be set on direct move to terminal")
+	}
+}
+
+func TestEditStartedManualBackfill(t *testing.T) {
+	kanbanDir := initBoard(t)
+	mustCreateTask(t, kanbanDir, "Task A")
+
+	var edited map[string]interface{}
+	r := runKanbanJSON(t, kanbanDir, &edited, "edit", "1", "--started", "2026-01-15")
+	if r.exitCode != 0 {
+		t.Fatalf("edit --started failed: %s", r.stderr)
+	}
+	started, ok := edited["started"].(string)
+	if !ok || !strings.HasPrefix(started, "2026-01-15") {
+		t.Errorf("started = %v, want prefix 2026-01-15", edited["started"])
+	}
+}
+
+func TestEditCompletedManualBackfill(t *testing.T) {
+	kanbanDir := initBoard(t)
+	mustCreateTask(t, kanbanDir, "Task A")
+
+	var edited map[string]interface{}
+	r := runKanbanJSON(t, kanbanDir, &edited, "edit", "1", "--completed", "2026-02-01")
+	if r.exitCode != 0 {
+		t.Fatalf("edit --completed failed: %s", r.stderr)
+	}
+	completed, ok := edited["completed"].(string)
+	if !ok || !strings.HasPrefix(completed, "2026-02-01") {
+		t.Errorf("completed = %v, want prefix 2026-02-01", edited["completed"])
+	}
+}
+
+func TestEditClearStarted(t *testing.T) {
+	kanbanDir := initBoard(t)
+	mustCreateTask(t, kanbanDir, "Task A")
+	runKanban(t, kanbanDir, "--json", "edit", "1", "--started", "2026-01-15")
+
+	var edited map[string]interface{}
+	r := runKanbanJSON(t, kanbanDir, &edited, "edit", "1", "--clear-started")
+	if r.exitCode != 0 {
+		t.Fatalf("edit --clear-started failed: %s", r.stderr)
+	}
+	if edited["started"] != nil {
+		t.Errorf("started = %v, want nil after clear", edited["started"])
+	}
+}
+
+func TestEditClearCompleted(t *testing.T) {
+	kanbanDir := initBoard(t)
+	mustCreateTask(t, kanbanDir, "Task A")
+	runKanban(t, kanbanDir, "--json", "edit", "1", "--completed", "2026-02-01")
+
+	var edited map[string]interface{}
+	r := runKanbanJSON(t, kanbanDir, &edited, "edit", "1", "--clear-completed")
+	if r.exitCode != 0 {
+		t.Fatalf("edit --clear-completed failed: %s", r.stderr)
+	}
+	if edited["completed"] != nil {
+		t.Errorf("completed = %v, want nil after clear", edited["completed"])
+	}
+}
+
+func TestEditStartedAndClearStartedConflict(t *testing.T) {
+	kanbanDir := initBoard(t)
+	mustCreateTask(t, kanbanDir, "Task A")
+
+	r := runKanban(t, kanbanDir, "--json", "edit", "1", "--started", "2026-01-15", "--clear-started")
+	if r.exitCode == 0 {
+		t.Error("expected error for --started + --clear-started conflict")
+	}
+	if !strings.Contains(r.stderr, "cannot use") {
+		t.Errorf("stderr = %q, want conflict error", r.stderr)
+	}
+}
+
+func TestShowDisplaysLeadCycleTime(t *testing.T) {
+	kanbanDir := initBoard(t)
+	mustCreateTask(t, kanbanDir, "Task A")
+	runKanban(t, kanbanDir, "--json", "move", "1", "todo")
+	runKanban(t, kanbanDir, "--json", "move", "1", "done")
+
+	r := runKanban(t, kanbanDir, "--table", "show", "1")
+	if r.exitCode != 0 {
+		t.Fatalf("show failed: %s", r.stderr)
+	}
+	if !strings.Contains(r.stdout, "Lead time") {
+		t.Errorf("show output missing 'Lead time', got: %s", r.stdout)
+	}
+	if !strings.Contains(r.stdout, "Cycle time") {
+		t.Errorf("show output missing 'Cycle time', got: %s", r.stdout)
+	}
+}
+
+// ---------------------------------------------------------------------------
 // Dependency tests
 // ---------------------------------------------------------------------------
 
