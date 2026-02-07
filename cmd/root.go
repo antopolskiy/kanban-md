@@ -1,3 +1,4 @@
+// Package cmd implements the kanban-md CLI commands.
 package cmd
 
 import (
