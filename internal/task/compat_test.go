@@ -137,3 +137,40 @@ func TestCompatV1TaskWithDependencies(t *testing.T) {
 		t.Errorf("Body = %q, want empty", tk.Body)
 	}
 }
+
+func TestCompatV1TaskBlockedFields(t *testing.T) {
+	path := filepath.Join(v1FixtureDir, "004-blocked-task.md")
+	tk, err := Read(path)
+	if err != nil {
+		t.Fatalf("Read() v1 blocked task: %v", err)
+	}
+
+	if tk.ID != 4 {
+		t.Errorf("ID = %d, want 4", tk.ID)
+	}
+	if !tk.Blocked {
+		t.Error("Blocked = false, want true")
+	}
+	if tk.BlockReason != "waiting for API credentials" {
+		t.Errorf("BlockReason = %q, want %q", tk.BlockReason, "waiting for API credentials")
+	}
+	if tk.Body == "" {
+		t.Error("Body is empty, want non-empty")
+	}
+}
+
+func TestCompatV1TaskMinimalNotBlocked(t *testing.T) {
+	path := filepath.Join(v1FixtureDir, "002-design-api.md")
+	tk, err := Read(path)
+	if err != nil {
+		t.Fatalf("Read() v1 task: %v", err)
+	}
+
+	// Tasks without blocked fields should default to not-blocked.
+	if tk.Blocked {
+		t.Error("Blocked = true, want false for task without blocked field")
+	}
+	if tk.BlockReason != "" {
+		t.Errorf("BlockReason = %q, want empty", tk.BlockReason)
+	}
+}

@@ -9,6 +9,7 @@ type FilterOptions struct {
 	Priorities []string
 	Assignee   string
 	Tag        string
+	Blocked    *bool // nil=no filter, true=only blocked, false=only not-blocked
 }
 
 // Filter returns tasks matching all specified criteria (AND logic).
@@ -33,6 +34,9 @@ func matchesFilter(t *task.Task, opts FilterOptions) bool {
 		return false
 	}
 	if opts.Tag != "" && !containsStr(t.Tags, opts.Tag) {
+		return false
+	}
+	if opts.Blocked != nil && t.Blocked != *opts.Blocked {
 		return false
 	}
 	return true

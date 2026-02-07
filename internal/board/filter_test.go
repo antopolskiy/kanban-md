@@ -69,3 +69,45 @@ func TestFilterEmpty(t *testing.T) {
 		t.Errorf("got %d tasks, want 4 (no filter)", len(result))
 	}
 }
+
+func makeTasksWithBlocked() []*task.Task {
+	return []*task.Task{
+		{ID: 1, Title: "Normal", Status: "backlog"},
+		{ID: 2, Title: "Blocked", Status: "in-progress", Blocked: true, BlockReason: "waiting"},
+		{ID: 3, Title: "Also blocked", Status: "todo", Blocked: true, BlockReason: "dependency"},
+		{ID: 4, Title: "Not blocked", Status: "in-progress"},
+	}
+}
+
+func TestFilterBlocked(t *testing.T) {
+	blocked := true
+	result := Filter(makeTasksWithBlocked(), FilterOptions{Blocked: &blocked})
+	if len(result) != 2 {
+		t.Errorf("got %d tasks, want 2 blocked", len(result))
+	}
+	for _, tk := range result {
+		if !tk.Blocked {
+			t.Errorf("task #%d should be blocked", tk.ID)
+		}
+	}
+}
+
+func TestFilterNotBlocked(t *testing.T) {
+	notBlocked := false
+	result := Filter(makeTasksWithBlocked(), FilterOptions{Blocked: &notBlocked})
+	if len(result) != 2 {
+		t.Errorf("got %d tasks, want 2 not-blocked", len(result))
+	}
+	for _, tk := range result {
+		if tk.Blocked {
+			t.Errorf("task #%d should not be blocked", tk.ID)
+		}
+	}
+}
+
+func TestFilterBlockedNil(t *testing.T) {
+	result := Filter(makeTasksWithBlocked(), FilterOptions{})
+	if len(result) != 4 {
+		t.Errorf("got %d tasks, want 4 (no blocked filter)", len(result))
+	}
+}

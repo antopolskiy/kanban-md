@@ -24,6 +24,8 @@ func init() {
 	listCmd.Flags().String("sort", "id", "sort field (id, status, priority, created, updated, due)")
 	listCmd.Flags().BoolP("reverse", "r", false, "reverse sort order")
 	listCmd.Flags().IntP("limit", "n", 0, "limit number of results")
+	listCmd.Flags().Bool("blocked", false, "show only blocked tasks")
+	listCmd.Flags().Bool("not-blocked", false, "show only non-blocked tasks")
 	rootCmd.AddCommand(listCmd)
 }
 
@@ -40,14 +42,26 @@ func runList(cmd *cobra.Command, _ []string) error {
 	sortBy, _ := cmd.Flags().GetString("sort")
 	reverse, _ := cmd.Flags().GetBool("reverse")
 	limit, _ := cmd.Flags().GetInt("limit")
+	blocked, _ := cmd.Flags().GetBool("blocked")
+	notBlocked, _ := cmd.Flags().GetBool("not-blocked")
+
+	filter := board.FilterOptions{
+		Statuses:   statuses,
+		Priorities: priorities,
+		Assignee:   assignee,
+		Tag:        tag,
+	}
+
+	if blocked {
+		v := true
+		filter.Blocked = &v
+	} else if notBlocked {
+		v := false
+		filter.Blocked = &v
+	}
 
 	opts := board.ListOptions{
-		Filter: board.FilterOptions{
-			Statuses:   statuses,
-			Priorities: priorities,
-			Assignee:   assignee,
-			Tag:        tag,
-		},
+		Filter:  filter,
 		SortBy:  sortBy,
 		Reverse: reverse,
 		Limit:   limit,

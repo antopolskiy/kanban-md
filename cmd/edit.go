@@ -35,6 +35,8 @@ func init() {
 	editCmd.Flags().Bool("clear-due", false, "clear due date")
 	editCmd.Flags().String("estimate", "", "new time estimate")
 	editCmd.Flags().String("body", "", "new body text")
+	editCmd.Flags().String("block", "", "mark task as blocked with reason")
+	editCmd.Flags().Bool("unblock", false, "clear blocked state")
 	rootCmd.AddCommand(editCmd)
 }
 
@@ -123,6 +125,37 @@ func applyEditFlags(cmd *cobra.Command, t *task.Task, cfg *config.Config) (bool,
 		t.Assignee = v
 		changed = true
 	}
+	tagDueChanged, err := applyTagDueFlags(cmd, t)
+	if err != nil {
+		return false, err
+	}
+	if tagDueChanged {
+		changed = true
+	}
+
+	if v, _ := cmd.Flags().GetString("estimate"); v != "" {
+		t.Estimate = v
+		changed = true
+	}
+	if v, _ := cmd.Flags().GetString("body"); v != "" {
+		t.Body = v
+		changed = true
+	}
+
+	blockChanged, err := applyBlockFlags(cmd, t)
+	if err != nil {
+		return false, err
+	}
+	if blockChanged {
+		changed = true
+	}
+
+	return changed, nil
+}
+
+func applyTagDueFlags(cmd *cobra.Command, t *task.Task) (bool, error) {
+	changed := false
+
 	if v, _ := cmd.Flags().GetStringSlice("add-tag"); len(v) > 0 {
 		t.Tags = appendUnique(t.Tags, v...)
 		changed = true
@@ -143,16 +176,32 @@ func applyEditFlags(cmd *cobra.Command, t *task.Task, cfg *config.Config) (bool,
 		t.Due = nil
 		changed = true
 	}
-	if v, _ := cmd.Flags().GetString("estimate"); v != "" {
-		t.Estimate = v
-		changed = true
-	}
-	if v, _ := cmd.Flags().GetString("body"); v != "" {
-		t.Body = v
-		changed = true
-	}
 
 	return changed, nil
+}
+
+func applyBlockFlags(cmd *cobra.Command, t *task.Task) (bool, error) {
+	blockReason, _ := cmd.Flags().GetString("block")
+	unblock, _ := cmd.Flags().GetBool("unblock")
+	blockSet := cmd.Flags().Changed("block")
+
+	if blockSet && unblock {
+		return false, errors.New("cannot use --block and --unblock together")
+	}
+	if blockSet {
+		if blockReason == "" {
+			return false, errors.New("block reason is required (use --block REASON)")
+		}
+		t.Blocked = true
+		t.BlockReason = blockReason
+		return true, nil
+	}
+	if unblock {
+		t.Blocked = false
+		t.BlockReason = ""
+		return true, nil
+	}
+	return false, nil
 }
 
 func appendUnique(slice []string, items ...string) []string {

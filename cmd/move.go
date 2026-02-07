@@ -3,11 +3,13 @@ package cmd
 import (
 	"errors"
 	"fmt"
+	"os"
 	"strconv"
 	"time"
 
 	"github.com/spf13/cobra"
 
+	"github.com/antopolskiy/kanban-md/internal/config"
 	"github.com/antopolskiy/kanban-md/internal/output"
 	"github.com/antopolskiy/kanban-md/internal/task"
 )
@@ -48,36 +50,19 @@ func runMove(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	next, _ := cmd.Flags().GetBool("next")
-	prev, _ := cmd.Flags().GetBool("prev")
-
-	var newStatus string
-
-	switch {
-	case len(args) == 2: //nolint:mnd // positional arg
-		newStatus = args[1]
-		if err := task.ValidateStatus(newStatus, cfg.Statuses); err != nil {
-			return err
-		}
-	case next:
-		idx := cfg.StatusIndex(t.Status)
-		if idx < 0 || idx >= len(cfg.Statuses)-1 {
-			return fmt.Errorf("task #%d is already at the last status (%s)", id, t.Status)
-		}
-		newStatus = cfg.Statuses[idx+1]
-	case prev:
-		idx := cfg.StatusIndex(t.Status)
-		if idx <= 0 {
-			return fmt.Errorf("task #%d is already at the first status (%s)", id, t.Status)
-		}
-		newStatus = cfg.Statuses[idx-1]
-	default:
-		return errors.New("provide a target status or use --next/--prev")
+	newStatus, err := resolveTargetStatus(cmd, args, t, cfg)
+	if err != nil {
+		return err
 	}
 
 	// Idempotent: if already at target status, succeed without writing.
 	if t.Status == newStatus {
 		return outputMoveResult(t, false)
+	}
+
+	// Warn when moving a blocked task.
+	if t.Blocked {
+		fmt.Fprintf(os.Stderr, "Warning: task #%d is blocked (%s)\n", t.ID, t.BlockReason)
 	}
 
 	oldStatus := t.Status
@@ -94,6 +79,34 @@ func runMove(cmd *cobra.Command, args []string) error {
 
 	output.Messagef("Moved task #%d: %s → %s", id, oldStatus, newStatus)
 	return nil
+}
+
+func resolveTargetStatus(cmd *cobra.Command, args []string, t *task.Task, cfg *config.Config) (string, error) {
+	next, _ := cmd.Flags().GetBool("next")
+	prev, _ := cmd.Flags().GetBool("prev")
+
+	switch {
+	case len(args) == 2: //nolint:mnd // positional arg
+		status := args[1]
+		if err := task.ValidateStatus(status, cfg.Statuses); err != nil {
+			return "", err
+		}
+		return status, nil
+	case next:
+		idx := cfg.StatusIndex(t.Status)
+		if idx < 0 || idx >= len(cfg.Statuses)-1 {
+			return "", fmt.Errorf("task #%d is already at the last status (%s)", t.ID, t.Status)
+		}
+		return cfg.Statuses[idx+1], nil
+	case prev:
+		idx := cfg.StatusIndex(t.Status)
+		if idx <= 0 {
+			return "", fmt.Errorf("task #%d is already at the first status (%s)", t.ID, t.Status)
+		}
+		return cfg.Statuses[idx-1], nil
+	default:
+		return "", errors.New("provide a target status or use --next/--prev")
+	}
 }
 
 // moveResult wraps a task with a changed flag for JSON output.

@@ -1058,6 +1058,138 @@ func TestTextOutput(t *testing.T) {
 	}
 }
 
+// ---------------------------------------------------------------------------
+// Blocked state tests
+// ---------------------------------------------------------------------------
+
+func TestBlockTask(t *testing.T) {
+	kanbanDir := initBoard(t)
+	mustCreateTask(t, kanbanDir, "Blockable task")
+
+	var task taskJSON
+	runKanbanJSON(t, kanbanDir, &task, "edit", "1", "--block", "waiting for API")
+
+	// Verify via show.
+	var shown struct {
+		taskJSON
+		Blocked     bool   `json:"blocked"`
+		BlockReason string `json:"block_reason"`
+	}
+	runKanbanJSON(t, kanbanDir, &shown, "show", "1")
+	if !shown.Blocked {
+		t.Error("Blocked = false, want true")
+	}
+	if shown.BlockReason != "waiting for API" {
+		t.Errorf("BlockReason = %q, want %q", shown.BlockReason, "waiting for API")
+	}
+}
+
+func TestUnblockTask(t *testing.T) {
+	kanbanDir := initBoard(t)
+	mustCreateTask(t, kanbanDir, "Unblockable")
+
+	// Block first.
+	runKanban(t, kanbanDir, "--json", "edit", "1", "--block", "stuck")
+
+	// Unblock.
+	runKanban(t, kanbanDir, "--json", "edit", "1", "--unblock")
+
+	var shown struct {
+		taskJSON
+		Blocked     bool   `json:"blocked"`
+		BlockReason string `json:"block_reason"`
+	}
+	runKanbanJSON(t, kanbanDir, &shown, "show", "1")
+	if shown.Blocked {
+		t.Error("Blocked = true after unblock, want false")
+	}
+	if shown.BlockReason != "" {
+		t.Errorf("BlockReason = %q after unblock, want empty", shown.BlockReason)
+	}
+}
+
+func TestBlockRequiresReason(t *testing.T) {
+	kanbanDir := initBoard(t)
+	mustCreateTask(t, kanbanDir, "No reason")
+
+	r := runKanban(t, kanbanDir, "--json", "edit", "1", "--block", "")
+	if r.exitCode == 0 {
+		t.Error("expected non-zero exit for empty block reason")
+	}
+	if !strings.Contains(r.stderr, "block reason is required") {
+		t.Errorf("stderr = %q, want 'block reason is required'", r.stderr)
+	}
+}
+
+func TestBlockAndUnblockConflict(t *testing.T) {
+	kanbanDir := initBoard(t)
+	mustCreateTask(t, kanbanDir, "Conflict")
+
+	r := runKanban(t, kanbanDir, "--json", "edit", "1", "--block", "reason", "--unblock")
+	if r.exitCode == 0 {
+		t.Error("expected non-zero exit for --block + --unblock")
+	}
+	if !strings.Contains(r.stderr, "cannot use --block and --unblock together") {
+		t.Errorf("stderr = %q, want conflict message", r.stderr)
+	}
+}
+
+func TestListBlocked(t *testing.T) {
+	kanbanDir := initBoard(t)
+	mustCreateTask(t, kanbanDir, "Normal task")
+	mustCreateTask(t, kanbanDir, "Blocked task")
+	runKanban(t, kanbanDir, "--json", "edit", "2", "--block", "stuck on dep")
+
+	var tasks []struct {
+		taskJSON
+		Blocked bool `json:"blocked"`
+	}
+	runKanbanJSON(t, kanbanDir, &tasks, "list", "--blocked")
+	if len(tasks) != 1 {
+		t.Fatalf("got %d blocked tasks, want 1", len(tasks))
+	}
+	if tasks[0].ID != 2 {
+		t.Errorf("blocked task ID = %d, want 2", tasks[0].ID)
+	}
+}
+
+func TestListNotBlocked(t *testing.T) {
+	kanbanDir := initBoard(t)
+	mustCreateTask(t, kanbanDir, "Normal task")
+	mustCreateTask(t, kanbanDir, "Blocked task")
+	runKanban(t, kanbanDir, "--json", "edit", "2", "--block", "stuck")
+
+	var tasks []struct {
+		taskJSON
+		Blocked bool `json:"blocked"`
+	}
+	runKanbanJSON(t, kanbanDir, &tasks, "list", "--not-blocked")
+	if len(tasks) != 1 {
+		t.Fatalf("got %d not-blocked tasks, want 1", len(tasks))
+	}
+	if tasks[0].ID != 1 {
+		t.Errorf("not-blocked task ID = %d, want 1", tasks[0].ID)
+	}
+}
+
+func TestMoveBlockedTaskWarns(t *testing.T) {
+	kanbanDir := initBoard(t)
+	mustCreateTask(t, kanbanDir, "Blocked mover")
+	runKanban(t, kanbanDir, "--json", "edit", "1", "--block", "waiting")
+
+	r := runKanban(t, kanbanDir, "--json", "move", "1", "todo")
+	if r.exitCode != 0 {
+		t.Fatalf("exit code = %d, want 0 (move should succeed)", r.exitCode)
+	}
+	if !strings.Contains(r.stderr, "Warning") || !strings.Contains(r.stderr, "blocked") {
+		t.Errorf("stderr = %q, want warning about blocked task", r.stderr)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Slug / output tests
+// ---------------------------------------------------------------------------
+
 func TestLongTitleSlugTruncation(t *testing.T) {
 	kanbanDir := initBoard(t)
 
