@@ -40,4 +40,4 @@ dist/
 .envrc
 
 # Local kanban board (used for dogfooding during development)
-kanban/
+/kanban/
