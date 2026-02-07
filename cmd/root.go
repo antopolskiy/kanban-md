@@ -9,6 +9,7 @@ import (
 
 	"github.com/antopolskiy/kanban-md/internal/config"
 	"github.com/antopolskiy/kanban-md/internal/output"
+	"github.com/antopolskiy/kanban-md/internal/task"
 )
 
 // version is set at build time via ldflags.
@@ -73,6 +74,19 @@ func loadConfig() (*config.Config, error) {
 // outputFormat returns the detected output format from flags/env/TTY.
 func outputFormat() output.Format {
 	return output.Detect(flagJSON, flagTable)
+}
+
+// validateDepIDs checks that all dependency IDs exist and none are self-referencing.
+func validateDepIDs(tasksDir string, selfID int, ids []int) error {
+	for _, depID := range ids {
+		if depID == selfID {
+			return fmt.Errorf("task cannot depend on itself (ID %d)", depID)
+		}
+		if _, err := task.FindByID(tasksDir, depID); err != nil {
+			return fmt.Errorf("dependency task #%d not found", depID)
+		}
+	}
+	return nil
 }
 
 // checkWIPLimit verifies that adding a task to targetStatus would not exceed

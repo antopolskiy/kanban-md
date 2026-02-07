@@ -11,6 +11,7 @@ import (
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
 
+	"github.com/antopolskiy/kanban-md/internal/board"
 	"github.com/antopolskiy/kanban-md/internal/output"
 	"github.com/antopolskiy/kanban-md/internal/task"
 )
@@ -50,6 +51,9 @@ func runDelete(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	// Warn if other tasks reference this one as a dependency or parent.
+	warnDependents(cfg.TasksPath(), t.ID)
+
 	force, _ := cmd.Flags().GetBool("force")
 
 	// Require confirmation in TTY mode unless --force.
@@ -82,4 +86,11 @@ func runDelete(cmd *cobra.Command, args []string) error {
 
 	output.Messagef("Deleted task #%d: %s", t.ID, t.Title)
 	return nil
+}
+
+func warnDependents(tasksDir string, id int) {
+	dependents := board.FindDependents(tasksDir, id)
+	for _, msg := range dependents {
+		fmt.Fprintf(os.Stderr, "Warning: %s\n", msg)
+	}
 }

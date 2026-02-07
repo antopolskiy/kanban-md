@@ -150,6 +150,28 @@ func TestStatusIndex(t *testing.T) {
 	}
 }
 
+func TestIsTerminalStatus(t *testing.T) {
+	cfg := NewDefault("Test")
+	// Default statuses: [backlog, todo, in-progress, review, done]
+	if !cfg.IsTerminalStatus("done") {
+		t.Error("IsTerminalStatus('done') = false, want true")
+	}
+	if cfg.IsTerminalStatus("backlog") {
+		t.Error("IsTerminalStatus('backlog') = true, want false")
+	}
+	if cfg.IsTerminalStatus("nonexistent") {
+		t.Error("IsTerminalStatus('nonexistent') = true, want false")
+	}
+}
+
+func TestIsTerminalStatusEmptyStatuses(t *testing.T) {
+	cfg := NewDefault("Test")
+	cfg.Statuses = nil
+	if cfg.IsTerminalStatus("done") {
+		t.Error("IsTerminalStatus with empty statuses should return false")
+	}
+}
+
 func TestPriorityIndex(t *testing.T) {
 	cfg := NewDefault("Test")
 	if idx := cfg.PriorityIndex("high"); idx != 2 {

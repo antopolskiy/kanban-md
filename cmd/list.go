@@ -26,6 +26,8 @@ func init() {
 	listCmd.Flags().IntP("limit", "n", 0, "limit number of results")
 	listCmd.Flags().Bool("blocked", false, "show only blocked tasks")
 	listCmd.Flags().Bool("not-blocked", false, "show only non-blocked tasks")
+	listCmd.Flags().Int("parent", 0, "filter by parent task ID")
+	listCmd.Flags().Bool("unblocked", false, "show only tasks with all dependencies satisfied")
 	rootCmd.AddCommand(listCmd)
 }
 
@@ -44,6 +46,8 @@ func runList(cmd *cobra.Command, _ []string) error {
 	limit, _ := cmd.Flags().GetInt("limit")
 	blocked, _ := cmd.Flags().GetBool("blocked")
 	notBlocked, _ := cmd.Flags().GetBool("not-blocked")
+	parentID, _ := cmd.Flags().GetInt("parent")
+	unblocked, _ := cmd.Flags().GetBool("unblocked")
 
 	filter := board.FilterOptions{
 		Statuses:   statuses,
@@ -60,11 +64,16 @@ func runList(cmd *cobra.Command, _ []string) error {
 		filter.Blocked = &v
 	}
 
+	if cmd.Flags().Changed("parent") {
+		filter.ParentID = &parentID
+	}
+
 	opts := board.ListOptions{
-		Filter:  filter,
-		SortBy:  sortBy,
-		Reverse: reverse,
-		Limit:   limit,
+		Filter:    filter,
+		SortBy:    sortBy,
+		Reverse:   reverse,
+		Limit:     limit,
+		Unblocked: unblocked,
 	}
 
 	tasks, err := board.List(cfg, opts)

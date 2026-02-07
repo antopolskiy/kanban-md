@@ -863,6 +863,211 @@ func TestInitWithWIPLimits(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
+// Dependency tests
+// ---------------------------------------------------------------------------
+
+func TestCreateWithParent(t *testing.T) {
+	kanbanDir := initBoard(t)
+	mustCreateTask(t, kanbanDir, "Parent task")
+
+	var child map[string]interface{}
+	r := runKanbanJSON(t, kanbanDir, &child, "create", "Child task", "--parent", "1")
+	if r.exitCode != 0 {
+		t.Fatalf("create with parent failed: %s", r.stderr)
+	}
+	if child["parent"] != float64(1) {
+		t.Errorf("parent = %v, want 1", child["parent"])
+	}
+}
+
+func TestCreateWithDependsOn(t *testing.T) {
+	kanbanDir := initBoard(t)
+	mustCreateTask(t, kanbanDir, "Dep A")
+	mustCreateTask(t, kanbanDir, "Dep B")
+
+	var child map[string]interface{}
+	r := runKanbanJSON(t, kanbanDir, &child, "create", "Dependent", "--depends-on", "1,2")
+	if r.exitCode != 0 {
+		t.Fatalf("create with depends-on failed: %s", r.stderr)
+	}
+	deps, ok := child["depends_on"].([]interface{})
+	if !ok || len(deps) != 2 {
+		t.Errorf("depends_on = %v, want [1,2]", child["depends_on"])
+	}
+}
+
+func TestCreateSelfDepErrors(t *testing.T) {
+	kanbanDir := initBoard(t)
+	// Task 1 will be created, then try to create task 2 depending on itself (ID 2).
+	mustCreateTask(t, kanbanDir, "Existing task")
+
+	// Next ID is 2. --depends-on 2 is self-reference.
+	r := runKanban(t, kanbanDir, "--json", "create", "Self dep", "--depends-on", "2")
+	if r.exitCode == 0 {
+		t.Error("expected error for self-dependency")
+	}
+	if !strings.Contains(r.stderr, "depend on itself") {
+		t.Errorf("stderr = %q, want self-dep error", r.stderr)
+	}
+}
+
+func TestCreateInvalidDepErrors(t *testing.T) {
+	kanbanDir := initBoard(t)
+
+	r := runKanban(t, kanbanDir, "--json", "create", "Bad dep", "--depends-on", "99")
+	if r.exitCode == 0 {
+		t.Error("expected error for invalid dependency ID")
+	}
+	if !strings.Contains(r.stderr, "not found") {
+		t.Errorf("stderr = %q, want 'not found'", r.stderr)
+	}
+}
+
+func TestEditAddDep(t *testing.T) {
+	kanbanDir := initBoard(t)
+	mustCreateTask(t, kanbanDir, "Task A")
+	mustCreateTask(t, kanbanDir, "Task B")
+
+	var edited map[string]interface{}
+	r := runKanbanJSON(t, kanbanDir, &edited, "edit", "2", "--add-dep", "1")
+	if r.exitCode != 0 {
+		t.Fatalf("edit add-dep failed: %s", r.stderr)
+	}
+	deps, ok := edited["depends_on"].([]interface{})
+	if !ok || len(deps) != 1 || deps[0] != float64(1) {
+		t.Errorf("depends_on = %v, want [1]", edited["depends_on"])
+	}
+}
+
+func TestEditRemoveDep(t *testing.T) {
+	kanbanDir := initBoard(t)
+	mustCreateTask(t, kanbanDir, "Task A")
+	mustCreateTask(t, kanbanDir, "Task B", "--depends-on", "1")
+
+	var edited map[string]interface{}
+	r := runKanbanJSON(t, kanbanDir, &edited, "edit", "2", "--remove-dep", "1")
+	if r.exitCode != 0 {
+		t.Fatalf("edit remove-dep failed: %s", r.stderr)
+	}
+	// depends_on should be empty or absent.
+	deps, _ := edited["depends_on"].([]interface{})
+	if len(deps) != 0 {
+		t.Errorf("depends_on = %v, want empty", edited["depends_on"])
+	}
+}
+
+func TestEditSetParent(t *testing.T) {
+	kanbanDir := initBoard(t)
+	mustCreateTask(t, kanbanDir, "Parent")
+	mustCreateTask(t, kanbanDir, "Child")
+
+	var edited map[string]interface{}
+	r := runKanbanJSON(t, kanbanDir, &edited, "edit", "2", "--parent", "1")
+	if r.exitCode != 0 {
+		t.Fatalf("edit set parent failed: %s", r.stderr)
+	}
+	if edited["parent"] != float64(1) {
+		t.Errorf("parent = %v, want 1", edited["parent"])
+	}
+}
+
+func TestEditClearParent(t *testing.T) {
+	kanbanDir := initBoard(t)
+	mustCreateTask(t, kanbanDir, "Parent")
+	mustCreateTask(t, kanbanDir, "Child", "--parent", "1")
+
+	var edited map[string]interface{}
+	r := runKanbanJSON(t, kanbanDir, &edited, "edit", "2", "--clear-parent")
+	if r.exitCode != 0 {
+		t.Fatalf("edit clear parent failed: %s", r.stderr)
+	}
+	if edited["parent"] != nil {
+		t.Errorf("parent = %v, want nil", edited["parent"])
+	}
+}
+
+func TestEditSelfDepErrors(t *testing.T) {
+	kanbanDir := initBoard(t)
+	mustCreateTask(t, kanbanDir, "Task")
+
+	r := runKanban(t, kanbanDir, "--json", "edit", "1", "--add-dep", "1")
+	if r.exitCode == 0 {
+		t.Error("expected error for self-dependency on edit")
+	}
+	if !strings.Contains(r.stderr, "depend on itself") {
+		t.Errorf("stderr = %q, want self-dep error", r.stderr)
+	}
+}
+
+func TestListByParent(t *testing.T) {
+	kanbanDir := initBoard(t)
+	mustCreateTask(t, kanbanDir, "Parent")
+	mustCreateTask(t, kanbanDir, "Child A", "--parent", "1")
+	mustCreateTask(t, kanbanDir, "Child B", "--parent", "1")
+	mustCreateTask(t, kanbanDir, "Orphan")
+
+	var tasks []map[string]interface{}
+	r := runKanbanJSON(t, kanbanDir, &tasks, "list", "--parent", "1")
+	if r.exitCode != 0 {
+		t.Fatalf("list --parent failed: %s", r.stderr)
+	}
+	if len(tasks) != 2 {
+		t.Errorf("got %d tasks, want 2 with parent 1", len(tasks))
+	}
+}
+
+func TestListUnblocked(t *testing.T) {
+	kanbanDir := initBoard(t)
+	mustCreateTask(t, kanbanDir, "Dep task")                          // #1
+	mustCreateTask(t, kanbanDir, "Depends on 1", "--depends-on", "1") // #2
+	mustCreateTask(t, kanbanDir, "No deps")                           // #3
+
+	// Task 1 is in backlog (not done), so task 2 is blocked by deps.
+	var tasks []map[string]interface{}
+	r := runKanbanJSON(t, kanbanDir, &tasks, "list", "--unblocked")
+	if r.exitCode != 0 {
+		t.Fatalf("list --unblocked failed: %s", r.stderr)
+	}
+	// Only tasks 1 and 3 should appear (no unsatisfied deps).
+	if len(tasks) != 2 {
+		t.Errorf("got %d unblocked tasks, want 2", len(tasks))
+	}
+}
+
+func TestListUnblockedAfterDepDone(t *testing.T) {
+	kanbanDir := initBoard(t)
+	mustCreateTask(t, kanbanDir, "Dep task")                          // #1
+	mustCreateTask(t, kanbanDir, "Depends on 1", "--depends-on", "1") // #2
+
+	// Move dep to done.
+	runKanban(t, kanbanDir, "--json", "move", "1", "done")
+
+	var tasks []map[string]interface{}
+	r := runKanbanJSON(t, kanbanDir, &tasks, "list", "--unblocked")
+	if r.exitCode != 0 {
+		t.Fatalf("list --unblocked failed: %s", r.stderr)
+	}
+	// Both tasks should now be unblocked.
+	if len(tasks) != 2 {
+		t.Errorf("got %d unblocked tasks, want 2 (dep satisfied)", len(tasks))
+	}
+}
+
+func TestDeleteWithDependentsWarns(t *testing.T) {
+	kanbanDir := initBoard(t)
+	mustCreateTask(t, kanbanDir, "Dep task")                          // #1
+	mustCreateTask(t, kanbanDir, "Depends on 1", "--depends-on", "1") // #2
+
+	r := runKanban(t, kanbanDir, "--json", "delete", "1", "--force")
+	if r.exitCode != 0 {
+		t.Fatalf("delete failed: %s", r.stderr)
+	}
+	if !strings.Contains(r.stderr, "depends on this task") {
+		t.Errorf("stderr = %q, want dependent warning", r.stderr)
+	}
+}
+
+// ---------------------------------------------------------------------------
 // Delete tests
 // ---------------------------------------------------------------------------
 

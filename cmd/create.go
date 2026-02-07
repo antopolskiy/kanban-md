@@ -30,6 +30,8 @@ func init() {
 	createCmd.Flags().StringSlice("tags", nil, "comma-separated tags")
 	createCmd.Flags().String("due", "", "due date (YYYY-MM-DD)")
 	createCmd.Flags().String("estimate", "", "time estimate (e.g. 4h, 2d)")
+	createCmd.Flags().Int("parent", 0, "parent task ID")
+	createCmd.Flags().IntSlice("depends-on", nil, "dependency task IDs (comma-separated)")
 	createCmd.Flags().String("body", "", "task body (markdown)")
 	rootCmd.AddCommand(createCmd)
 }
@@ -53,6 +55,11 @@ func runCreate(cmd *cobra.Command, args []string) error {
 	}
 
 	if err := applyCreateFlags(cmd, t, cfg); err != nil {
+		return err
+	}
+
+	// Validate dependency references.
+	if err := validateCreateDeps(cfg, t); err != nil {
 		return err
 	}
 
@@ -123,8 +130,29 @@ func applyCreateFlags(cmd *cobra.Command, t *task.Task, cfg *config.Config) erro
 	if v, _ := cmd.Flags().GetString("estimate"); v != "" {
 		t.Estimate = v
 	}
+	if cmd.Flags().Changed("parent") {
+		v, _ := cmd.Flags().GetInt("parent")
+		t.Parent = &v
+	}
+	if v, _ := cmd.Flags().GetIntSlice("depends-on"); len(v) > 0 {
+		t.DependsOn = v
+	}
 	if v, _ := cmd.Flags().GetString("body"); v != "" {
 		t.Body = v
+	}
+	return nil
+}
+
+func validateCreateDeps(cfg *config.Config, t *task.Task) error {
+	if t.Parent != nil {
+		if err := validateDepIDs(cfg.TasksPath(), t.ID, []int{*t.Parent}); err != nil {
+			return fmt.Errorf("invalid parent: %w", err)
+		}
+	}
+	if len(t.DependsOn) > 0 {
+		if err := validateDepIDs(cfg.TasksPath(), t.ID, t.DependsOn); err != nil {
+			return err
+		}
 	}
 	return nil
 }

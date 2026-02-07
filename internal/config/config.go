@@ -211,6 +211,14 @@ func FindDir(startDir string) (string, error) {
 	}
 }
 
+// IsTerminalStatus returns true if the given status is the last in the configured order.
+func (c *Config) IsTerminalStatus(s string) bool {
+	if len(c.Statuses) == 0 {
+		return false
+	}
+	return s == c.Statuses[len(c.Statuses)-1]
+}
+
 // StatusIndex returns the index of a status in the configured order, or -1.
 func (c *Config) StatusIndex(status string) int {
 	return indexOf(c.Statuses, status)

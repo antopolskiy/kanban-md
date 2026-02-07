@@ -35,6 +35,10 @@ func init() {
 	editCmd.Flags().Bool("clear-due", false, "clear due date")
 	editCmd.Flags().String("estimate", "", "new time estimate")
 	editCmd.Flags().String("body", "", "new body text")
+	editCmd.Flags().Int("parent", 0, "set parent task ID")
+	editCmd.Flags().Bool("clear-parent", false, "clear parent")
+	editCmd.Flags().IntSlice("add-dep", nil, "add dependency task IDs")
+	editCmd.Flags().IntSlice("remove-dep", nil, "remove dependency task IDs")
 	editCmd.Flags().String("block", "", "mark task as blocked with reason")
 	editCmd.Flags().Bool("unblock", false, "clear blocked state")
 	rootCmd.AddCommand(editCmd)
@@ -69,6 +73,11 @@ func runEdit(cmd *cobra.Command, args []string) error {
 	}
 	if !changed {
 		return errors.New("no changes specified")
+	}
+
+	// Validate dependency references.
+	if err := validateEditDeps(cfg, t); err != nil {
+		return err
 	}
 
 	// Check WIP limit if status changed.
@@ -150,6 +159,14 @@ func applyEditFlags(cmd *cobra.Command, t *task.Task, cfg *config.Config) (bool,
 		changed = true
 	}
 
+	depChanged, err := applyDepFlags(cmd, t)
+	if err != nil {
+		return false, err
+	}
+	if depChanged {
+		changed = true
+	}
+
 	blockChanged, err := applyBlockFlags(cmd, t)
 	if err != nil {
 		return false, err
@@ -186,6 +203,65 @@ func applyTagDueFlags(cmd *cobra.Command, t *task.Task) (bool, error) {
 	}
 
 	return changed, nil
+}
+
+func applyDepFlags(cmd *cobra.Command, t *task.Task) (bool, error) {
+	changed := false
+
+	parentSet := cmd.Flags().Changed("parent")
+	clearParent, _ := cmd.Flags().GetBool("clear-parent")
+
+	if parentSet && clearParent {
+		return false, errors.New("cannot use --parent and --clear-parent together")
+	}
+	if parentSet {
+		v, _ := cmd.Flags().GetInt("parent")
+		t.Parent = &v
+		changed = true
+	}
+	if clearParent {
+		t.Parent = nil
+		changed = true
+	}
+
+	if v, _ := cmd.Flags().GetIntSlice("add-dep"); len(v) > 0 {
+		t.DependsOn = appendUniqueInts(t.DependsOn, v...)
+		changed = true
+	}
+	if v, _ := cmd.Flags().GetIntSlice("remove-dep"); len(v) > 0 {
+		t.DependsOn = removeInts(t.DependsOn, v...)
+		changed = true
+	}
+
+	return changed, nil
+}
+
+func appendUniqueInts(slice []int, items ...int) []int {
+	seen := make(map[int]bool, len(slice))
+	for _, v := range slice {
+		seen[v] = true
+	}
+	for _, item := range items {
+		if !seen[item] {
+			slice = append(slice, item)
+			seen[item] = true
+		}
+	}
+	return slice
+}
+
+func removeInts(slice []int, items ...int) []int {
+	remove := make(map[int]bool, len(items))
+	for _, item := range items {
+		remove[item] = true
+	}
+	result := make([]int, 0, len(slice))
+	for _, v := range slice {
+		if !remove[v] {
+			result = append(result, v)
+		}
+	}
+	return result
 }
 
 func applyBlockFlags(cmd *cobra.Command, t *task.Task) (bool, error) {
@@ -238,4 +314,18 @@ func removeAll(slice []string, items ...string) []string {
 		}
 	}
 	return result
+}
+
+func validateEditDeps(cfg *config.Config, t *task.Task) error {
+	if t.Parent != nil {
+		if err := validateDepIDs(cfg.TasksPath(), t.ID, []int{*t.Parent}); err != nil {
+			return fmt.Errorf("invalid parent: %w", err)
+		}
+	}
+	if len(t.DependsOn) > 0 {
+		if err := validateDepIDs(cfg.TasksPath(), t.ID, t.DependsOn); err != nil {
+			return err
+		}
+	}
+	return nil
 }
