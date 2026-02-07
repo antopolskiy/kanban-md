@@ -75,6 +75,11 @@ func runMove(cmd *cobra.Command, args []string) error {
 		return errors.New("provide a target status or use --next/--prev")
 	}
 
+	// Idempotent: if already at target status, succeed without writing.
+	if t.Status == newStatus {
+		return outputMoveResult(t, false)
+	}
+
 	oldStatus := t.Status
 	t.Status = newStatus
 	t.Updated = time.Now()
@@ -83,11 +88,27 @@ func runMove(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("writing task: %w", err)
 	}
 
-	format := outputFormat()
-	if format == output.FormatJSON {
-		return output.JSON(t)
+	if outputFormat() == output.FormatJSON {
+		return outputMoveResult(t, true)
 	}
 
 	output.Messagef("Moved task #%d: %s → %s", id, oldStatus, newStatus)
+	return nil
+}
+
+// moveResult wraps a task with a changed flag for JSON output.
+type moveResult struct {
+	*task.Task
+	Changed bool `json:"changed"`
+}
+
+func outputMoveResult(t *task.Task, changed bool) error {
+	format := outputFormat()
+	if format == output.FormatJSON {
+		return output.JSON(moveResult{Task: t, Changed: changed})
+	}
+	if !changed {
+		output.Messagef("Task #%d is already at %s", t.ID, t.Status)
+	}
 	return nil
 }

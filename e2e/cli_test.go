@@ -689,6 +689,60 @@ func TestMoveNoStatusSpecified(t *testing.T) {
 	}
 }
 
+func TestMoveIdempotentJSON(t *testing.T) {
+	kanbanDir := initBoard(t)
+	mustCreateTask(t, kanbanDir, "Idempotent task") // starts at "backlog"
+
+	// Move to same status should succeed with changed=false.
+	var got struct {
+		taskJSON
+		Changed bool `json:"changed"`
+	}
+	r := runKanbanJSON(t, kanbanDir, &got, "move", "1", "backlog")
+	if r.exitCode != 0 {
+		t.Fatalf("exit code = %d, want 0\nstderr: %s", r.exitCode, r.stderr)
+	}
+	if got.Changed {
+		t.Error("Changed = true, want false for same-status move")
+	}
+	if got.Status != "backlog" {
+		t.Errorf("Status = %q, want %q", got.Status, "backlog")
+	}
+}
+
+func TestMoveIdempotentHumanOutput(t *testing.T) {
+	kanbanDir := initBoard(t)
+	mustCreateTask(t, kanbanDir, "Idempotent human") // starts at "backlog"
+
+	r := runKanban(t, kanbanDir, "--table", "move", "1", "backlog")
+	if r.exitCode != 0 {
+		t.Fatalf("exit code = %d, want 0\nstderr: %s", r.exitCode, r.stderr)
+	}
+	if !strings.Contains(r.stdout, "already at") {
+		t.Errorf("stdout = %q, want 'already at'", r.stdout)
+	}
+}
+
+func TestMoveChangedTrue(t *testing.T) {
+	kanbanDir := initBoard(t)
+	mustCreateTask(t, kanbanDir, "Changed task") // starts at "backlog"
+
+	var got struct {
+		taskJSON
+		Changed bool `json:"changed"`
+	}
+	r := runKanbanJSON(t, kanbanDir, &got, "move", "1", "todo")
+	if r.exitCode != 0 {
+		t.Fatalf("exit code = %d, want 0\nstderr: %s", r.exitCode, r.stderr)
+	}
+	if !got.Changed {
+		t.Error("Changed = false, want true for status change")
+	}
+	if got.Status != "todo" {
+		t.Errorf("Status = %q, want %q", got.Status, "todo")
+	}
+}
+
 // ---------------------------------------------------------------------------
 // Delete tests
 // ---------------------------------------------------------------------------
