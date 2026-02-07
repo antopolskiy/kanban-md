@@ -75,6 +75,8 @@ func runDelete(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("deleting task file: %w", err)
 	}
 
+	logActivity(cfg, "delete", t.ID, t.Title)
+
 	format := outputFormat()
 	if format == output.FormatJSON {
 		return output.JSON(map[string]interface{}{

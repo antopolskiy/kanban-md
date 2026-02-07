@@ -84,6 +84,8 @@ func runCreate(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("saving config: %w", err)
 	}
 
+	logActivity(cfg, "create", t.ID, t.Title)
+
 	// Output.
 	if outputFormat() == output.FormatJSON {
 		return output.JSON(t)

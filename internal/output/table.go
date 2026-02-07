@@ -179,6 +179,23 @@ func formatOptionalPercent(f *float64) string {
 	return fmt.Sprintf("%.1f%%", *f*percentMultiplier)
 }
 
+// ActivityLogTable renders activity log entries as a formatted table.
+func ActivityLogTable(entries []board.LogEntry) {
+	if len(entries) == 0 {
+		fmt.Fprintln(os.Stderr, "No activity log entries found.")
+		return
+	}
+
+	header := fmt.Sprintf("%-20s %-10s %6s  %s", "TIMESTAMP", "ACTION", "TASK", "DETAIL")
+	fmt.Fprintln(os.Stdout, headerStyle.Render(header))
+
+	for _, e := range entries {
+		fmt.Fprintf(os.Stdout, "%-20s %-10s %6d  %s\n",
+			e.Timestamp.Format("2006-01-02 15:04:05"),
+			e.Action, e.TaskID, e.Detail)
+	}
+}
+
 // Messagef prints a simple formatted message line.
 func Messagef(format string, args ...interface{}) {
 	fmt.Fprintf(os.Stdout, format+"\n", args...)

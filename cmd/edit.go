@@ -71,6 +71,7 @@ func runEdit(cmd *cobra.Command, args []string) error {
 
 	oldTitle := t.Title
 	oldStatus := t.Status
+	wasBlocked := t.Blocked
 	changed, err := applyEditFlags(cmd, t, cfg)
 	if err != nil {
 		return err
@@ -80,37 +81,26 @@ func runEdit(cmd *cobra.Command, args []string) error {
 	}
 
 	// Validate dependency references.
-	if err := validateEditDeps(cfg, t); err != nil {
+	if err = validateEditDeps(cfg, t); err != nil {
 		return err
 	}
 
 	// Check WIP limit if status changed.
 	if t.Status != oldStatus {
-		if err := enforceWIPLimit(cfg, oldStatus, t.Status, false); err != nil {
+		if err = enforceWIPLimit(cfg, oldStatus, t.Status, false); err != nil {
 			return err
 		}
 	}
 
 	t.Updated = time.Now()
 
-	// If title changed, rename the file.
-	newPath := path
-	if t.Title != oldTitle {
-		slug := task.GenerateSlug(t.Title)
-		filename := task.GenerateFilename(t.ID, slug)
-		newPath = filepath.Join(filepath.Dir(path), filename)
+	var newPath string
+	newPath, err = writeAndRename(path, t, oldTitle)
+	if err != nil {
+		return err
 	}
 
-	if err := task.Write(newPath, t); err != nil {
-		return fmt.Errorf("writing task: %w", err)
-	}
-
-	// Remove old file if renamed.
-	if newPath != path {
-		if err := os.Remove(path); err != nil {
-			return fmt.Errorf("removing old file: %w", err)
-		}
-	}
+	logEditActivity(cfg, t, wasBlocked)
 
 	if outputFormat() == output.FormatJSON {
 		t.File = newPath
@@ -119,6 +109,38 @@ func runEdit(cmd *cobra.Command, args []string) error {
 
 	output.Messagef("Updated task #%d: %s", t.ID, t.Title)
 	return nil
+}
+
+// writeAndRename writes the task and renames the file if the title changed.
+func writeAndRename(path string, t *task.Task, oldTitle string) (string, error) {
+	newPath := path
+	if t.Title != oldTitle {
+		slug := task.GenerateSlug(t.Title)
+		filename := task.GenerateFilename(t.ID, slug)
+		newPath = filepath.Join(filepath.Dir(path), filename)
+	}
+
+	if err := task.Write(newPath, t); err != nil {
+		return "", fmt.Errorf("writing task: %w", err)
+	}
+
+	if newPath != path {
+		if err := os.Remove(path); err != nil {
+			return "", fmt.Errorf("removing old file: %w", err)
+		}
+	}
+	return newPath, nil
+}
+
+// logEditActivity logs the edit and any block/unblock transitions.
+func logEditActivity(cfg *config.Config, t *task.Task, wasBlocked bool) {
+	logActivity(cfg, "edit", t.ID, t.Title)
+	if !wasBlocked && t.Blocked {
+		logActivity(cfg, "block", t.ID, t.BlockReason)
+	}
+	if wasBlocked && !t.Blocked {
+		logActivity(cfg, "unblock", t.ID, t.Title)
+	}
 }
 
 func applyEditFlags(cmd *cobra.Command, t *task.Task, cfg *config.Config) (bool, error) {

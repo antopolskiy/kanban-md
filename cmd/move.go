@@ -83,6 +83,8 @@ func runMove(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("writing task: %w", err)
 	}
 
+	logActivity(cfg, "move", id, oldStatus+" -> "+newStatus)
+
 	if outputFormat() == output.FormatJSON {
 		return outputMoveResult(t, true)
 	}

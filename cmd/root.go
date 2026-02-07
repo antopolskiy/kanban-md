@@ -4,9 +4,11 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/spf13/cobra"
 
+	"github.com/antopolskiy/kanban-md/internal/board"
 	"github.com/antopolskiy/kanban-md/internal/config"
 	"github.com/antopolskiy/kanban-md/internal/output"
 	"github.com/antopolskiy/kanban-md/internal/task"
@@ -109,4 +111,18 @@ func checkWIPLimit(cfg *config.Config, statusCounts map[string]int, targetStatus
 		return fmt.Errorf("WIP limit reached for %q (%d/%d)", targetStatus, count, limit)
 	}
 	return nil
+}
+
+// logActivity appends an entry to the activity log. Errors are warned to
+// stderr but never fail the command.
+func logActivity(cfg *config.Config, action string, taskID int, detail string) {
+	entry := board.LogEntry{
+		Timestamp: time.Now(),
+		Action:    action,
+		TaskID:    taskID,
+		Detail:    detail,
+	}
+	if err := board.AppendLog(cfg.Dir(), entry); err != nil {
+		fmt.Fprintf(os.Stderr, "Warning: failed to write activity log: %v\n", err)
+	}
 }
