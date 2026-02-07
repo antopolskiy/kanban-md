@@ -1,6 +1,11 @@
 package cmd
 
-import "github.com/spf13/cobra"
+import (
+	"os"
+	"path/filepath"
+
+	"github.com/spf13/cobra"
+)
 
 var completionCmd = &cobra.Command{
 	Use:   "completion [bash|zsh|fish|powershell]",
@@ -33,6 +38,10 @@ func init() {
 }
 
 func runCompletion(cmd *cobra.Command, args []string) error {
+	// Use the actual binary name so "kbmd completion zsh" generates
+	// completions registered for "kbmd", not "kanban-md".
+	cmd.Root().Use = filepath.Base(os.Args[0])
+
 	switch args[0] {
 	case "bash":
 		return cmd.Root().GenBashCompletionV2(cmd.OutOrStdout(), true)
