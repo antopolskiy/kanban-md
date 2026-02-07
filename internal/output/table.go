@@ -16,6 +16,12 @@ var (
 	dimStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
 )
 
+// DisableColor strips all styling from table output.
+func DisableColor() {
+	headerStyle = lipgloss.NewStyle()
+	dimStyle = lipgloss.NewStyle()
+}
+
 // TaskTable renders a list of tasks as a formatted table.
 func TaskTable(tasks []*task.Task) {
 	if len(tasks) == 0 {

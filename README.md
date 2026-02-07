@@ -31,6 +31,8 @@ brew install antopolskiy/tap/kanban-md
 go install github.com/antopolskiy/kanban-md@latest
 ```
 
+Homebrew also installs `kbmd` as a shorthand alias for `kanban-md`.
+
 ### Binary downloads
 
 Pre-built binaries for macOS, Linux, and Windows are available on the [Releases](https://github.com/antopolskiy/kanban-md/releases/latest) page.
@@ -237,7 +239,7 @@ These work with any command:
 | `--json` | Force JSON output |
 | `--table` | Force table output |
 | `--dir` | Path to kanban directory (overrides auto-detection) |
-| `--no-color` | Disable color output |
+| `--no-color` | Disable color output (also respects `NO_COLOR` env var) |
 
 ### Output format detection
 
@@ -289,6 +291,24 @@ priorities:
   - showstopper
 defaults:
   priority: normal
+```
+
+## Shell completions
+
+Generate completions for your shell:
+
+```bash
+# bash
+source <(kanban-md completion bash)
+
+# zsh
+kanban-md completion zsh > "${fpath[1]}/_kanban-md"
+
+# fish
+kanban-md completion fish | source
+
+# PowerShell
+kanban-md completion powershell | Out-String | Invoke-Expression
 ```
 
 ## Design principles

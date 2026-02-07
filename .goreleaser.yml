@@ -26,6 +26,10 @@ brews:
     homepage: https://github.com/antopolskiy/kanban-md
     description: A file-based Kanban tool powered by Markdown
     license: MIT
+    install: |
+      bin.install "kanban-md"
+      bin.install_symlink bin/"kanban-md" => "kbmd"
+      generate_completions_from_executable(bin/"kanban-md", "completion")
 release:
   github:
   name_template: "{{.Version}}"

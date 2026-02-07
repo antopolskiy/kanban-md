@@ -29,6 +29,11 @@ var rootCmd = &cobra.Command{
 Tasks are stored as individual files with YAML frontmatter, making them
 easy to read, edit, and version-control. Designed for AI agents and humans alike.`,
 	Version: version,
+	PersistentPreRun: func(_ *cobra.Command, _ []string) {
+		if flagNoColor || os.Getenv("NO_COLOR") != "" {
+			output.DisableColor()
+		}
+	},
 }
 
 func init() {
