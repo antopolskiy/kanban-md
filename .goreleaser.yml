@@ -1,0 +1,40 @@
+version: 2
+
+before:
+  hooks:
+    - go mod download
+builds:
+  - env:
+      - CGO_ENABLED=0
+    goos:
+      - darwin
+      - linux
+      - windows
+    goarch:
+      - amd64
+      - arm64
+archives:
+  - format_overrides:
+      - goos: windows
+        formats:
+          - zip
+dockers:
+  - image_templates:
+    - "ghcr.io/santop/kanban-md:latest"
+    - "ghcr.io/santop/kanban-md:{{ .Major }}"
+    - "ghcr.io/santop/kanban-md:{{ .Major }}.{{ .Minor }}"
+    - "ghcr.io/santop/kanban-md:{{ .Major }}.{{ .Minor }}.{{ .Patch }}"
+    build_flag_templates:
+    - "--pull"
+    - "--label=org.opencontainers.image.created={{.Date}}"
+    - "--label=org.opencontainers.image.name={{.ProjectName}}"
+    - "--label=org.opencontainers.image.revision={{.FullCommit}}"
+    - "--label=org.opencontainers.image.version={{.Version}}"
+    - "--label=org.opencontainers.image.source={{.GitURL}}"
+release:
+  github:
+  name_template: "{{.Version}}"
+  prerelease: auto
+  mode: append
+changelog:
+  disable: true
