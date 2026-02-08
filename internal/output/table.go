@@ -3,6 +3,7 @@ package output
 import (
 	"fmt"
 	"io"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -27,7 +28,7 @@ func DisableColor() {
 // TaskTable renders a list of tasks as a formatted table.
 func TaskTable(w io.Writer, tasks []*task.Task) {
 	if len(tasks) == 0 {
-		fmt.Fprintln(w, "No tasks found.")
+		fmt.Fprintln(os.Stderr, "No tasks found.")
 		return
 	}
 
@@ -192,7 +193,7 @@ func formatOptionalPercent(f *float64) string {
 // ActivityLogTable renders activity log entries as a formatted table.
 func ActivityLogTable(w io.Writer, entries []board.LogEntry) {
 	if len(entries) == 0 {
-		fmt.Fprintln(w, "No activity log entries found.")
+		fmt.Fprintln(os.Stderr, "No activity log entries found.")
 		return
 	}
 

@@ -57,6 +57,10 @@ test: ## go test
 test-e2e: ## e2e tests
 	go test $(RACE_OPT) -v ./e2e/
 
+.PHONY: setup-hooks
+setup-hooks: ## install git pre-commit hook
+	git config core.hooksPath .githooks
+
 .PHONY: diff
 diff: ## git diff
 	git diff --exit-code

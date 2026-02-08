@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Ensure Go toolchain and golangci-lint are on PATH.
+export PATH="$HOME/go/bin:$PATH:/usr/local/go/bin"
+
+echo "Running pre-commit checks..."
+make precommit

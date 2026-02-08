@@ -37,11 +37,12 @@ func TestTaskTableWritesToWriter(t *testing.T) {
 	}
 }
 
-func TestTaskTableEmptyWritesToWriter(t *testing.T) {
+func TestTaskTableEmptyWritesNothing(t *testing.T) {
 	var buf strings.Builder
 	TaskTable(&buf, nil)
-	if !strings.Contains(buf.String(), "No tasks found") {
-		t.Errorf("TaskTable empty output = %q", buf.String())
+	// "No tasks found." is written to stderr, not the writer.
+	if buf.String() != "" {
+		t.Errorf("TaskTable empty output to writer = %q, want empty", buf.String())
 	}
 }
 
@@ -385,7 +386,8 @@ func TestActivityLogTable(t *testing.T) {
 func TestActivityLogTableEmpty(t *testing.T) {
 	var buf strings.Builder
 	ActivityLogTable(&buf, nil)
-	if !strings.Contains(buf.String(), "No activity log entries found") {
-		t.Errorf("empty ActivityLogTable = %q", buf.String())
+	// "No activity log entries found." is written to stderr, not the writer.
+	if buf.String() != "" {
+		t.Errorf("ActivityLogTable empty output to writer = %q, want empty", buf.String())
 	}
 }
