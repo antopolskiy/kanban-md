@@ -23,6 +23,57 @@ git tag vX.Y.Z
 git push origin main --tags
 ```
 
+### Release notes
+
+After the release workflow completes, edit the GitHub release with human-written notes (not commit logs). Use `gh release edit` to update the release created by goreleaser.
+
+**Process:**
+
+1. Diff against the previous version to understand what changed:
+   ```
+   git diff vPREVIOUS..vNEW --stat
+   git log vPREVIOUS..vNEW --oneline
+   ```
+2. Write release notes from the user's perspective — what can they do now that they couldn't before?
+3. Publish with `gh release edit vX.Y.Z --title "vX.Y.Z — Short Theme" --notes "..."`.
+
+**Format:**
+
+```markdown
+One to three sentence TL;DR of what this release is about and why users should care.
+
+## New: Feature name
+
+Brief explanation of what it does and why it matters.
+
+\```bash
+# 1-2 practical examples showing real usage
+kanban-md <command> <flags>
+\```
+
+## New: Another feature
+
+...
+
+## Changed: Behavior change
+
+Explain what changed and what users need to know. Include migration notes if applicable.
+
+## Upgrading
+
+Any steps users need to take, or "No action needed" with explanation of auto-migration.
+
+**Full diff:** [`vPREVIOUS...vNEW`](https://github.com/antopolskiy/kanban-md/compare/vPREVIOUS...vNEW)
+```
+
+**Guidelines:**
+- Title format: `vX.Y.Z — Short Theme` (2-5 words capturing the release theme)
+- Start with a short TL;DR paragraph (no heading) summarizing the release for someone skimming
+- Use `## New:` for new commands/features, `## Changed:` for behavior changes, `## Fixed:` for bug fixes
+- Every feature section should include a code example
+- End with `## Upgrading` section and a full diff link
+- Write for users, not developers — focus on what they can do, not what files changed
+
 ## Backward Compatibility
 
 When modifying `config.yml` schema or task file frontmatter, you must ensure backward compatibility:
