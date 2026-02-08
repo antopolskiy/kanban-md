@@ -71,9 +71,14 @@ func TaskTable(tasks []*task.Task) {
 			due = dimStyle.Render(due)
 		}
 
-		fmt.Fprintf(os.Stdout, "%-*d %-*s %-*s %-*s %-*s %-*s %-*s\n",
-			idW, t.ID, statusW, t.Status, prioW, t.Priority,
-			titleW, title, assignW, assignee, tagsW, tags, dueW, due)
+		fmt.Fprintf(os.Stdout, "%-*d %s %s %s %s %s %s\n",
+			idW, t.ID,
+			padRight(t.Status, statusW),
+			padRight(t.Priority, prioW),
+			padRight(title, titleW),
+			padRight(assignee, assignW),
+			padRight(tags, tagsW),
+			padRight(due, dueW))
 	}
 }
 
@@ -129,8 +134,8 @@ func OverviewTable(s board.Overview) {
 		if ss.WIPLimit > 0 {
 			wip = strconv.Itoa(ss.Count) + "/" + strconv.Itoa(ss.WIPLimit)
 		}
-		fmt.Fprintf(os.Stdout, "%-16s %6d %8s %8d %8d\n",
-			ss.Status, ss.Count, wip, ss.Blocked, ss.Overdue)
+		fmt.Fprintf(os.Stdout, "%-16s %6d %s %8d %8d\n",
+			ss.Status, ss.Count, padRight(wip, 8), ss.Blocked, ss.Overdue) //nolint:mnd // column width
 	}
 
 	fmt.Fprintln(os.Stdout)
@@ -220,6 +225,16 @@ func FormatDuration(d time.Duration) string {
 	}
 	minutes := int(d.Minutes()) % 60 //nolint:mnd // 60 minutes per hour
 	return strconv.Itoa(hours) + "h " + strconv.Itoa(minutes) + "m"
+}
+
+// padRight pads s with spaces to the given visible width, accounting for ANSI
+// escape codes that are invisible but consume bytes.
+func padRight(s string, width int) string {
+	visible := lipgloss.Width(s)
+	if visible >= width {
+		return s
+	}
+	return s + strings.Repeat(" ", width-visible)
 }
 
 func stringOrDash(s string) string {
