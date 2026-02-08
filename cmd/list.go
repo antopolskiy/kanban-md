@@ -9,6 +9,7 @@ import (
 
 	"github.com/antopolskiy/kanban-md/internal/board"
 	"github.com/antopolskiy/kanban-md/internal/clierr"
+	"github.com/antopolskiy/kanban-md/internal/config"
 	"github.com/antopolskiy/kanban-md/internal/output"
 	"github.com/antopolskiy/kanban-md/internal/task"
 )
@@ -112,14 +113,22 @@ func runList(cmd *cobra.Command, _ []string) error {
 	printWarnings(warnings)
 
 	if groupBy != "" {
-		grouped := board.GroupBy(tasks, groupBy, cfg)
-		if outputFormat() == output.FormatJSON {
-			return output.JSON(os.Stdout, grouped)
-		}
-		output.GroupedTable(os.Stdout, grouped)
-		return nil
+		return outputGroupedList(tasks, groupBy, cfg)
 	}
 
+	return outputTaskList(tasks)
+}
+
+func outputGroupedList(tasks []*task.Task, groupBy string, cfg *config.Config) error {
+	grouped := board.GroupBy(tasks, groupBy, cfg)
+	if outputFormat() == output.FormatJSON {
+		return output.JSON(os.Stdout, grouped)
+	}
+	output.GroupedTable(os.Stdout, grouped)
+	return nil
+}
+
+func outputTaskList(tasks []*task.Task) error {
 	format := outputFormat()
 	if format == output.FormatJSON {
 		if tasks == nil {
