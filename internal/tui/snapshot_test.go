@@ -166,6 +166,28 @@ func setupManyTasksBoard(t *testing.T) (*tui.Board, *config.Config) { //nolint:u
 	return b, cfg
 }
 
+func TestSnapshot_DetailLongBody(t *testing.T) {
+	b, cfg := setupTestBoard(t)
+	addLongBodyToTask(t, cfg, 1, 30)
+	b = sendKey(b, "r")
+	b = sendKey(b, "enter")
+	assertGolden(t, "detail_long_body", b.View())
+}
+
+func TestSnapshot_ScrollBothIndicators(t *testing.T) {
+	b, _ := setupManyTasksBoard(t)
+	// Use height 24 to test tight layout with both indicators.
+	b.Update(tea.WindowSizeMsg{Width: 100, Height: 24})
+	// Navigate to done column and scroll to middle.
+	for range 4 {
+		b = sendKey(b, "l")
+	}
+	for range 5 {
+		b = sendKey(b, "j")
+	}
+	assertGolden(t, "scroll_both_indicators", b.View())
+}
+
 func TestSnapshot_EmptyBoard(t *testing.T) {
 	dir := t.TempDir()
 	kanbanDir := filepath.Join(dir, "kanban")

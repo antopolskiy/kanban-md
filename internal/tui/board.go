@@ -35,7 +35,8 @@ const (
 
 	tagMaxFraction = 2 // tags get at most 1/N of card width
 	cardHeight     = 4 // top border + 2 content lines + bottom border
-	reservedLines  = 3 // header (1) + blank line (1) + status bar (1)
+	boardChrome    = 2 // blank line + status bar below the column area
+	maxScrollOff   = 1<<31 - 1
 )
 
 // Board is the top-level bubbletea model.
@@ -51,7 +52,8 @@ type Board struct {
 	err       error
 
 	// Detail view.
-	detailTask *task.Task
+	detailTask      *task.Task
+	detailScrollOff int
 
 	// Move view.
 	moveStatuses []string
@@ -193,6 +195,7 @@ func (b *Board) handleNavigation(k string) {
 func (b *Board) handleEnter() {
 	if t := b.selectedTask(); t != nil {
 		b.detailTask = t
+		b.detailScrollOff = 0
 		b.view = viewDetail
 	}
 }
@@ -221,6 +224,18 @@ func (b *Board) handleDetailKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "q", keyEsc, "backspace":
 		b.view = viewBoard
 		b.detailTask = nil
+		b.detailScrollOff = 0
+	case "j", keyDown:
+		b.detailScrollOff++
+	case "k", keyUp:
+		if b.detailScrollOff > 0 {
+			b.detailScrollOff--
+		}
+	case "g":
+		b.detailScrollOff = 0
+	case "G":
+		// Set to large value; viewDetail will clamp it.
+		b.detailScrollOff = maxScrollOff
 	}
 	return b, nil
 }
@@ -319,15 +334,38 @@ func (b *Board) clampRow() {
 	b.ensureVisible()
 }
 
-// maxVisibleCards returns how many cards fit vertically in the terminal.
-func (b *Board) maxVisibleCards() int {
-	if b.height <= reservedLines {
+// visibleCardsForColumn returns the number of cards that fit in the column,
+// accounting for scroll indicator lines ("↑ N more" / "↓ N more") that
+// consume vertical space.
+func (b *Board) visibleCardsForColumn(col *column) int {
+	budget := b.height - boardChrome
+	if budget < 1 {
 		return 1
 	}
-	n := (b.height - reservedLines) / cardHeight
+
+	// Always need 1 line for column header.
+	avail := budget - 1
+
+	// Check if up indicator is needed.
+	if col.scrollOff > 0 {
+		avail--
+	}
+
+	// Compute cards assuming no down indicator.
+	n := avail / cardHeight
 	if n < 1 {
 		n = 1
 	}
+
+	// Check if down indicator is needed.
+	if col.scrollOff+n < len(col.tasks) {
+		// Re-compute with 1 fewer line for the down indicator.
+		n = (avail - 1) / cardHeight
+		if n < 1 {
+			n = 1
+		}
+	}
+
 	return n
 }
 
@@ -338,7 +376,7 @@ func (b *Board) ensureVisible() {
 	if col == nil {
 		return
 	}
-	maxVis := b.maxVisibleCards()
+	maxVis := b.visibleCardsForColumn(col)
 
 	// Scroll down if active row is below visible window.
 	if b.activeRow >= col.scrollOff+maxVis {
@@ -543,7 +581,7 @@ func (b *Board) renderColumn(colIdx int, col column, width int) string {
 	}
 
 	// Determine visible card range.
-	maxVis := b.maxVisibleCards()
+	maxVis := b.visibleCardsForColumn(&col)
 	start := col.scrollOff
 	end := start + maxVis
 	if end > len(col.tasks) {
@@ -687,13 +725,39 @@ func (b *Board) viewDetail() string {
 	}
 	if t.Body != "" {
 		lines = append(lines, "")
-		lines = append(lines, t.Body)
+		// Word-wrap body text to terminal width.
+		wrapped := lipgloss.NewStyle().Width(b.width).Render(t.Body)
+		lines = append(lines, strings.Split(wrapped, "\n")...)
 	}
 
-	lines = append(lines, "")
-	lines = append(lines, dimStyle.Render("Press q/esc to go back"))
+	// Reserve the last line for the fixed status hint.
+	viewHeight := b.height - 1
+	if viewHeight < 1 {
+		viewHeight = len(lines)
+	}
 
-	return strings.Join(lines, "\n")
+	// Build the status hint (always visible at bottom).
+	hint := "q/esc:back"
+	if len(lines) > viewHeight {
+		hint += "  j/k:scroll  g/G:top/bottom"
+	}
+
+	// Apply viewport scrolling.
+	off := b.detailScrollOff
+	maxOff := len(lines) - viewHeight
+	if maxOff < 0 {
+		maxOff = 0
+	}
+	if off > maxOff {
+		off = maxOff
+	}
+
+	end := off + viewHeight
+	if end > len(lines) {
+		end = len(lines)
+	}
+
+	return strings.Join(lines[off:end], "\n") + "\n" + dimStyle.Render(hint)
 }
 
 func (b *Board) viewMoveDialog() string {

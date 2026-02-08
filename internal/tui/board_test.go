@@ -1,8 +1,10 @@
 package tui_test
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -334,4 +336,137 @@ func findSubstring(s, sub string) bool {
 		}
 	}
 	return false
+}
+
+// addLongBodyToTask modifies a task file to have a multi-line body.
+func addLongBodyToTask(t *testing.T, cfg *config.Config, taskID, lineCount int) { //nolint:unparam // helper accepts any task ID
+	t.Helper()
+	path, err := task.FindByID(cfg.TasksPath(), taskID)
+	if err != nil {
+		t.Fatalf("finding task %d: %v", taskID, err)
+	}
+	tk, err := task.Read(path)
+	if err != nil {
+		t.Fatalf("reading task %d: %v", taskID, err)
+	}
+	var bodyLines []string
+	for i := 1; i <= lineCount; i++ {
+		bodyLines = append(bodyLines, fmt.Sprintf("Body line %d content here", i))
+	}
+	tk.Body = strings.Join(bodyLines, "\n")
+	if err := task.Write(path, tk); err != nil {
+		t.Fatalf("writing task %d: %v", taskID, err)
+	}
+}
+
+// --- Bug #55: Detail view starts at bottom, scrolling doesn't work ---
+
+func TestBoard_DetailStartsAtTop(t *testing.T) {
+	b, cfg := setupTestBoard(t)
+	addLongBodyToTask(t, cfg, 1, 50)
+
+	b = sendKey(b, "r")     // refresh to pick up body change
+	b = sendKey(b, "enter") // enter detail view
+	v := b.View()
+
+	// Should show title at the top.
+	if !containsStr(v, "Task #1") {
+		t.Error("expected Task #1 in detail view")
+	}
+	// First body line should be visible.
+	if !containsStr(v, "Body line 1") {
+		t.Error("expected first body line visible")
+	}
+}
+
+func TestBoard_DetailFitsTerminal(t *testing.T) {
+	b, cfg := setupTestBoard(t)
+	addLongBodyToTask(t, cfg, 1, 50) // 50 body lines + metadata > 40 lines
+
+	b = sendKey(b, "r")
+	b = sendKey(b, "enter")
+	v := b.View()
+
+	lines := strings.Split(v, "\n")
+	if len(lines) > 40 {
+		t.Errorf("detail view has %d lines, exceeds terminal height 40", len(lines))
+	}
+}
+
+func TestBoard_DetailScrollDown(t *testing.T) {
+	b, cfg := setupTestBoard(t)
+	addLongBodyToTask(t, cfg, 1, 50)
+
+	b = sendKey(b, "r")
+	b = sendKey(b, "enter")
+
+	// Scroll down 20 lines.
+	for range 20 {
+		b = sendKey(b, "j")
+	}
+	v := b.View()
+
+	// After scrolling, the first body line should be gone.
+	if containsStr(v, "Body line 1 content") {
+		t.Error("expected first body line to be scrolled out of view")
+	}
+}
+
+// --- Bug #56: Detail view doesn't wrap long lines ---
+
+func TestBoard_DetailWrapsLongLines(t *testing.T) {
+	b, cfg := setupTestBoard(t)
+
+	path, err := task.FindByID(cfg.TasksPath(), 1)
+	if err != nil {
+		t.Fatalf("finding task: %v", err)
+	}
+	tk, err := task.Read(path)
+	if err != nil {
+		t.Fatalf("reading task: %v", err)
+	}
+	tk.Body = strings.Repeat("word ", 50) // 250 chars, exceeds width of 120
+	if err := task.Write(path, tk); err != nil {
+		t.Fatalf("writing task: %v", err)
+	}
+
+	b = sendKey(b, "r")
+	b = sendKey(b, "enter")
+	v := b.View()
+
+	// No line should exceed terminal width.
+	for i, line := range strings.Split(v, "\n") {
+		if len(line) > 120 {
+			t.Errorf("line %d exceeds width 120: len=%d", i, len(line))
+		}
+	}
+}
+
+// --- Bug #58: Column headers disappear when scrolling ---
+
+func TestBoard_ScrollHeaderVisible(t *testing.T) {
+	b, _ := setupManyTasksBoard(t)
+	// Use height 24 where indicators cause overflow.
+	b.Update(tea.WindowSizeMsg{Width: 100, Height: 24})
+
+	// Navigate to done column (index 4).
+	for range 4 {
+		b = sendKey(b, "l")
+	}
+	// Scroll down to trigger both up and down indicators.
+	for range 5 {
+		b = sendKey(b, "j")
+	}
+	v := b.View()
+
+	// Total output lines must not exceed terminal height.
+	lines := strings.Split(v, "\n")
+	if len(lines) > 24 {
+		t.Errorf("output has %d lines, exceeds terminal height 24", len(lines))
+	}
+
+	// Header row should be the first line and contain all column names.
+	if len(lines) > 0 && !containsStr(lines[0], "done") {
+		t.Errorf("expected 'done' header on first line, got %q", lines[0])
+	}
 }

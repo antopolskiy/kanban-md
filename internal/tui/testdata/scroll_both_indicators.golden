@@ -1,0 +1,21 @@
+ backlog (3)         todo (0)            in-progress (0)     review (0)          done (15)          
+╭──────────────────╮  (empty)             (empty)             (empty)             ↑ 1 more          
+│ #18 Backlog t... │                                                            ╭──────────────────╮
+│ medium           │                                                            │ #8 Done task 8   │
+╰──────────────────╯                                                            │ critical         │
+╭──────────────────╮                                                            ╰──────────────────╯
+│ #17 Backlog t... │                                                            ╭──────────────────╮
+│ medium           │                                                            │ #4 Done task 4   │
+╰──────────────────╯                                                            │ critical         │
+╭──────────────────╮                                                            ╰──────────────────╯
+│ #16 Backlog t... │                                                            ╭──────────────────╮
+│ medium           │                                                            │ #13 Done task 13 │
+╰──────────────────╯                                                            │ high             │
+                                                                                ╰──────────────────╯
+                                                                                ╭──────────────────╮
+                                                                                │ #9 Done task 9   │
+                                                                                │ high             │
+                                                                                ╰──────────────────╯
+                                                                                  ↓ 10 more         
+                                                                                                    
+ Scroll Test | 18 tasks | hjkl:navigate enter:detail m:move M:next d:delete ?:help q:quit           
