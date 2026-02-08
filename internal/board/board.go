@@ -83,12 +83,19 @@ type PriorityCount struct {
 	Count    int    `json:"count"`
 }
 
+// ClassCount holds a count for a class of service.
+type ClassCount struct {
+	Class string `json:"class"`
+	Count int    `json:"count"`
+}
+
 // Overview is the aggregate board overview.
 type Overview struct {
 	BoardName  string          `json:"board_name"`
 	TotalTasks int             `json:"total_tasks"`
 	Statuses   []StatusSummary `json:"statuses"`
 	Priorities []PriorityCount `json:"priorities"`
+	Classes    []ClassCount    `json:"classes,omitempty"`
 }
 
 // Summary computes a board summary from all tasks.
@@ -104,6 +111,7 @@ func Summary(cfg *config.Config, tasks []*task.Task) Overview {
 	}
 
 	prioMap := make(map[string]int, len(cfg.Priorities))
+	classMap := make(map[string]int)
 
 	for _, t := range tasks {
 		if ss, ok := statusMap[t.Status]; ok {
@@ -116,6 +124,11 @@ func Summary(cfg *config.Config, tasks []*task.Task) Overview {
 			}
 		}
 		prioMap[t.Priority]++
+		cls := t.Class
+		if cls == "" {
+			cls = classStandard
+		}
+		classMap[cls]++
 	}
 
 	statuses := make([]StatusSummary, 0, len(cfg.Statuses))
@@ -128,11 +141,20 @@ func Summary(cfg *config.Config, tasks []*task.Task) Overview {
 		priorities = append(priorities, PriorityCount{Priority: p, Count: prioMap[p]})
 	}
 
+	var classes []ClassCount
+	if len(cfg.Classes) > 0 {
+		classes = make([]ClassCount, 0, len(cfg.Classes))
+		for _, cl := range cfg.Classes {
+			classes = append(classes, ClassCount{Class: cl.Name, Count: classMap[cl.Name]})
+		}
+	}
+
 	return Overview{
 		BoardName:  cfg.Board.Name,
 		TotalTasks: len(tasks),
 		Statuses:   statuses,
 		Priorities: priorities,
+		Classes:    classes,
 	}
 }
 

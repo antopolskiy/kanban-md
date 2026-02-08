@@ -34,6 +34,7 @@ func init() {
 	createCmd.Flags().Int("parent", 0, "parent task ID")
 	createCmd.Flags().IntSlice("depends-on", nil, "dependency task IDs (comma-separated)")
 	createCmd.Flags().String("body", "", "task body (markdown)")
+	createCmd.Flags().String("class", "", "class of service (expedite, fixed-date, standard, intangible)")
 	rootCmd.AddCommand(createCmd)
 }
 
@@ -51,6 +52,7 @@ func runCreate(cmd *cobra.Command, args []string) error {
 		Title:    title,
 		Status:   cfg.Defaults.Status,
 		Priority: cfg.Defaults.Priority,
+		Class:    cfg.Defaults.Class,
 		Created:  now,
 		Updated:  now,
 	}
@@ -64,9 +66,15 @@ func runCreate(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	// Check WIP limit for the target status (new task, so currentStatus is empty).
-	if err := enforceWIPLimit(cfg, "", t.Status, false); err != nil {
-		return err
+	// Check WIP limit for the target status (class-aware).
+	if t.Class != "" && len(cfg.Classes) > 0 {
+		if err := enforceWIPLimitForClass(cfg, t, "", t.Status, false); err != nil {
+			return err
+		}
+	} else {
+		if err := enforceWIPLimit(cfg, "", t.Status, false); err != nil {
+			return err
+		}
 	}
 
 	// Generate filename and write.
@@ -142,6 +150,12 @@ func applyCreateFlags(cmd *cobra.Command, t *task.Task, cfg *config.Config) erro
 	}
 	if v, _ := cmd.Flags().GetString("body"); v != "" {
 		t.Body = v
+	}
+	if v, _ := cmd.Flags().GetString("class"); v != "" {
+		if err := task.ValidateClass(v, cfg.ClassNames()); err != nil {
+			return err
+		}
+		t.Class = v
 	}
 	return nil
 }
