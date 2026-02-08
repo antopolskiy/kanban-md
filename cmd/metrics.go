@@ -41,7 +41,7 @@ func runMetrics(cmd *cobra.Command, _ []string) error {
 	if sinceStr != "" {
 		d, parseErr := date.Parse(sinceStr)
 		if parseErr != nil {
-			return parseErr
+			return task.ValidateDate("since", sinceStr, parseErr)
 		}
 		sinceTime := d.Time
 		filtered := make([]*task.Task, 0, len(tasks))

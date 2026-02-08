@@ -20,6 +20,7 @@ var binPath string
 const (
 	codeWIPLimitExceeded = "WIP_LIMIT_EXCEEDED"
 	codeInvalidInput     = "INVALID_INPUT"
+	codeInvalidDate      = "INVALID_DATE"
 	statusBacklog        = "backlog"
 	priorityHigh         = "high"
 )
@@ -339,7 +340,7 @@ func TestCreateBadDateFormat(t *testing.T) {
 	kanbanDir := initBoard(t)
 
 	errResp := runKanbanJSONError(t, kanbanDir, "create", "Bad date", "--due", "02-15-2026")
-	if errResp.Code != "INVALID_DATE" {
+	if errResp.Code != codeInvalidDate {
 		t.Errorf("code = %q, want INVALID_DATE", errResp.Code)
 	}
 	if !strings.Contains(errResp.Error, "invalid") {
@@ -1926,6 +1927,24 @@ func TestMetricsTableOutput(t *testing.T) {
 	}
 	if !strings.Contains(r.stdout, "lead time") || !strings.Contains(r.stdout, "cycle time") {
 		t.Errorf("table output missing time fields:\n%s", r.stdout)
+	}
+}
+
+func TestMetricsInvalidSinceStructuredError(t *testing.T) {
+	kanbanDir := initBoard(t)
+
+	errResp := runKanbanJSONError(t, kanbanDir, "metrics", "--since", "not-a-date")
+	if errResp.Code != codeInvalidDate {
+		t.Errorf("code = %q, want INVALID_DATE", errResp.Code)
+	}
+}
+
+func TestLogInvalidSinceStructuredError(t *testing.T) {
+	kanbanDir := initBoard(t)
+
+	errResp := runKanbanJSONError(t, kanbanDir, "log", "--since", "not-a-date")
+	if errResp.Code != codeInvalidDate {
+		t.Errorf("code = %q, want INVALID_DATE", errResp.Code)
 	}
 }
 

@@ -6,6 +6,7 @@ import (
 	"github.com/antopolskiy/kanban-md/internal/board"
 	"github.com/antopolskiy/kanban-md/internal/date"
 	"github.com/antopolskiy/kanban-md/internal/output"
+	"github.com/antopolskiy/kanban-md/internal/task"
 )
 
 var logCmd = &cobra.Command{
@@ -34,7 +35,7 @@ func runLog(cmd *cobra.Command, _ []string) error {
 	if v, _ := cmd.Flags().GetString("since"); v != "" {
 		d, parseErr := date.Parse(v)
 		if parseErr != nil {
-			return parseErr
+			return task.ValidateDate("since", v, parseErr)
 		}
 		opts.Since = d.Time
 	}
