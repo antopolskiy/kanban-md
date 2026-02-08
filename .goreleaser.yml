@@ -4,8 +4,25 @@ before:
   hooks:
     - go mod download
 builds:
-  - ldflags:
+  - id: kanban-md
+    main: .
+    binary: kanban-md
+    ldflags:
       - -s -w -X github.com/antopolskiy/kanban-md/cmd.version={{.Version}}
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - darwin
+      - linux
+      - windows
+    goarch:
+      - amd64
+      - arm64
+  - id: kanban-md-tui
+    main: ./cmd/kanban-md-tui
+    binary: kanban-md-tui
+    ldflags:
+      - -s -w
     env:
       - CGO_ENABLED=0
     goos:
@@ -30,6 +47,7 @@ brews:
     license: MIT
     install: |
       bin.install "kanban-md"
+      bin.install "kanban-md-tui"
       bin.install_symlink bin/"kanban-md" => "kbmd"
       generate_completions_from_executable(bin/"kanban-md", "completion")
       generate_completions_from_executable(bin/"kbmd", "completion")
