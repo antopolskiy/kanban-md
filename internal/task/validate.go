@@ -1,16 +1,7 @@
 package task
 
 import (
-	"errors"
-	"fmt"
-
 	"github.com/antopolskiy/kanban-md/internal/clierr"
-)
-
-// Validation errors (kept for backward compatibility with errors.Is).
-var (
-	ErrInvalidStatus   = errors.New("invalid status")
-	ErrInvalidPriority = errors.New("invalid priority")
 )
 
 // ValidateStatus checks that a status is in the allowed list.
@@ -93,9 +84,4 @@ func ValidateBoundaryError(id int, status, direction string) *clierr.Error {
 // FormatDueDate returns a CLIError for invalid due date input.
 func FormatDueDate(input string, err error) *clierr.Error {
 	return ValidateDate("due", input, err)
-}
-
-// FormatParentError wraps a dependency error as a parent error.
-func FormatParentError(err error) error {
-	return fmt.Errorf("invalid parent: %w", err)
 }

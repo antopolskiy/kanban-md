@@ -1,7 +1,6 @@
 package task
 
 import (
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -10,9 +9,6 @@ import (
 
 	"github.com/antopolskiy/kanban-md/internal/clierr"
 )
-
-// ErrNotFound indicates a task was not found.
-var ErrNotFound = errors.New("task not found")
 
 // FindByID scans the tasks directory for a file matching the given ID.
 // Returns the full path to the task file.
