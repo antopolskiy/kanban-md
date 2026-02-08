@@ -3,8 +3,6 @@ package output
 
 import (
 	"os"
-
-	"golang.org/x/term"
 )
 
 // Format represents an output format.
@@ -19,7 +17,8 @@ const (
 	FormatTable
 )
 
-// Detect returns the appropriate format based on flags and TTY detection.
+// Detect returns the appropriate format based on flags and environment.
+// The default is table output. Use --json or KANBAN_OUTPUT=json for JSON.
 func Detect(jsonFlag, tableFlag bool) Format {
 	if jsonFlag {
 		return FormatJSON
@@ -36,9 +35,5 @@ func Detect(jsonFlag, tableFlag bool) Format {
 		return FormatTable
 	}
 
-	// Auto-detect based on TTY.
-	if term.IsTerminal(int(os.Stdout.Fd())) {
-		return FormatTable
-	}
-	return FormatJSON
+	return FormatTable
 }

@@ -33,19 +33,20 @@ func TaskTable(tasks []*task.Task) {
 
 	// Calculate column widths.
 	const pad = 2
-	idW, statusW, prioW, titleW, assignW, dueW := 4, 8, 10, 5, 10, 12
+	idW, statusW, prioW, titleW, assignW, tagsW, dueW := 4, 8, 10, 5, 10, 6, 12
 	for _, t := range tasks {
 		idW = max(idW, len(strconv.Itoa(t.ID))+pad)
 		statusW = max(statusW, len(t.Status)+pad)
 		prioW = max(prioW, len(t.Priority)+pad)
 		titleW = max(titleW, min(len(t.Title)+pad, 50)) //nolint:mnd // max title column width
 		assignW = max(assignW, len(t.Assignee)+pad)
+		tagsW = max(tagsW, min(len(strings.Join(t.Tags, ","))+pad, 30)) //nolint:mnd // max tags column width
 	}
 
 	// Print header.
-	header := fmt.Sprintf("%-*s %-*s %-*s %-*s %-*s %-*s",
+	header := fmt.Sprintf("%-*s %-*s %-*s %-*s %-*s %-*s %-*s",
 		idW, "ID", statusW, "STATUS", prioW, "PRIORITY",
-		titleW, "TITLE", assignW, "ASSIGNEE", dueW, "DUE")
+		titleW, "TITLE", assignW, "ASSIGNEE", tagsW, "TAGS", dueW, "DUE")
 	fmt.Fprintln(os.Stdout, headerStyle.Render(header))
 
 	// Print rows.
@@ -59,6 +60,10 @@ func TaskTable(tasks []*task.Task) {
 		if assignee == "" {
 			assignee = dimStyle.Render("--")
 		}
+		tags := strings.Join(t.Tags, ",")
+		if tags == "" {
+			tags = dimStyle.Render("--")
+		}
 		due := "--"
 		if t.Due != nil {
 			due = t.Due.String()
@@ -66,9 +71,9 @@ func TaskTable(tasks []*task.Task) {
 			due = dimStyle.Render(due)
 		}
 
-		fmt.Fprintf(os.Stdout, "%-*d %-*s %-*s %-*s %-*s %-*s\n",
+		fmt.Fprintf(os.Stdout, "%-*d %-*s %-*s %-*s %-*s %-*s %-*s\n",
 			idW, t.ID, statusW, t.Status, prioW, t.Priority,
-			titleW, title, assignW, assignee, dueW, due)
+			titleW, title, assignW, assignee, tagsW, tags, dueW, due)
 	}
 }
 

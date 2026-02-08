@@ -19,52 +19,52 @@ Each task is a `.md` file in `kanban/tasks/`. The CLI is `kanban-md`
 
 ## Current Board State
 
-!`kanban-md board --json 2>/dev/null || echo '{"error": "no board found — run: kanban-md init --name PROJECT_NAME"}'`
+!`kanban-md board 2>/dev/null || echo 'No board found — run: kanban-md init --name PROJECT_NAME'`
 
 ## Rules
 
-- Always pass `--json` for programmatic output. Parse JSON, never scrape table output.
-- Always pass `--force` when deleting (`kanban-md delete ID --force --json`).
+- Default output is concise table text. Only use `--json` with `show` when you need
+  full structured task data (body, timestamps, dependencies).
+  For the `show --json` schema, see [references/json-schemas.md](references/json-schemas.md).
+- Always pass `--force` when deleting (`kanban-md delete ID --force`).
 - Dates use `YYYY-MM-DD` format.
 - Statuses and priorities are board-specific. Check the board state above or run
-  `kanban-md board --json` to discover valid values before using them.
+  `kanban-md board` to discover valid values before using them.
 - Default statuses: backlog, todo, in-progress, review, done.
 - Default priorities: low, medium, high, critical.
-- Present results to the user in readable format (tables, bullets), not raw JSON.
-- For JSON output schemas, see [references/json-schemas.md](references/json-schemas.md).
 
 ## Decision Tree
 
-| User wants to...                        | Command                                                     |
-|-----------------------------------------|-------------------------------------------------------------|
-| See board overview / standup            | `kanban-md board --json`                                    |
-| List all tasks                          | `kanban-md list --json`                                     |
-| List tasks by status                    | `kanban-md list --status todo,in-progress --json`           |
-| List tasks by priority                  | `kanban-md list --priority high,critical --json`            |
-| List tasks by assignee                  | `kanban-md list --assignee alice --json`                    |
-| List tasks by tag                       | `kanban-md list --tag bug --json`                           |
-| List blocked tasks                      | `kanban-md list --blocked --json`                           |
-| List ready-to-start tasks               | `kanban-md list --not-blocked --status todo --json`         |
-| List tasks with resolved deps           | `kanban-md list --unblocked --json`                         |
-| Find a specific task                    | `kanban-md show ID --json`                                  |
-| Create a task                           | `kanban-md create "TITLE" --priority P --tags T --json`     |
-| Create a task with body                 | `kanban-md create "TITLE" --body "DESC" --json`             |
-| Start working on a task                 | `kanban-md move ID in-progress --json`                      |
-| Advance to next status                  | `kanban-md move ID --next --json`                           |
-| Move a task back                        | `kanban-md move ID --prev --json`                           |
-| Complete a task                         | `kanban-md move ID done --json`                             |
-| Edit task fields                        | `kanban-md edit ID --title "NEW" --priority P --json`       |
-| Add/remove tags                         | `kanban-md edit ID --add-tag T --remove-tag T --json`       |
-| Set a due date                          | `kanban-md edit ID --due 2026-03-01 --json`                 |
-| Block a task                            | `kanban-md edit ID --block "REASON" --json`                 |
-| Unblock a task                          | `kanban-md edit ID --unblock --json`                        |
-| Add a dependency                        | `kanban-md edit ID --add-dep DEP_ID --json`                 |
-| Set a parent task                       | `kanban-md edit ID --parent PARENT_ID --json`               |
-| Delete a task                           | `kanban-md delete ID --force --json`                        |
-| See flow metrics                        | `kanban-md metrics --json`                                  |
-| See activity log                        | `kanban-md log --limit 20 --json`                           |
-| See recent activity for a task          | `kanban-md log --task ID --json`                            |
-| Initialize a new board                  | `kanban-md init --name "NAME"`                              |
+| User wants to...                        | Command                                                 |
+|-----------------------------------------|---------------------------------------------------------|
+| See board overview / standup            | `kanban-md board`                                       |
+| List all tasks                          | `kanban-md list`                                        |
+| List tasks by status                    | `kanban-md list --status todo,in-progress`              |
+| List tasks by priority                  | `kanban-md list --priority high,critical`               |
+| List tasks by assignee                  | `kanban-md list --assignee alice`                       |
+| List tasks by tag                       | `kanban-md list --tag bug`                              |
+| List blocked tasks                      | `kanban-md list --blocked`                              |
+| List ready-to-start tasks               | `kanban-md list --not-blocked --status todo`            |
+| List tasks with resolved deps           | `kanban-md list --unblocked`                            |
+| Find a specific task                    | `kanban-md show ID --json`                              |
+| Create a task                           | `kanban-md create "TITLE" --priority P --tags T`        |
+| Create a task with body                 | `kanban-md create "TITLE" --body "DESC"`                |
+| Start working on a task                 | `kanban-md move ID in-progress`                         |
+| Advance to next status                  | `kanban-md move ID --next`                              |
+| Move a task back                        | `kanban-md move ID --prev`                              |
+| Complete a task                         | `kanban-md move ID done`                                |
+| Edit task fields                        | `kanban-md edit ID --title "NEW" --priority P`          |
+| Add/remove tags                         | `kanban-md edit ID --add-tag T --remove-tag T`          |
+| Set a due date                          | `kanban-md edit ID --due 2026-03-01`                    |
+| Block a task                            | `kanban-md edit ID --block "REASON"`                    |
+| Unblock a task                          | `kanban-md edit ID --unblock`                           |
+| Add a dependency                        | `kanban-md edit ID --add-dep DEP_ID`                    |
+| Set a parent task                       | `kanban-md edit ID --parent PARENT_ID`                  |
+| Delete a task                           | `kanban-md delete ID --force`                           |
+| See flow metrics                        | `kanban-md metrics`                                     |
+| See activity log                        | `kanban-md log --limit 20`                              |
+| See recent activity for a task          | `kanban-md log --task ID`                               |
+| Initialize a new board                  | `kanban-md init --name "NAME"`                          |
 
 ## Core Commands
 
@@ -73,22 +73,21 @@ Each task is a `.md` file in `kanban/tasks/`. The CLI is `kanban-md`
 ```bash
 kanban-md list [--status S] [--priority P] [--assignee A] [--tag T] \
   [--sort FIELD] [-r] [-n LIMIT] [--blocked] [--not-blocked] \
-  [--parent ID] [--unblocked] --json
+  [--parent ID] [--unblocked]
 ```
 
 Sort fields: id, status, priority, created, updated, due. `-r` reverses.
 `--unblocked` shows tasks whose dependencies are all at terminal status.
-Returns a JSON array of task objects.
 
 ### create
 
 ```bash
 kanban-md create "TITLE" [--status S] [--priority P] [--assignee A] \
   [--tags T1,T2] [--due YYYY-MM-DD] [--estimate E] [--body "TEXT"] \
-  [--parent ID] [--depends-on ID1,ID2] --json
+  [--parent ID] [--depends-on ID1,ID2]
 ```
 
-Returns the created task object with its assigned ID.
+Prints the created task ID and summary.
 
 ### show
 
@@ -96,7 +95,8 @@ Returns the created task object with its assigned ID.
 kanban-md show ID --json
 ```
 
-Returns a single task object including body text.
+Returns a single task object including body text. Use `--json` here to get
+full structured data for parsing. See [references/json-schemas.md](references/json-schemas.md).
 
 ### edit
 
@@ -106,27 +106,26 @@ kanban-md edit ID [--title T] [--status S] [--priority P] [--assignee A] \
   [--estimate E] [--body "TEXT"] [--started YYYY-MM-DD] [--clear-started] \
   [--completed YYYY-MM-DD] [--clear-completed] [--parent ID] \
   [--clear-parent] [--add-dep ID] [--remove-dep ID] \
-  [--block "REASON"] [--unblock] --json
+  [--block "REASON"] [--unblock]
 ```
 
-Only specified fields are changed. Returns the updated task object.
+Only specified fields are changed. Prints a confirmation message.
 
 ### move
 
 ```bash
-kanban-md move ID STATUS --json
-kanban-md move ID --next --json
-kanban-md move ID --prev --json
+kanban-md move ID STATUS
+kanban-md move ID --next
+kanban-md move ID --prev
 ```
 
 Use `-f` to override WIP limits. Auto-sets Started on first move from
 initial status. Auto-sets Completed on move to terminal status.
-Returns a task object with a `changed` boolean field.
 
 ### delete
 
 ```bash
-kanban-md delete ID --force --json
+kanban-md delete ID --force
 ```
 
 Always pass `--force` (non-interactive context requires it).
@@ -134,26 +133,26 @@ Always pass `--force` (non-interactive context requires it).
 ### board
 
 ```bash
-kanban-md board --json
+kanban-md board
 ```
 
-Returns board overview: task counts per status, WIP utilization,
+Shows board overview: task counts per status, WIP utilization,
 blocked/overdue counts, priority distribution.
 
 ### metrics
 
 ```bash
-kanban-md metrics [--since YYYY-MM-DD] --json
+kanban-md metrics [--since YYYY-MM-DD]
 ```
 
-Returns throughput (7d/30d), avg lead/cycle time, flow efficiency,
+Shows throughput (7d/30d), avg lead/cycle time, flow efficiency,
 aging items.
 
 ### log
 
 ```bash
 kanban-md log [--since YYYY-MM-DD] [--limit N] [--action TYPE] \
-  [--task ID] --json
+  [--task ID]
 ```
 
 Action types: create, move, edit, delete, block, unblock.
@@ -166,50 +165,50 @@ All commands accept: `--json`, `--table`, `--dir PATH`, `--no-color`.
 
 ### Daily Standup
 
-1. `kanban-md board --json` — board overview
-2. `kanban-md list --status in-progress --json` — in-flight work
-3. `kanban-md list --blocked --json` — stuck items
-4. `kanban-md metrics --json` — throughput and aging
+1. `kanban-md board` — board overview
+2. `kanban-md list --status in-progress` — in-flight work
+3. `kanban-md list --blocked` — stuck items
+4. `kanban-md metrics` — throughput and aging
 5. Summarize: completed, active, blocked, aging items
 
 ### Triage New Work
 
-1. `kanban-md list --status backlog --sort priority -r --json` — review backlog
-2. For items to promote: `kanban-md move ID todo --json`
-3. For new items: `kanban-md create "TITLE" --priority P --tags T --json`
-4. For stale items: `kanban-md delete ID --force --json`
+1. `kanban-md list --status backlog --sort priority -r` — review backlog
+2. For items to promote: `kanban-md move ID todo`
+3. For new items: `kanban-md create "TITLE" --priority P --tags T`
+4. For stale items: `kanban-md delete ID --force`
 
 ### Sprint Planning
 
-1. `kanban-md board --json` — current state
-2. `kanban-md list --status backlog,todo --sort priority -r --json` — candidates
-3. Promote selected: `kanban-md move ID todo --json`
-4. Assign: `kanban-md edit ID --assignee NAME --json`
-5. Set deadlines: `kanban-md edit ID --due YYYY-MM-DD --json`
+1. `kanban-md board` — current state
+2. `kanban-md list --status backlog,todo --sort priority -r` — candidates
+3. Promote selected: `kanban-md move ID todo`
+4. Assign: `kanban-md edit ID --assignee NAME`
+5. Set deadlines: `kanban-md edit ID --due YYYY-MM-DD`
 
 ### Complete a Task
 
-1. `kanban-md move ID done --json` — marks complete, sets Completed timestamp
+1. `kanban-md move ID done` — marks complete, sets Completed timestamp
 2. `kanban-md show ID --json` — verify status and timestamps
 
 ### Track a Bug
 
-1. `kanban-md create "Fix: DESCRIPTION" --priority high --tags bug --json`
-2. `kanban-md edit ID --body "Steps to reproduce: ..." --json`
+1. `kanban-md create "Fix: DESCRIPTION" --priority high --tags bug`
+2. `kanban-md edit ID --body "Steps to reproduce: ..."`
 
 ### Track a Dependency Chain
 
-1. Create parent: `kanban-md create "Epic title" --json`
-2. Create subtask: `kanban-md create "Subtask" --parent PARENT_ID --json`
-3. Or add dependency: `kanban-md create "Task B" --depends-on TASK_A_ID --json`
-4. List unresolved: `kanban-md list --blocked --json`
+1. Create parent: `kanban-md create "Epic title"`
+2. Create subtask: `kanban-md create "Subtask" --parent PARENT_ID`
+3. Or add dependency: `kanban-md create "Task B" --depends-on TASK_A_ID`
+4. List unresolved: `kanban-md list --blocked`
 
 ## Pitfalls
 
-- **DO** pass `--json` on every command. Without it, output format depends on TTY and is not parseable.
 - **DO** pass `--force` on delete. Without it, the command hangs waiting for stdin.
-- **DO NOT** hardcode status or priority values. Read them from `kanban-md board --json`.
-- **DO NOT** pipe table output through jq. Use `--json` instead.
+- **DO** use `--json` with `show` when you need to parse task fields programmatically.
+- **DO NOT** use `--json` on other commands unless you specifically need structured output — table is the default and saves tokens.
+- **DO NOT** hardcode status or priority values. Read them from `kanban-md board`.
 - **DO NOT** use `--next` or `--prev` without checking current status. They fail at boundary statuses.
 - **DO NOT** pass both `--status` and `--next`/`--prev` to move. Use one or the other.
-- **DO** quote task titles with special characters: `kanban-md create "Fix: the 'login' bug" --json`.
+- **DO** quote task titles with special characters: `kanban-md create "Fix: the 'login' bug"`.

@@ -39,3 +39,11 @@ func TestDetectFlagOverridesEnv(t *testing.T) {
 		t.Errorf("Detect(json=true) with KANBAN_OUTPUT=table = %d, want FormatJSON (flag wins)", got)
 	}
 }
+
+func TestDetectDefaultIsTable(t *testing.T) {
+	t.Setenv("KANBAN_OUTPUT", "")
+
+	if got := Detect(false, false); got != FormatTable {
+		t.Errorf("Detect(no flags, no env) = %d, want FormatTable (table is default)", got)
+	}
+}

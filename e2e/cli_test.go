@@ -2610,3 +2610,105 @@ func TestBatchMoveJSON(t *testing.T) {
 		t.Errorf("IDs = [%d,%d], want [1,2]", results[0].ID, results[1].ID)
 	}
 }
+
+// ---------------------------------------------------------------------------
+// Default output format tests (table is default, no --json or --table flag)
+// ---------------------------------------------------------------------------
+
+func TestDefaultOutputList(t *testing.T) {
+	kanbanDir := initBoard(t)
+	mustCreateTask(t, kanbanDir, "Default output task", "--tags", "test,demo")
+
+	r := runKanban(t, kanbanDir, "list")
+	if r.exitCode != 0 {
+		t.Fatalf("list failed: %s", r.stderr)
+	}
+	// Should be table output with column headers, not JSON.
+	if !strings.Contains(r.stdout, "ID") || !strings.Contains(r.stdout, "STATUS") {
+		t.Errorf("default output missing table headers:\n%s", r.stdout)
+	}
+	if !strings.Contains(r.stdout, "Default output task") {
+		t.Errorf("default output missing task title:\n%s", r.stdout)
+	}
+	if !strings.Contains(r.stdout, "TAGS") {
+		t.Errorf("default output missing TAGS column:\n%s", r.stdout)
+	}
+	if !strings.Contains(r.stdout, "test,demo") {
+		t.Errorf("default output missing tag values:\n%s", r.stdout)
+	}
+	// Must NOT be JSON.
+	if strings.HasPrefix(strings.TrimSpace(r.stdout), "[") {
+		t.Errorf("default output is JSON, expected table:\n%s", r.stdout)
+	}
+}
+
+func TestDefaultOutputCreate(t *testing.T) {
+	kanbanDir := initBoard(t)
+
+	r := runKanban(t, kanbanDir, "create", "New task via default")
+	if r.exitCode != 0 {
+		t.Fatalf("create failed: %s", r.stderr)
+	}
+	if !strings.Contains(r.stdout, "Created task #1") {
+		t.Errorf("default create missing confirmation:\n%s", r.stdout)
+	}
+	// Must NOT be JSON.
+	if strings.HasPrefix(strings.TrimSpace(r.stdout), "{") {
+		t.Errorf("default create output is JSON, expected table:\n%s", r.stdout)
+	}
+}
+
+func TestDefaultOutputMove(t *testing.T) {
+	kanbanDir := initBoard(t)
+	mustCreateTask(t, kanbanDir, "Movable task")
+
+	r := runKanban(t, kanbanDir, "move", "1", "todo")
+	if r.exitCode != 0 {
+		t.Fatalf("move failed: %s", r.stderr)
+	}
+	if !strings.Contains(r.stdout, "Moved task #1") {
+		t.Errorf("default move missing confirmation:\n%s", r.stdout)
+	}
+}
+
+func TestDefaultOutputDelete(t *testing.T) {
+	kanbanDir := initBoard(t)
+	mustCreateTask(t, kanbanDir, "Deletable task")
+
+	r := runKanban(t, kanbanDir, "delete", "1", "--force")
+	if r.exitCode != 0 {
+		t.Fatalf("delete failed: %s", r.stderr)
+	}
+	if !strings.Contains(r.stdout, "Deleted task #1") {
+		t.Errorf("default delete missing confirmation:\n%s", r.stdout)
+	}
+}
+
+func TestDefaultOutputBoard(t *testing.T) {
+	kanbanDir := initBoard(t)
+	mustCreateTask(t, kanbanDir, "Board task")
+
+	r := runKanban(t, kanbanDir, "board")
+	if r.exitCode != 0 {
+		t.Fatalf("board failed: %s", r.stderr)
+	}
+	if !strings.Contains(r.stdout, "STATUS") || !strings.Contains(r.stdout, "COUNT") {
+		t.Errorf("default board missing table headers:\n%s", r.stdout)
+	}
+	// Must NOT be JSON.
+	if strings.HasPrefix(strings.TrimSpace(r.stdout), "{") {
+		t.Errorf("default board output is JSON, expected table:\n%s", r.stdout)
+	}
+}
+
+func TestDefaultOutputMetrics(t *testing.T) {
+	kanbanDir := initBoard(t)
+
+	r := runKanban(t, kanbanDir, "metrics")
+	if r.exitCode != 0 {
+		t.Fatalf("metrics failed: %s", r.stderr)
+	}
+	if !strings.Contains(r.stdout, "Throughput") {
+		t.Errorf("default metrics missing throughput:\n%s", r.stdout)
+	}
+}
