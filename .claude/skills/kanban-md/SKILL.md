@@ -1,5 +1,5 @@
 ---
-name: kanban
+name: kanban-md
 description: >
   Manage project tasks using kanban-md, a file-based kanban board CLI.
   Use when the user mentions tasks, kanban, board, backlog, sprint,
@@ -44,7 +44,7 @@ Each task is a `.md` file in `kanban/tasks/`. The CLI is `kanban-md`
 | List tasks by assignee                  | `kanban-md list --assignee alice --json`                    |
 | List tasks by tag                       | `kanban-md list --tag bug --json`                           |
 | List blocked tasks                      | `kanban-md list --blocked --json`                           |
-| List ready-to-start tasks              | `kanban-md list --not-blocked --status todo --json`         |
+| List ready-to-start tasks               | `kanban-md list --not-blocked --status todo --json`         |
 | List tasks with resolved deps           | `kanban-md list --unblocked --json`                         |
 | Find a specific task                    | `kanban-md show ID --json`                                  |
 | Create a task                           | `kanban-md create "TITLE" --priority P --tags T --json`     |
@@ -70,7 +70,7 @@ Each task is a `.md` file in `kanban/tasks/`. The CLI is `kanban-md`
 
 ### list
 
-```
+```bash
 kanban-md list [--status S] [--priority P] [--assignee A] [--tag T] \
   [--sort FIELD] [-r] [-n LIMIT] [--blocked] [--not-blocked] \
   [--parent ID] [--unblocked] --json
@@ -82,7 +82,7 @@ Returns a JSON array of task objects.
 
 ### create
 
-```
+```bash
 kanban-md create "TITLE" [--status S] [--priority P] [--assignee A] \
   [--tags T1,T2] [--due YYYY-MM-DD] [--estimate E] [--body "TEXT"] \
   [--parent ID] [--depends-on ID1,ID2] --json
@@ -92,7 +92,7 @@ Returns the created task object with its assigned ID.
 
 ### show
 
-```
+```bash
 kanban-md show ID --json
 ```
 
@@ -100,7 +100,7 @@ Returns a single task object including body text.
 
 ### edit
 
-```
+```bash
 kanban-md edit ID [--title T] [--status S] [--priority P] [--assignee A] \
   [--add-tag T] [--remove-tag T] [--due YYYY-MM-DD] [--clear-due] \
   [--estimate E] [--body "TEXT"] [--started YYYY-MM-DD] [--clear-started] \
@@ -113,7 +113,7 @@ Only specified fields are changed. Returns the updated task object.
 
 ### move
 
-```
+```bash
 kanban-md move ID STATUS --json
 kanban-md move ID --next --json
 kanban-md move ID --prev --json
@@ -125,7 +125,7 @@ Returns a task object with a `changed` boolean field.
 
 ### delete
 
-```
+```bash
 kanban-md delete ID --force --json
 ```
 
@@ -133,7 +133,7 @@ Always pass `--force` (non-interactive context requires it).
 
 ### board
 
-```
+```bash
 kanban-md board --json
 ```
 
@@ -142,7 +142,7 @@ blocked/overdue counts, priority distribution.
 
 ### metrics
 
-```
+```bash
 kanban-md metrics [--since YYYY-MM-DD] --json
 ```
 
@@ -151,7 +151,7 @@ aging items.
 
 ### log
 
-```
+```bash
 kanban-md log [--since YYYY-MM-DD] [--limit N] [--action TYPE] \
   [--task ID] --json
 ```
