@@ -23,9 +23,9 @@ func compareTasks(a, b *task.Task, field string, cfg *config.Config) bool {
 	switch field {
 	case "id":
 		return a.ID < b.ID
-	case "status":
+	case fieldStatus:
 		return cfg.StatusIndex(a.Status) < cfg.StatusIndex(b.Status)
-	case "priority":
+	case fieldPriority:
 		return cfg.PriorityIndex(a.Priority) < cfg.PriorityIndex(b.Priority)
 	case "created":
 		return a.Created.Before(b.Created)

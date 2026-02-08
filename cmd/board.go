@@ -5,11 +5,14 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"slices"
+	"strings"
 	"syscall"
 
 	"github.com/spf13/cobra"
 
 	"github.com/antopolskiy/kanban-md/internal/board"
+	"github.com/antopolskiy/kanban-md/internal/clierr"
 	"github.com/antopolskiy/kanban-md/internal/config"
 	"github.com/antopolskiy/kanban-md/internal/output"
 	"github.com/antopolskiy/kanban-md/internal/task"
@@ -34,16 +37,23 @@ Press Ctrl+C to stop.`,
 func init() {
 	rootCmd.AddCommand(boardCmd)
 	boardCmd.Flags().BoolVarP(&flagWatch, "watch", "w", false, "live-update the board on file changes")
+	boardCmd.Flags().String("group-by", "", "group board by field ("+strings.Join(board.ValidGroupByFields(), ", ")+")")
 }
 
-func runBoard(_ *cobra.Command, _ []string) error {
+func runBoard(cmd *cobra.Command, _ []string) error {
 	cfg, err := loadConfig()
 	if err != nil {
 		return err
 	}
 
+	groupBy, _ := cmd.Flags().GetString("group-by")
+	if groupBy != "" && !slices.Contains(board.ValidGroupByFields(), groupBy) {
+		return clierr.Newf(clierr.InvalidGroupBy, "invalid --group-by field %q; valid: %s",
+			groupBy, strings.Join(board.ValidGroupByFields(), ", "))
+	}
+
 	// Render once.
-	if err := renderBoard(cfg); err != nil {
+	if err := renderBoard(cfg, groupBy); err != nil {
 		return err
 	}
 
@@ -51,10 +61,10 @@ func runBoard(_ *cobra.Command, _ []string) error {
 		return nil
 	}
 
-	return watchBoard(cfg)
+	return watchBoard(cfg, groupBy)
 }
 
-func renderBoard(cfg *config.Config) error {
+func renderBoard(cfg *config.Config, groupBy string) error {
 	tasks, warnings, err := task.ReadAllLenient(cfg.TasksPath())
 	if err != nil {
 		return err
@@ -62,6 +72,10 @@ func renderBoard(cfg *config.Config) error {
 	printWarnings(warnings)
 	if tasks == nil {
 		tasks = []*task.Task{}
+	}
+
+	if groupBy != "" {
+		return renderGroupedBoard(cfg, tasks, groupBy)
 	}
 
 	summary := board.Summary(cfg, tasks)
@@ -74,7 +88,18 @@ func renderBoard(cfg *config.Config) error {
 	return nil
 }
 
-func watchBoard(cfg *config.Config) error {
+func renderGroupedBoard(cfg *config.Config, tasks []*task.Task, groupBy string) error {
+	grouped := board.GroupBy(tasks, groupBy, cfg)
+
+	if outputFormat() == output.FormatJSON {
+		return output.JSON(os.Stdout, grouped)
+	}
+
+	output.GroupedTable(os.Stdout, grouped)
+	return nil
+}
+
+func watchBoard(cfg *config.Config, groupBy string) error {
 	// Watch both the tasks directory and the config file's directory.
 	watchPaths := []string{cfg.TasksPath(), cfg.Dir()}
 
@@ -89,7 +114,7 @@ func watchBoard(cfg *config.Config) error {
 			fmt.Fprintf(os.Stderr, "Warning: reloading config: %v\n", loadErr)
 			freshCfg = cfg
 		}
-		if renderErr := renderBoard(freshCfg); renderErr != nil {
+		if renderErr := renderBoard(freshCfg, groupBy); renderErr != nil {
 			fmt.Fprintf(os.Stderr, "Warning: rendering board: %v\n", renderErr)
 		}
 	})
