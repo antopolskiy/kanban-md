@@ -2603,6 +2603,25 @@ func TestBatchSingleIDBackcompat(t *testing.T) {
 	}
 }
 
+func TestBatchDeleteWarnsDependents(t *testing.T) {
+	kanbanDir := initBoard(t)
+	mustCreateTask(t, kanbanDir, "Task A")
+	mustCreateTask(t, kanbanDir, "Task B")
+	mustCreateTask(t, kanbanDir, "Task C")
+
+	// Make B depend on A.
+	runKanban(t, kanbanDir, "edit", "2", "--add-dep", "1")
+
+	// Batch delete A and C — should warn about B depending on A.
+	r := runKanban(t, kanbanDir, "delete", "1,3", "--force")
+	if r.exitCode != 0 {
+		t.Fatalf("exit code = %d, want 0\nstderr: %s", r.exitCode, r.stderr)
+	}
+	if !strings.Contains(r.stderr, "Warning") {
+		t.Errorf("stderr should contain dependent-task warning, got: %q", r.stderr)
+	}
+}
+
 func TestBatchDeleteRequiresForce(t *testing.T) {
 	kanbanDir := initBoard(t)
 	mustCreateTask(t, kanbanDir, "Task A")

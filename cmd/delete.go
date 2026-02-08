@@ -123,6 +123,8 @@ func deleteSingleCore(cfg *config.Config, id int) error {
 		return err
 	}
 
+	warnDependents(cfg.TasksPath(), t.ID)
+
 	if err := os.Remove(path); err != nil {
 		return fmt.Errorf("deleting task file: %w", err)
 	}
