@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -88,17 +89,17 @@ func runCreate(cmd *cobra.Command, args []string) error {
 
 	// Output.
 	if outputFormat() == output.FormatJSON {
-		return output.JSON(t)
+		return output.JSON(os.Stdout, t)
 	}
 
-	output.Messagef("Created task #%d: %s", t.ID, t.Title)
-	output.Messagef("  File: %s", path)
-	output.Messagef("  Status: %s | Priority: %s", t.Status, t.Priority)
+	output.Messagef(os.Stdout, "Created task #%d: %s", t.ID, t.Title)
+	output.Messagef(os.Stdout, "  File: %s", path)
+	output.Messagef(os.Stdout, "  Status: %s | Priority: %s", t.Status, t.Priority)
 	if t.Assignee != "" {
-		output.Messagef("  Assignee: %s", t.Assignee)
+		output.Messagef(os.Stdout, "  Assignee: %s", t.Assignee)
 	}
 	if len(t.Tags) > 0 {
-		output.Messagef("  Tags: %s", strings.Join(t.Tags, ", "))
+		output.Messagef(os.Stdout, "  Tags: %s", strings.Join(t.Tags, ", "))
 	}
 	return nil
 }

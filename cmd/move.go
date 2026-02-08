@@ -103,7 +103,7 @@ func moveSingleTask(cfg *config.Config, id int, cmd *cobra.Command, args []strin
 		return outputMoveResult(t, true)
 	}
 
-	output.Messagef("Moved task #%d: %s → %s", id, oldStatus, newStatus)
+	output.Messagef(os.Stdout, "Moved task #%d: %s → %s", id, oldStatus, newStatus)
 	return nil
 }
 
@@ -229,10 +229,10 @@ func updateTimestamps(t *task.Task, oldStatus, newStatus string, cfg *config.Con
 func outputMoveResult(t *task.Task, changed bool) error {
 	format := outputFormat()
 	if format == output.FormatJSON {
-		return output.JSON(moveResult{Task: t, Changed: changed})
+		return output.JSON(os.Stdout, moveResult{Task: t, Changed: changed})
 	}
 	if !changed {
-		output.Messagef("Task #%d is already at %s", t.ID, t.Status)
+		output.Messagef(os.Stdout, "Task #%d is already at %s", t.ID, t.Status)
 	}
 	return nil
 }

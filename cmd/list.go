@@ -1,6 +1,8 @@
 package cmd
 
 import (
+	"os"
+
 	"github.com/spf13/cobra"
 
 	"github.com/antopolskiy/kanban-md/internal/board"
@@ -86,9 +88,9 @@ func runList(cmd *cobra.Command, _ []string) error {
 		if tasks == nil {
 			tasks = []*task.Task{}
 		}
-		return output.JSON(tasks)
+		return output.JSON(os.Stdout, tasks)
 	}
 
-	output.TaskTable(tasks)
+	output.TaskTable(os.Stdout, tasks)
 	return nil
 }

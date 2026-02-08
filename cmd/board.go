@@ -1,6 +1,8 @@
 package cmd
 
 import (
+	"os"
+
 	"github.com/spf13/cobra"
 
 	"github.com/antopolskiy/kanban-md/internal/board"
@@ -37,9 +39,9 @@ func runBoard(_ *cobra.Command, _ []string) error {
 	summary := board.Summary(cfg, tasks)
 
 	if outputFormat() == output.FormatJSON {
-		return output.JSON(summary)
+		return output.JSON(os.Stdout, summary)
 	}
 
-	output.OverviewTable(summary)
+	output.OverviewTable(os.Stdout, summary)
 	return nil
 }

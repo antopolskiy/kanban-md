@@ -1,7 +1,6 @@
 package output
 
 import (
-	"os"
 	"strings"
 	"testing"
 	"time"
@@ -13,25 +12,66 @@ import (
 	"github.com/antopolskiy/kanban-md/internal/task"
 )
 
-// captureStdout redirects os.Stdout to a pipe and returns the captured output.
-func captureStdout(t *testing.T, fn func()) string {
-	t.Helper()
-	old := os.Stdout
-	r, w, err := os.Pipe()
+func TestTaskTableWritesToWriter(t *testing.T) {
+	DisableColor()
+	t.Cleanup(func() {
+		headerStyle = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("244"))
+		dimStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
+	})
+
+	now := time.Now()
+	tasks := []*task.Task{
+		{ID: 1, Title: "Test task", Status: "backlog", Priority: "medium", Created: now, Updated: now},
+	}
+
+	var buf strings.Builder
+	TaskTable(&buf, tasks)
+
+	output := buf.String()
+	if !strings.Contains(output, "Test task") {
+		t.Errorf("TaskTable output missing task title:\n%s", output)
+	}
+	if !strings.Contains(output, "ID") {
+		t.Errorf("TaskTable output missing header:\n%s", output)
+	}
+}
+
+func TestTaskTableEmptyWritesToWriter(t *testing.T) {
+	var buf strings.Builder
+	TaskTable(&buf, nil)
+	if !strings.Contains(buf.String(), "No tasks found") {
+		t.Errorf("TaskTable empty output = %q", buf.String())
+	}
+}
+
+func TestMessagefWritesToWriter(t *testing.T) {
+	var buf strings.Builder
+	Messagef(&buf, "hello %s", "world")
+	if buf.String() != "hello world\n" {
+		t.Errorf("Messagef output = %q, want %q", buf.String(), "hello world\n")
+	}
+}
+
+func TestJSONWritesToWriter(t *testing.T) {
+	var buf strings.Builder
+	err := JSON(&buf, map[string]string{"key": "value"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	os.Stdout = w
+	if !strings.Contains(buf.String(), `"key": "value"`) {
+		t.Errorf("JSON output missing content:\n%s", buf.String())
+	}
+}
 
-	fn()
-
-	_ = w.Close()
-	os.Stdout = old
-
-	const captureSize = 64 * 1024
-	buf := make([]byte, captureSize)
-	n, _ := r.Read(buf)
-	return string(buf[:n])
+func TestJSONErrorWritesToWriter(t *testing.T) {
+	var buf strings.Builder
+	JSONError(&buf, "TEST_CODE", "test message", nil)
+	if !strings.Contains(buf.String(), `"code": "TEST_CODE"`) {
+		t.Errorf("JSONError output missing code:\n%s", buf.String())
+	}
+	if !strings.Contains(buf.String(), `"error": "test message"`) {
+		t.Errorf("JSONError output missing error:\n%s", buf.String())
+	}
 }
 
 func TestTaskTableColumnAlignment(t *testing.T) {
@@ -67,7 +107,9 @@ func TestTaskTableColumnAlignment(t *testing.T) {
 		},
 	}
 
-	output := captureStdout(t, func() { TaskTable(tasks) })
+	var buf strings.Builder
+	TaskTable(&buf, tasks)
+	output := buf.String()
 	lines := strings.Split(strings.TrimRight(output, "\n"), "\n")
 
 	const expectedMinLines = 4 // header + 3 data rows
@@ -75,13 +117,6 @@ func TestTaskTableColumnAlignment(t *testing.T) {
 		t.Fatalf("expected at least 4 lines, got %d:\n%s", len(lines), output)
 	}
 
-	// Measure visible widths of all rows. The key test: rows with "--" placeholders
-	// (which contain ANSI escape codes) should NOT be wider than rows with real data,
-	// because the padding should be based on visible width, not byte length.
-	//
-	// Row 1 has all fields populated (no ANSI in data columns).
-	// Row 2 has empty assignee, tags, and due (all rendered with dimStyle → ANSI codes).
-	// If %-*s counts ANSI bytes as width, row 2 will be visibly wider than row 1.
 	row1Width := lipgloss.Width(lines[1])
 	row2Width := lipgloss.Width(lines[2])
 	row3Width := lipgloss.Width(lines[3])

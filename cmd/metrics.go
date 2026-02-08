@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"os"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -57,9 +58,9 @@ func runMetrics(cmd *cobra.Command, _ []string) error {
 	m := board.ComputeMetrics(cfg, tasks, now)
 
 	if outputFormat() == output.FormatJSON {
-		return output.JSON(m)
+		return output.JSON(os.Stdout, m)
 	}
 
-	output.MetricsTable(m)
+	output.MetricsTable(os.Stdout, m)
 	return nil
 }

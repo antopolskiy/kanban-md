@@ -137,7 +137,7 @@ func runConfigShow(_ *cobra.Command, _ []string) error {
 		for _, key := range allConfigKeys() {
 			m[key] = accessors[key].get(cfg)
 		}
-		return output.JSON(m)
+		return output.JSON(os.Stdout, m)
 	}
 
 	// Table mode: key-value pairs.
@@ -164,7 +164,7 @@ func runConfigGet(_ *cobra.Command, args []string) error {
 	val := acc.get(cfg)
 
 	if outputFormat() == output.FormatJSON {
-		return output.JSON(val)
+		return output.JSON(os.Stdout, val)
 	}
 
 	fmt.Fprintln(os.Stdout, formatConfigValue(val))
@@ -200,10 +200,10 @@ func runConfigSet(_ *cobra.Command, args []string) error {
 	}
 
 	if outputFormat() == output.FormatJSON {
-		return output.JSON(map[string]any{"key": key, "value": acc.get(cfg)})
+		return output.JSON(os.Stdout, map[string]any{"key": key, "value": acc.get(cfg)})
 	}
 
-	output.Messagef("Set %s = %v", key, formatConfigValue(acc.get(cfg)))
+	output.Messagef(os.Stdout, "Set %s = %v", key, formatConfigValue(acc.get(cfg)))
 	return nil
 }
 

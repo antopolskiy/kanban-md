@@ -1,6 +1,8 @@
 package cmd
 
 import (
+	"os"
+
 	"github.com/spf13/cobra"
 
 	"github.com/antopolskiy/kanban-md/internal/board"
@@ -58,9 +60,9 @@ func runLog(cmd *cobra.Command, _ []string) error {
 		if entries == nil {
 			entries = []board.LogEntry{}
 		}
-		return output.JSON(entries)
+		return output.JSON(os.Stdout, entries)
 	}
 
-	output.ActivityLogTable(entries)
+	output.ActivityLogTable(os.Stdout, entries)
 	return nil
 }

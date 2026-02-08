@@ -3,12 +3,12 @@ package output
 import (
 	"encoding/json"
 	"fmt"
-	"os"
+	"io"
 )
 
-// JSON writes data as indented JSON to stdout.
-func JSON(data interface{}) error {
-	enc := json.NewEncoder(os.Stdout)
+// JSON writes data as indented JSON to the given writer.
+func JSON(w io.Writer, data interface{}) error {
+	enc := json.NewEncoder(w)
 	enc.SetIndent("", "  ")
 	if err := enc.Encode(data); err != nil {
 		return fmt.Errorf("encoding JSON: %w", err)
@@ -23,12 +23,12 @@ type ErrorResponse struct {
 	Details map[string]any `json:"details,omitempty"`
 }
 
-// JSONError writes a structured error to stdout as JSON.
-func JSONError(code, msg string, details map[string]any) {
+// JSONError writes a structured error to the given writer as JSON.
+func JSONError(w io.Writer, code, msg string, details map[string]any) {
 	resp := ErrorResponse{Error: msg, Code: code, Details: details}
-	enc := json.NewEncoder(os.Stdout)
+	enc := json.NewEncoder(w)
 	enc.SetIndent("", "  ")
-	_ = enc.Encode(resp) // best-effort; if stdout fails, nothing we can do
+	_ = enc.Encode(resp) // best-effort; if writer fails, nothing we can do
 }
 
 // BatchResult represents the outcome of a single operation within a batch.

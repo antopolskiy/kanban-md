@@ -2,7 +2,7 @@ package output
 
 import (
 	"fmt"
-	"os"
+	"io"
 	"strconv"
 	"strings"
 	"time"
@@ -25,9 +25,9 @@ func DisableColor() {
 }
 
 // TaskTable renders a list of tasks as a formatted table.
-func TaskTable(tasks []*task.Task) {
+func TaskTable(w io.Writer, tasks []*task.Task) {
 	if len(tasks) == 0 {
-		fmt.Fprintln(os.Stderr, "No tasks found.")
+		fmt.Fprintln(w, "No tasks found.")
 		return
 	}
 
@@ -47,7 +47,7 @@ func TaskTable(tasks []*task.Task) {
 	header := fmt.Sprintf("%-*s %-*s %-*s %-*s %-*s %-*s %-*s",
 		idW, "ID", statusW, "STATUS", prioW, "PRIORITY",
 		titleW, "TITLE", assignW, "ASSIGNEE", tagsW, "TAGS", dueW, "DUE")
-	fmt.Fprintln(os.Stdout, headerStyle.Render(header))
+	fmt.Fprintln(w, headerStyle.Render(header))
 
 	// Print rows.
 	for _, t := range tasks {
@@ -71,7 +71,7 @@ func TaskTable(tasks []*task.Task) {
 			due = dimStyle.Render(due)
 		}
 
-		fmt.Fprintf(os.Stdout, "%-*d %s %s %s %s %s %s\n",
+		fmt.Fprintf(w, "%-*d %s %s %s %s %s %s\n",
 			idW, t.ID,
 			padRight(t.Status, statusW),
 			padRight(t.Priority, prioW),
@@ -83,92 +83,92 @@ func TaskTable(tasks []*task.Task) {
 }
 
 // TaskDetail renders a single task with full detail.
-func TaskDetail(t *task.Task) {
+func TaskDetail(w io.Writer, t *task.Task) {
 	titleLine := fmt.Sprintf("Task #%d: %s", t.ID, t.Title)
-	fmt.Fprintln(os.Stdout, lipgloss.NewStyle().Bold(true).Render(titleLine))
-	fmt.Fprintln(os.Stdout, strings.Repeat("─", len(titleLine)))
+	fmt.Fprintln(w, lipgloss.NewStyle().Bold(true).Render(titleLine))
+	fmt.Fprintln(w, strings.Repeat("─", len(titleLine)))
 
-	printField("Status", t.Status)
-	printField("Priority", t.Priority)
-	printField("Assignee", stringOrDash(t.Assignee))
+	printField(w, "Status", t.Status)
+	printField(w, "Priority", t.Priority)
+	printField(w, "Assignee", stringOrDash(t.Assignee))
 	if len(t.Tags) > 0 {
-		printField("Tags", strings.Join(t.Tags, ", "))
+		printField(w, "Tags", strings.Join(t.Tags, ", "))
 	} else {
-		printField("Tags", dimStyle.Render("--"))
+		printField(w, "Tags", dimStyle.Render("--"))
 	}
 	if t.Due != nil {
-		printField("Due", t.Due.String())
+		printField(w, "Due", t.Due.String())
 	} else {
-		printField("Due", dimStyle.Render("--"))
+		printField(w, "Due", dimStyle.Render("--"))
 	}
-	printField("Estimate", stringOrDash(t.Estimate))
-	printField("Created", t.Created.Format("2006-01-02 15:04"))
-	printField("Updated", t.Updated.Format("2006-01-02 15:04"))
+	printField(w, "Estimate", stringOrDash(t.Estimate))
+	printField(w, "Created", t.Created.Format("2006-01-02 15:04"))
+	printField(w, "Updated", t.Updated.Format("2006-01-02 15:04"))
 	if t.Started != nil {
-		printField("Started", t.Started.Format("2006-01-02 15:04"))
+		printField(w, "Started", t.Started.Format("2006-01-02 15:04"))
 	}
 	if t.Completed != nil {
-		printField("Completed", t.Completed.Format("2006-01-02 15:04"))
-		printField("Lead time", FormatDuration(t.Completed.Sub(t.Created)))
+		printField(w, "Completed", t.Completed.Format("2006-01-02 15:04"))
+		printField(w, "Lead time", FormatDuration(t.Completed.Sub(t.Created)))
 		if t.Started != nil {
-			printField("Cycle time", FormatDuration(t.Completed.Sub(*t.Started)))
+			printField(w, "Cycle time", FormatDuration(t.Completed.Sub(*t.Started)))
 		}
 	}
 
 	if t.Body != "" {
-		fmt.Fprintln(os.Stdout)
-		fmt.Fprintln(os.Stdout, t.Body)
+		fmt.Fprintln(w)
+		fmt.Fprintln(w, t.Body)
 	}
 }
 
 // OverviewTable renders a board summary as a formatted dashboard.
-func OverviewTable(s board.Overview) {
-	fmt.Fprintln(os.Stdout, lipgloss.NewStyle().Bold(true).Render(s.BoardName))
-	fmt.Fprintf(os.Stdout, "Total: %d tasks\n\n", s.TotalTasks)
+func OverviewTable(w io.Writer, s board.Overview) {
+	fmt.Fprintln(w, lipgloss.NewStyle().Bold(true).Render(s.BoardName))
+	fmt.Fprintf(w, "Total: %d tasks\n\n", s.TotalTasks)
 
 	header := fmt.Sprintf("%-16s %6s %8s %8s %8s", "STATUS", "COUNT", "WIP", "BLOCKED", "OVERDUE")
-	fmt.Fprintln(os.Stdout, headerStyle.Render(header))
+	fmt.Fprintln(w, headerStyle.Render(header))
 
 	for _, ss := range s.Statuses {
 		wip := dimStyle.Render("--")
 		if ss.WIPLimit > 0 {
 			wip = strconv.Itoa(ss.Count) + "/" + strconv.Itoa(ss.WIPLimit)
 		}
-		fmt.Fprintf(os.Stdout, "%-16s %6d %s %8d %8d\n",
+		fmt.Fprintf(w, "%-16s %6d %s %8d %8d\n",
 			ss.Status, ss.Count, padRight(wip, 8), ss.Blocked, ss.Overdue) //nolint:mnd // column width
 	}
 
-	fmt.Fprintln(os.Stdout)
+	fmt.Fprintln(w)
 	prioHeader := fmt.Sprintf("%-16s %6s", "PRIORITY", "COUNT")
-	fmt.Fprintln(os.Stdout, headerStyle.Render(prioHeader))
+	fmt.Fprintln(w, headerStyle.Render(prioHeader))
 
 	for _, pc := range s.Priorities {
-		fmt.Fprintf(os.Stdout, "%-16s %6d\n", pc.Priority, pc.Count)
+		fmt.Fprintf(w, "%-16s %6d\n", pc.Priority, pc.Count)
 	}
 }
 
 // MetricsTable renders flow metrics as a formatted dashboard.
-func MetricsTable(m board.Metrics) {
-	fmt.Fprintln(os.Stdout, lipgloss.NewStyle().Bold(true).Render("Flow Metrics"))
-	fmt.Fprintln(os.Stdout)
+func MetricsTable(w io.Writer, m board.Metrics) {
+	fmt.Fprintln(w, lipgloss.NewStyle().Bold(true).Render("Flow Metrics"))
+	fmt.Fprintln(w)
 
-	printField("Throughput 7d", strconv.Itoa(m.Throughput7d)+" tasks")
-	printField("Throughput 30d", strconv.Itoa(m.Throughput30d)+" tasks")
-	printField("Avg lead time", formatOptionalHours(m.AvgLeadTimeHours))
-	printField("Avg cycle time", formatOptionalHours(m.AvgCycleTimeHours))
-	printField("Flow efficiency", formatOptionalPercent(m.FlowEfficiency))
+	printField(w, "Throughput 7d", strconv.Itoa(m.Throughput7d)+" tasks")
+	printField(w, "Throughput 30d", strconv.Itoa(m.Throughput30d)+" tasks")
+	printField(w, "Avg lead time", formatOptionalHours(m.AvgLeadTimeHours))
+	printField(w, "Avg cycle time", formatOptionalHours(m.AvgCycleTimeHours))
+	printField(w, "Flow efficiency", formatOptionalPercent(m.FlowEfficiency))
 
 	if len(m.AgingItems) > 0 {
-		fmt.Fprintln(os.Stdout)
+		fmt.Fprintln(w)
 		agingHeader := fmt.Sprintf("%-6s %-16s %-40s %10s", "ID", "STATUS", "TITLE", "AGE")
-		fmt.Fprintln(os.Stdout, headerStyle.Render(agingHeader))
+		fmt.Fprintln(w, headerStyle.Render(agingHeader))
 		for _, a := range m.AgingItems {
 			title := a.Title
 			const maxTitle = 38
 			if len(title) > maxTitle {
 				title = title[:maxTitle-3] + "..."
 			}
-			fmt.Fprintf(os.Stdout, "%-6d %-16s %-40s %10s\n",
+			fmt.Fprintf(w, "%-6d %-16s %-40s %10s\n",
 				a.ID, a.Status, title, FormatDuration(time.Duration(a.AgeHours*float64(time.Hour))))
 		}
 	}
@@ -190,29 +190,29 @@ func formatOptionalPercent(f *float64) string {
 }
 
 // ActivityLogTable renders activity log entries as a formatted table.
-func ActivityLogTable(entries []board.LogEntry) {
+func ActivityLogTable(w io.Writer, entries []board.LogEntry) {
 	if len(entries) == 0 {
-		fmt.Fprintln(os.Stderr, "No activity log entries found.")
+		fmt.Fprintln(w, "No activity log entries found.")
 		return
 	}
 
 	header := fmt.Sprintf("%-20s %-10s %6s  %s", "TIMESTAMP", "ACTION", "TASK", "DETAIL")
-	fmt.Fprintln(os.Stdout, headerStyle.Render(header))
+	fmt.Fprintln(w, headerStyle.Render(header))
 
 	for _, e := range entries {
-		fmt.Fprintf(os.Stdout, "%-20s %-10s %6d  %s\n",
+		fmt.Fprintf(w, "%-20s %-10s %6d  %s\n",
 			e.Timestamp.Format("2006-01-02 15:04:05"),
 			e.Action, e.TaskID, e.Detail)
 	}
 }
 
 // Messagef prints a simple formatted message line.
-func Messagef(format string, args ...interface{}) {
-	fmt.Fprintf(os.Stdout, format+"\n", args...)
+func Messagef(w io.Writer, format string, args ...interface{}) {
+	fmt.Fprintf(w, format+"\n", args...)
 }
 
-func printField(label, value string) {
-	fmt.Fprintf(os.Stdout, "  %-12s %s\n", label+":", value)
+func printField(w io.Writer, label, value string) {
+	fmt.Fprintf(w, "  %-12s %s\n", label+":", value)
 }
 
 // FormatDuration renders a duration as human-readable "Xd Yh" or "Xh Ym".

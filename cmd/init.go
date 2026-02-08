@@ -89,7 +89,7 @@ func runInit(cmd *cobra.Command, _ []string) error {
 	// Output result.
 	format := outputFormat()
 	if format == output.FormatJSON {
-		return output.JSON(map[string]string{
+		return output.JSON(os.Stdout, map[string]string{
 			"status":  "initialized",
 			"dir":     absDir,
 			"name":    name,
@@ -99,10 +99,10 @@ func runInit(cmd *cobra.Command, _ []string) error {
 		})
 	}
 
-	output.Messagef("Initialized board %q in %s", name, absDir)
-	output.Messagef("  Config:  %s", cfg.ConfigPath())
-	output.Messagef("  Tasks:   %s", tasksDir)
-	output.Messagef("  Columns: %s", strings.Join(cfg.Statuses, ", "))
+	output.Messagef(os.Stdout, "Initialized board %q in %s", name, absDir)
+	output.Messagef(os.Stdout, "  Config:  %s", cfg.ConfigPath())
+	output.Messagef(os.Stdout, "  Tasks:   %s", tasksDir)
+	output.Messagef(os.Stdout, "  Columns: %s", strings.Join(cfg.Statuses, ", "))
 	return nil
 }
 

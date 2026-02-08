@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/spf13/cobra"
 
@@ -58,12 +59,12 @@ func runContext(cmd *cobra.Command, _ []string) error {
 		if err := board.WriteContextToFile(writeTo, md); err != nil {
 			return fmt.Errorf("writing context file: %w", err)
 		}
-		output.Messagef("Context written to %s", writeTo)
+		output.Messagef(os.Stdout, "Context written to %s", writeTo)
 		return nil
 	}
 
 	if outputFormat() == output.FormatJSON {
-		return output.JSON(data)
+		return output.JSON(os.Stdout, data)
 	}
 
 	// Table/auto mode: render markdown to stdout.

@@ -74,11 +74,11 @@ func Execute() {
 	if jsonMode {
 		var cliErr *clierr.Error
 		if errors.As(err, &cliErr) {
-			output.JSONError(cliErr.Code, cliErr.Message, cliErr.Details)
+			output.JSONError(os.Stdout, cliErr.Code, cliErr.Message, cliErr.Details)
 			os.Exit(cliErr.ExitCode())
 		}
 		// Unknown error — wrap as INTERNAL_ERROR.
-		output.JSONError(clierr.InternalError, err.Error(), nil)
+		output.JSONError(os.Stdout, clierr.InternalError, err.Error(), nil)
 		os.Exit(2) //nolint:mnd // exit code 2 for internal errors
 	}
 
@@ -211,7 +211,7 @@ func runBatch(ids []int, fn func(int) error) error {
 	}
 
 	if outputFormat() == output.FormatJSON {
-		if err := output.JSON(results); err != nil {
+		if err := output.JSON(os.Stdout, results); err != nil {
 			return err
 		}
 	} else {
@@ -223,7 +223,7 @@ func runBatch(ids []int, fn func(int) error) error {
 				fmt.Fprintf(os.Stderr, "Error: task #%d: %s\n", r.ID, r.Error)
 			}
 		}
-		output.Messagef("Completed %d/%d operations", succeeded, len(ids))
+		output.Messagef(os.Stdout, "Completed %d/%d operations", succeeded, len(ids))
 	}
 
 	if anyFailed {

@@ -120,10 +120,10 @@ func editSingleTask(cfg *config.Config, id int, cmd *cobra.Command, force bool) 
 
 	if outputFormat() == output.FormatJSON {
 		t.File = newPath
-		return output.JSON(t)
+		return output.JSON(os.Stdout, t)
 	}
 
-	output.Messagef("Updated task #%d: %s", t.ID, t.Title)
+	output.Messagef(os.Stdout, "Updated task #%d: %s", t.ID, t.Title)
 	return nil
 }
 

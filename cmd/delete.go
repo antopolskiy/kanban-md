@@ -100,14 +100,14 @@ func deleteSingleTask(cfg *config.Config, id int, force bool) error {
 
 	format := outputFormat()
 	if format == output.FormatJSON {
-		return output.JSON(map[string]interface{}{
+		return output.JSON(os.Stdout, map[string]interface{}{
 			"status": "deleted",
 			"id":     t.ID,
 			"title":  t.Title,
 		})
 	}
 
-	output.Messagef("Deleted task #%d: %s", t.ID, t.Title)
+	output.Messagef(os.Stdout, "Deleted task #%d: %s", t.ID, t.Title)
 	return nil
 }
 

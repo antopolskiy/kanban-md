@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"os"
 	"strconv"
 
 	"github.com/spf13/cobra"
@@ -44,9 +45,9 @@ func runShow(_ *cobra.Command, args []string) error {
 
 	format := outputFormat()
 	if format == output.FormatJSON {
-		return output.JSON(t)
+		return output.JSON(os.Stdout, t)
 	}
 
-	output.TaskDetail(t)
+	output.TaskDetail(os.Stdout, t)
 	return nil
 }
