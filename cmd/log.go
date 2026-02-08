@@ -56,11 +56,16 @@ func runLog(cmd *cobra.Command, _ []string) error {
 		return err
 	}
 
-	if outputFormat() == output.FormatJSON {
+	format := outputFormat()
+	if format == output.FormatJSON {
 		if entries == nil {
 			entries = []board.LogEntry{}
 		}
 		return output.JSON(os.Stdout, entries)
+	}
+	if format == output.FormatCompact {
+		output.ActivityLogCompact(os.Stdout, entries)
+		return nil
 	}
 
 	output.ActivityLogTable(os.Stdout, entries)

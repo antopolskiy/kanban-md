@@ -66,8 +66,13 @@ func renderBoard(cfg *config.Config) error {
 
 	summary := board.Summary(cfg, tasks)
 
-	if outputFormat() == output.FormatJSON {
+	format := outputFormat()
+	if format == output.FormatJSON {
 		return output.JSON(os.Stdout, summary)
+	}
+	if format == output.FormatCompact {
+		output.OverviewCompact(os.Stdout, summary)
+		return nil
 	}
 
 	output.OverviewTable(os.Stdout, summary)

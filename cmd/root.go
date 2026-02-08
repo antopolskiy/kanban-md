@@ -24,6 +24,7 @@ var version = "dev"
 var (
 	flagJSON    bool
 	flagTable   bool
+	flagCompact bool
 	flagDir     string
 	flagNoColor bool
 )
@@ -47,6 +48,8 @@ easy to read, edit, and version-control. Designed for AI agents and humans alike
 func init() {
 	rootCmd.PersistentFlags().BoolVar(&flagJSON, "json", false, "output as JSON")
 	rootCmd.PersistentFlags().BoolVar(&flagTable, "table", false, "output as table")
+	rootCmd.PersistentFlags().BoolVar(&flagCompact, "compact", false, "compact one-line-per-record output")
+	rootCmd.PersistentFlags().BoolVar(&flagCompact, "oneline", false, "alias for --compact")
 	rootCmd.PersistentFlags().StringVar(&flagDir, "dir", "", "path to kanban directory")
 	rootCmd.PersistentFlags().BoolVar(&flagNoColor, "no-color", false, "disable color output")
 }
@@ -109,9 +112,9 @@ func loadConfig() (*config.Config, error) {
 	return config.Load(dir)
 }
 
-// outputFormat returns the detected output format from flags/env/TTY.
+// outputFormat returns the detected output format from flags/env.
 func outputFormat() output.Format {
-	return output.Detect(flagJSON, flagTable)
+	return output.Detect(flagJSON, flagTable, flagCompact)
 }
 
 // printWarnings writes task read warnings to stderr.

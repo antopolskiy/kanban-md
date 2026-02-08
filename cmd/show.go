@@ -47,6 +47,10 @@ func runShow(_ *cobra.Command, args []string) error {
 	if format == output.FormatJSON {
 		return output.JSON(os.Stdout, t)
 	}
+	if format == output.FormatCompact {
+		output.TaskDetailCompact(os.Stdout, t)
+		return nil
+	}
 
 	output.TaskDetail(os.Stdout, t)
 	return nil

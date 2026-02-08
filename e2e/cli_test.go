@@ -106,6 +106,37 @@ func runKanban(t *testing.T, dir string, args ...string) result {
 	return r
 }
 
+// runKanbanEnv runs the kanban-md binary with extra environment variables.
+func runKanbanEnv(t *testing.T, dir string, env []string, args ...string) result {
+	t.Helper()
+
+	fullArgs := append([]string{"--dir", dir}, args...)
+	cmd := exec.Command(binPath, fullArgs...) //nolint:gosec,noctx // e2e test binary
+	cmd.Env = append(os.Environ(), env...)
+
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+
+	err := cmd.Run()
+
+	r := result{
+		stdout: stdout.String(),
+		stderr: stderr.String(),
+	}
+
+	if err != nil {
+		var exitErr *exec.ExitError
+		if errors.As(err, &exitErr) {
+			r.exitCode = exitErr.ExitCode()
+		} else {
+			t.Fatalf("running kanban-md: %v", err)
+		}
+	}
+
+	return r
+}
+
 // runKanbanJSON runs with --json and unmarshals stdout into dest.
 func runKanbanJSON(t *testing.T, dir string, dest interface{}, args ...string) result {
 	t.Helper()
@@ -2672,29 +2703,29 @@ func TestBatchMoveJSON(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// Default output format tests (table is default, no --json or --table flag)
+// Default output format tests (table is always the default)
 // ---------------------------------------------------------------------------
 
-func TestPipedOutputDefaultsToJSON(t *testing.T) {
+func TestDefaultOutputIsTable(t *testing.T) {
 	kanbanDir := initBoard(t)
-	mustCreateTask(t, kanbanDir, "Piped output task", "--tags", "test,demo")
+	mustCreateTask(t, kanbanDir, "Default output task", "--tags", "test,demo")
 
-	// When piped (non-TTY), default output should be JSON.
+	// Default output should be table (even when piped/non-TTY).
 	r := runKanban(t, kanbanDir, "list")
 	if r.exitCode != 0 {
 		t.Fatalf("list failed: %s", r.stderr)
 	}
-	if !strings.HasPrefix(strings.TrimSpace(r.stdout), "[") {
-		t.Errorf("piped list should default to JSON, got:\n%s", r.stdout)
+	if !strings.Contains(r.stdout, "ID") || !strings.Contains(r.stdout, "STATUS") {
+		t.Errorf("default list should be table with headers, got:\n%s", r.stdout)
 	}
 
-	// Create should also default to JSON when piped.
+	// Create should also default to table (message) output.
 	r = runKanban(t, kanbanDir, "create", "Another task")
 	if r.exitCode != 0 {
 		t.Fatalf("create failed: %s", r.stderr)
 	}
-	if !strings.HasPrefix(strings.TrimSpace(r.stdout), "{") {
-		t.Errorf("piped create should default to JSON, got:\n%s", r.stdout)
+	if !strings.Contains(r.stdout, "Created task #2") {
+		t.Errorf("default create should show message, got:\n%s", r.stdout)
 	}
 }
 
@@ -2872,5 +2903,111 @@ func TestREADMEDocumentsAllCommands(t *testing.T) {
 	// Config example must mention wip_limits.
 	if !strings.Contains(readme, "wip_limits") {
 		t.Error("README config example missing wip_limits field")
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Compact output format tests
+// ---------------------------------------------------------------------------
+
+func TestCompactOutputList(t *testing.T) {
+	kanbanDir := initBoard(t)
+	mustCreateTask(t, kanbanDir, "Compact list task", "--tags", "test,demo", "--priority", "high")
+
+	r := runKanban(t, kanbanDir, "--compact", "list")
+	if r.exitCode != 0 {
+		t.Fatalf("compact list failed: %s", r.stderr)
+	}
+	if !strings.HasPrefix(strings.TrimSpace(r.stdout), "#1 [") {
+		t.Errorf("compact list should start with '#1 [', got:\n%s", r.stdout)
+	}
+	if !strings.Contains(r.stdout, "Compact list task") {
+		t.Errorf("compact list missing title:\n%s", r.stdout)
+	}
+	if !strings.Contains(r.stdout, "(test, demo)") {
+		t.Errorf("compact list missing tags:\n%s", r.stdout)
+	}
+}
+
+func TestCompactOutputShow(t *testing.T) {
+	kanbanDir := initBoard(t)
+	mustCreateTask(t, kanbanDir, "Compact show task", "--priority", "high")
+
+	r := runKanban(t, kanbanDir, "--compact", "show", "1")
+	if r.exitCode != 0 {
+		t.Fatalf("compact show failed: %s", r.stderr)
+	}
+	if !strings.Contains(r.stdout, "#1 [backlog/high] Compact show task") {
+		t.Errorf("compact show missing header:\n%s", r.stdout)
+	}
+	if !strings.Contains(r.stdout, "created:") {
+		t.Errorf("compact show missing timestamps:\n%s", r.stdout)
+	}
+}
+
+func TestCompactOutputBoard(t *testing.T) {
+	kanbanDir := initBoard(t)
+	mustCreateTask(t, kanbanDir, "Board compact task")
+
+	r := runKanban(t, kanbanDir, "--compact", "board")
+	if r.exitCode != 0 {
+		t.Fatalf("compact board failed: %s", r.stderr)
+	}
+	if !strings.Contains(r.stdout, "tasks)") {
+		t.Errorf("compact board missing task count:\n%s", r.stdout)
+	}
+	if !strings.Contains(r.stdout, "backlog:") {
+		t.Errorf("compact board missing status line:\n%s", r.stdout)
+	}
+}
+
+func TestCompactOutputMetrics(t *testing.T) {
+	kanbanDir := initBoard(t)
+
+	r := runKanban(t, kanbanDir, "--compact", "metrics")
+	if r.exitCode != 0 {
+		t.Fatalf("compact metrics failed: %s", r.stderr)
+	}
+	if !strings.Contains(r.stdout, "Throughput:") {
+		t.Errorf("compact metrics missing throughput:\n%s", r.stdout)
+	}
+}
+
+func TestCompactOutputLog(t *testing.T) {
+	kanbanDir := initBoard(t)
+	mustCreateTask(t, kanbanDir, "Log compact task")
+
+	r := runKanban(t, kanbanDir, "--compact", "log")
+	if r.exitCode != 0 {
+		t.Fatalf("compact log failed: %s", r.stderr)
+	}
+	if !strings.Contains(r.stdout, "create #1") {
+		t.Errorf("compact log missing create entry:\n%s", r.stdout)
+	}
+}
+
+func TestOnelineAlias(t *testing.T) {
+	kanbanDir := initBoard(t)
+	mustCreateTask(t, kanbanDir, "Oneline alias task")
+
+	compact := runKanban(t, kanbanDir, "--compact", "list")
+	oneline := runKanban(t, kanbanDir, "--oneline", "list")
+
+	if compact.stdout != oneline.stdout {
+		t.Errorf("--oneline should produce same output as --compact\ncompact:\n%s\noneline:\n%s",
+			compact.stdout, oneline.stdout)
+	}
+}
+
+func TestCompactEnvVar(t *testing.T) {
+	kanbanDir := initBoard(t)
+	mustCreateTask(t, kanbanDir, "Env compact task")
+
+	r := runKanbanEnv(t, kanbanDir, []string{"KANBAN_OUTPUT=compact"}, "list")
+	if r.exitCode != 0 {
+		t.Fatalf("env compact list failed: %s", r.stderr)
+	}
+	if !strings.HasPrefix(strings.TrimSpace(r.stdout), "#1 [") {
+		t.Errorf("KANBAN_OUTPUT=compact should produce compact output, got:\n%s", r.stdout)
 	}
 }

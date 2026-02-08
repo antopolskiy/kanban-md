@@ -23,7 +23,8 @@ Each task is a `.md` file in `kanban/tasks/`. The CLI is `kanban-md`
 
 ## Rules
 
-- Default output is concise table text. Only use `--json` with `show` when you need
+- Use `--compact` for listing commands (`list`, `board`, `metrics`, `log`) to get
+  token-efficient one-line output. Only use `--json` with `show` when you need
   full structured task data (body, timestamps, dependencies).
   For the `show --json` schema, see [references/json-schemas.md](references/json-schemas.md).
 - Always pass `--force` when deleting (`kanban-md delete ID --force`).
@@ -37,15 +38,15 @@ Each task is a `.md` file in `kanban/tasks/`. The CLI is `kanban-md`
 
 | User wants to...                        | Command                                                 |
 |-----------------------------------------|---------------------------------------------------------|
-| See board overview / standup            | `kanban-md board`                                       |
-| List all tasks                          | `kanban-md list`                                        |
-| List tasks by status                    | `kanban-md list --status todo,in-progress`              |
-| List tasks by priority                  | `kanban-md list --priority high,critical`               |
-| List tasks by assignee                  | `kanban-md list --assignee alice`                       |
-| List tasks by tag                       | `kanban-md list --tag bug`                              |
-| List blocked tasks                      | `kanban-md list --blocked`                              |
-| List ready-to-start tasks               | `kanban-md list --not-blocked --status todo`            |
-| List tasks with resolved deps           | `kanban-md list --unblocked`                            |
+| See board overview / standup            | `kanban-md board --compact`                             |
+| List all tasks                          | `kanban-md list --compact`                              |
+| List tasks by status                    | `kanban-md list --compact --status todo,in-progress`    |
+| List tasks by priority                  | `kanban-md list --compact --priority high,critical`     |
+| List tasks by assignee                  | `kanban-md list --compact --assignee alice`             |
+| List tasks by tag                       | `kanban-md list --compact --tag bug`                    |
+| List blocked tasks                      | `kanban-md list --compact --blocked`                    |
+| List ready-to-start tasks               | `kanban-md list --compact --not-blocked --status todo`  |
+| List tasks with resolved deps           | `kanban-md list --compact --unblocked`                  |
 | Find a specific task                    | `kanban-md show ID --json`                              |
 | Create a task                           | `kanban-md create "TITLE" --priority P --tags T`        |
 | Create a task with body                 | `kanban-md create "TITLE" --body "DESC"`                |
@@ -61,9 +62,9 @@ Each task is a `.md` file in `kanban/tasks/`. The CLI is `kanban-md`
 | Add a dependency                        | `kanban-md edit ID --add-dep DEP_ID`                    |
 | Set a parent task                       | `kanban-md edit ID --parent PARENT_ID`                  |
 | Delete a task                           | `kanban-md delete ID --force`                           |
-| See flow metrics                        | `kanban-md metrics`                                     |
-| See activity log                        | `kanban-md log --limit 20`                              |
-| See recent activity for a task          | `kanban-md log --task ID`                               |
+| See flow metrics                        | `kanban-md metrics --compact`                           |
+| See activity log                        | `kanban-md log --compact --limit 20`                    |
+| See recent activity for a task          | `kanban-md log --compact --task ID`                     |
 | Initialize a new board                  | `kanban-md init --name "NAME"`                          |
 
 ## Core Commands
@@ -159,29 +160,29 @@ Action types: create, move, edit, delete, block, unblock.
 
 ### Global Flags
 
-All commands accept: `--json`, `--table`, `--dir PATH`, `--no-color`.
+All commands accept: `--json`, `--table`, `--compact` (alias `--oneline`), `--dir PATH`, `--no-color`.
 
 ## Workflows
 
 ### Daily Standup
 
-1. `kanban-md board` — board overview
-2. `kanban-md list --status in-progress` — in-flight work
-3. `kanban-md list --blocked` — stuck items
-4. `kanban-md metrics` — throughput and aging
+1. `kanban-md board --compact` — board overview
+2. `kanban-md list --compact --status in-progress` — in-flight work
+3. `kanban-md list --compact --blocked` — stuck items
+4. `kanban-md metrics --compact` — throughput and aging
 5. Summarize: completed, active, blocked, aging items
 
 ### Triage New Work
 
-1. `kanban-md list --status backlog --sort priority -r` — review backlog
+1. `kanban-md list --compact --status backlog --sort priority -r` — review backlog
 2. For items to promote: `kanban-md move ID todo`
 3. For new items: `kanban-md create "TITLE" --priority P --tags T`
 4. For stale items: `kanban-md delete ID --force`
 
 ### Sprint Planning
 
-1. `kanban-md board` — current state
-2. `kanban-md list --status backlog,todo --sort priority -r` — candidates
+1. `kanban-md board --compact` — current state
+2. `kanban-md list --compact --status backlog,todo --sort priority -r` — candidates
 3. Promote selected: `kanban-md move ID todo`
 4. Assign: `kanban-md edit ID --assignee NAME`
 5. Set deadlines: `kanban-md edit ID --due YYYY-MM-DD`
@@ -201,14 +202,15 @@ All commands accept: `--json`, `--table`, `--dir PATH`, `--no-color`.
 1. Create parent: `kanban-md create "Epic title"`
 2. Create subtask: `kanban-md create "Subtask" --parent PARENT_ID`
 3. Or add dependency: `kanban-md create "Task B" --depends-on TASK_A_ID`
-4. List unresolved: `kanban-md list --blocked`
+4. List unresolved: `kanban-md list --compact --blocked`
 
 ## Pitfalls
 
+- **DO** use `--compact` for listing, board, metrics, and log commands — it is the most token-efficient format.
 - **DO** pass `--force` on delete. Without it, the command hangs waiting for stdin.
 - **DO** use `--json` with `show` when you need to parse task fields programmatically.
-- **DO NOT** use `--json` on other commands unless you specifically need structured output — table is the default and saves tokens.
-- **DO NOT** hardcode status or priority values. Read them from `kanban-md board`.
+- **DO NOT** use `--json` on other commands unless you specifically need structured output — `--compact` saves tokens.
+- **DO NOT** hardcode status or priority values. Read them from `kanban-md board --compact`.
 - **DO NOT** use `--next` or `--prev` without checking current status. They fail at boundary statuses.
 - **DO NOT** pass both `--status` and `--next`/`--prev` to move. Use one or the other.
 - **DO** quote task titles with special characters: `kanban-md create "Fix: the 'login' bug"`.

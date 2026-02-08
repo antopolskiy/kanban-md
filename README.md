@@ -14,7 +14,7 @@ Most project management tools lock your data behind a UI or an API. kanban-md ta
 
 - **Plain files.** Every task is a Markdown file. You can read, edit, grep, and diff them with any tool you already use.
 - **Version-controlled by default.** Task files live in your repo alongside code. Every change is a commit. History is free.
-- **Built for automation.** Auto-detects terminal vs piped output (table for humans, JSON for scripts), deterministic file naming, and a CLI-first interface make it easy to script and integrate with AI agents, CI pipelines, or custom tooling.
+- **Built for automation.** Table output by default, compact one-line format for AI agents (`--compact`), JSON for scripts (`--json`). Deterministic file naming and a CLI-first interface make it easy to integrate with CI pipelines or custom tooling.
 - **Zero dependencies at runtime.** A single static binary. No database, no server, no config service.
 
 ## Installation
@@ -377,29 +377,29 @@ These work with any command:
 | Flag | Description |
 |------|-------------|
 | `--json` | Force JSON output |
-| `--table` | Force table output |
+| `--table` | Force table output (default) |
+| `--compact` / `--oneline` | Compact one-line-per-record output |
 | `--dir` | Path to kanban directory (overrides auto-detection) |
 | `--no-color` | Disable color output (also respects `NO_COLOR` env var) |
 
 ### Output format
 
-Output format is auto-detected based on whether stdout is a terminal:
-- **TTY** (interactive terminal): table output (human-readable)
-- **Piped** (non-TTY): JSON output (machine-readable)
-
-Use `--json` or `--table` to override auto-detection:
+The default output format is **table** (human-readable). Use flags to switch:
 
 ```bash
-# Auto: table in terminal, JSON when piped
+# Default: table
 kanban-md list --status todo
-kanban-md list --status todo | jq '.[].title'  # auto-JSON
 
-# Explicit overrides
-kanban-md list --json    # force JSON even in terminal
-kanban-md list --table   # force table even when piped
+# Compact: one line per task, ideal for AI agents
+kanban-md list --compact
+
+# JSON: for scripting and piping
+kanban-md list --json | jq '.[].title'
 ```
 
-Override priority: `--json`/`--table` flags > `KANBAN_OUTPUT` env var > TTY auto-detection.
+Set the `KANBAN_OUTPUT` environment variable to change the default: `json`, `table`, `compact`, or `oneline`.
+
+Override priority: `--json`/`--table`/`--compact` flags > `KANBAN_OUTPUT` env var > table default.
 
 ## Configuration
 
@@ -457,7 +457,7 @@ kanban-md completion powershell | Out-String | Invoke-Expression
 
 **Files are the API.** The CLI is a convenience layer over a simple file format. You can always fall back to editing files directly — the tool will pick up changes.
 
-**Predictable output.** Auto-detects TTY for table output (human-readable) or JSON (piped/scripted). Use `--json`/`--table` to override. JSON follows a stable schema for automation.
+**Predictable output.** Default is table (human-readable). Use `--compact` for AI agents (token-efficient one-line format), `--json` for scripting. JSON follows a stable schema for automation.
 
 **No hidden state.** Everything is in `config.yml` and the task files. There's no database, no cache, no lock file. Two people (or agents) can work on the same board by editing different files and merging via git.
 

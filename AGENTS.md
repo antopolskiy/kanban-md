@@ -46,6 +46,17 @@ When modifying `config.yml` schema or task file frontmatter, you must ensure bac
 - Run `go test -run Compat ./internal/config/ ./internal/task/` to verify backward compatibility.
 - Compat tests must pass for ALL previous fixture versions, not just the latest.
 
+## Output Format Design
+
+The default output is **table**. TTY auto-detection was intentionally removed — agents run in non-TTY environments and were getting verbose JSON by default, wasting tokens and context window.
+
+Three formats are available:
+- **table** (default): Human-readable padded columns. Best for interactive terminal use.
+- **compact** (`--compact`/`--oneline` or `KANBAN_OUTPUT=compact`): One-line-per-record format modeled after `git log --oneline`. ~70% fewer tokens than JSON. Designed for AI agent consumption.
+- **json** (`--json` or `KANBAN_OUTPUT=json`): Full structured JSON. Use for scripting and piping to `jq`.
+
+This is a deliberate design decision. Do not revert to TTY auto-detection without understanding the agent token cost implications. See `docs/research/2026-02-08-token-efficient-output-formats.md` for the research behind this choice.
+
 ## Using the Kanban Board
 
 This project uses its own kanban board (in `kanban/`) to track work. Use the CLI to manage tasks as you work.

@@ -91,6 +91,10 @@ func runList(cmd *cobra.Command, _ []string) error {
 		}
 		return output.JSON(os.Stdout, tasks)
 	}
+	if format == output.FormatCompact {
+		output.TaskCompact(os.Stdout, tasks)
+		return nil
+	}
 
 	output.TaskTable(os.Stdout, tasks)
 	return nil

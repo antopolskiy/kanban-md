@@ -58,8 +58,13 @@ func runMetrics(cmd *cobra.Command, _ []string) error {
 	now := time.Now()
 	m := board.ComputeMetrics(cfg, tasks, now)
 
-	if outputFormat() == output.FormatJSON {
+	format := outputFormat()
+	if format == output.FormatJSON {
 		return output.JSON(os.Stdout, m)
+	}
+	if format == output.FormatCompact {
+		output.MetricsCompact(os.Stdout, m)
+		return nil
 	}
 
 	output.MetricsTable(os.Stdout, m)
