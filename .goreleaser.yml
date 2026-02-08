@@ -33,24 +33,50 @@ builds:
       - amd64
       - arm64
 archives:
-  - format_overrides:
+  - id: cli
+    builds:
+      - kanban-md
+    name_template: "kanban-md_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    format_overrides:
+      - goos: windows
+        formats:
+          - zip
+  - id: tui
+    builds:
+      - kanban-md-tui
+    name_template: "kanban-md-tui_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    format_overrides:
       - goos: windows
         formats:
           - zip
 brews:
-  - repository:
+  - ids:
+      - cli
+    repository:
       owner: antopolskiy
       name: homebrew-tap
       token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
+    name: kanban-md
     homepage: https://github.com/antopolskiy/kanban-md
     description: A file-based Kanban tool powered by Markdown
     license: MIT
     install: |
       bin.install "kanban-md"
-      bin.install "kanban-md-tui"
       bin.install_symlink bin/"kanban-md" => "kbmd"
       generate_completions_from_executable(bin/"kanban-md", "completion")
       generate_completions_from_executable(bin/"kbmd", "completion")
+  - ids:
+      - tui
+    repository:
+      owner: antopolskiy
+      name: homebrew-tap
+      token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
+    name: kanban-md-tui
+    homepage: https://github.com/antopolskiy/kanban-md
+    description: Interactive terminal UI for kanban-md boards
+    license: MIT
+    install: |
+      bin.install "kanban-md-tui"
 release:
   github:
   name_template: "{{.Version}}"
