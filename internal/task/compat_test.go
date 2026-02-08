@@ -215,3 +215,46 @@ func TestCompatV1TaskMinimalNotBlocked(t *testing.T) {
 		t.Errorf("BlockReason = %q, want empty", tk.BlockReason)
 	}
 }
+
+func TestCompatV1TaskWithClaimAndClass(t *testing.T) {
+	path := filepath.Join(v1FixtureDir, "006-with-claim-and-class.md")
+	tk, err := Read(path)
+	if err != nil {
+		t.Fatalf("Read() v1 task with claim and class: %v", err)
+	}
+
+	if tk.ID != 6 {
+		t.Errorf("ID = %d, want 6", tk.ID)
+	}
+	if tk.ClaimedBy != "agent-1" {
+		t.Errorf("ClaimedBy = %q, want %q", tk.ClaimedBy, "agent-1")
+	}
+	if tk.ClaimedAt == nil {
+		t.Fatal("ClaimedAt is nil, want non-nil")
+	}
+	if tk.ClaimedAt.Year() != 2026 || tk.ClaimedAt.Month() != 2 || tk.ClaimedAt.Day() != 8 {
+		t.Errorf("ClaimedAt = %v, want 2026-02-08", tk.ClaimedAt)
+	}
+	if tk.Class != "expedite" {
+		t.Errorf("Class = %q, want %q", tk.Class, "expedite")
+	}
+}
+
+func TestCompatV1TaskWithoutClaimAndClass(t *testing.T) {
+	path := filepath.Join(v1FixtureDir, "002-design-api.md")
+	tk, err := Read(path)
+	if err != nil {
+		t.Fatalf("Read() v1 task: %v", err)
+	}
+
+	// Tasks without claim/class fields should have zero values.
+	if tk.ClaimedBy != "" {
+		t.Errorf("ClaimedBy = %q, want empty", tk.ClaimedBy)
+	}
+	if tk.ClaimedAt != nil {
+		t.Errorf("ClaimedAt = %v, want nil", tk.ClaimedAt)
+	}
+	if tk.Class != "" {
+		t.Errorf("Class = %q, want empty", tk.Class)
+	}
+}

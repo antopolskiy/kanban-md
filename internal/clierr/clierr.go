@@ -25,6 +25,11 @@ const (
 	BoundaryError      = "BOUNDARY_ERROR"
 	StatusConflict     = "STATUS_CONFLICT"
 	ConfirmationReq    = "CONFIRMATION_REQUIRED"
+	TaskClaimed        = "TASK_CLAIMED"
+	InvalidClass       = "INVALID_CLASS"
+	ClassWIPExceeded   = "CLASS_WIP_EXCEEDED"
+	NothingToPick      = "NOTHING_TO_PICK"
+	InvalidGroupBy     = "INVALID_GROUP_BY"
 	InternalError      = "INTERNAL_ERROR"
 )
 

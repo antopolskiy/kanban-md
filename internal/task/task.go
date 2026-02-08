@@ -25,6 +25,9 @@ type Task struct {
 	DependsOn   []int      `yaml:"depends_on,omitempty" json:"depends_on,omitempty"`
 	Blocked     bool       `yaml:"blocked,omitempty" json:"blocked,omitempty"`
 	BlockReason string     `yaml:"block_reason,omitempty" json:"block_reason,omitempty"`
+	ClaimedBy   string     `yaml:"claimed_by,omitempty" json:"claimed_by,omitempty"`
+	ClaimedAt   *time.Time `yaml:"claimed_at,omitempty" json:"claimed_at,omitempty"`
+	Class       string     `yaml:"class,omitempty" json:"class,omitempty"`
 
 	// Body is the markdown content below the frontmatter (not in YAML).
 	Body string `yaml:"-" json:"body,omitempty"`

@@ -81,6 +81,43 @@ func ValidateBoundaryError(id int, status, direction string) *clierr.Error {
 		})
 }
 
+// ValidateClass checks that a class is in the allowed list.
+func ValidateClass(class string, allowed []string) error {
+	for _, c := range allowed {
+		if c == class {
+			return nil
+		}
+	}
+	return clierr.Newf(clierr.InvalidClass, "invalid class %q", class).
+		WithDetails(map[string]any{
+			"class":   class,
+			"allowed": allowed,
+		})
+}
+
+// ValidateTaskClaimed returns a CLIError when a task is claimed by another agent.
+func ValidateTaskClaimed(id int, claimedBy, remaining string) *clierr.Error {
+	return clierr.Newf(clierr.TaskClaimed,
+		"task #%d is claimed by %q (expires in %s). Use --force to override",
+		id, claimedBy, remaining).
+		WithDetails(map[string]any{
+			"id":         id,
+			"claimed_by": claimedBy,
+			"remaining":  remaining,
+		})
+}
+
+// ValidateClassWIPExceeded returns a CLIError for class-level WIP limit violations.
+func ValidateClassWIPExceeded(class string, limit, current int) *clierr.Error {
+	return clierr.Newf(clierr.ClassWIPExceeded,
+		"%s WIP limit reached (%d/%d board-wide)", class, current, limit).
+		WithDetails(map[string]any{
+			"class":   class,
+			"limit":   limit,
+			"current": current,
+		})
+}
+
 // FormatDueDate returns a CLIError for invalid due date input.
 func FormatDueDate(input string, err error) *clierr.Error {
 	return ValidateDate("due", input, err)
