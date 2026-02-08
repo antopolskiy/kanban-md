@@ -1,5 +1,7 @@
 # Guidelines
 
+> **Note:** `CLAUDE.md` is a symlink to `AGENTS.md`. Only edit `AGENTS.md` — both files are always in sync.
+
 - Use semantic commit format, e.g.
 
 ```
