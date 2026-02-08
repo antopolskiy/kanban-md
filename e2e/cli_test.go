@@ -858,6 +858,28 @@ func TestEditStatusRespectsWIPLimit(t *testing.T) {
 	}
 }
 
+func TestEditForceOverridesWIP(t *testing.T) {
+	kanbanDir := initBoardWithWIP(t, 1)
+
+	mustCreateTask(t, kanbanDir, "Task A", "--status", "in-progress")
+	mustCreateTask(t, kanbanDir, "Task B")
+
+	// Without --force, edit should fail.
+	errResp := runKanbanJSONError(t, kanbanDir, "edit", "2", "--status", "in-progress")
+	if errResp.Code != codeWIPLimitExceeded {
+		t.Fatalf("code = %q, want WIP_LIMIT_EXCEEDED", errResp.Code)
+	}
+
+	// With --force, edit should succeed with a warning.
+	r := runKanban(t, kanbanDir, "edit", "2", "--status", "in-progress", "--force")
+	if r.exitCode != 0 {
+		t.Fatalf("exit code = %d, want 0 with --force\nstderr: %s", r.exitCode, r.stderr)
+	}
+	if !strings.Contains(r.stderr, "Warning") {
+		t.Errorf("stderr = %q, want WIP warning", r.stderr)
+	}
+}
+
 func TestWIPUnlimitedByDefault(t *testing.T) {
 	kanbanDir := initBoard(t) // no WIP limits
 

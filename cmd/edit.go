@@ -45,6 +45,7 @@ func init() {
 	editCmd.Flags().IntSlice("remove-dep", nil, "remove dependency task IDs")
 	editCmd.Flags().String("block", "", "mark task as blocked with reason")
 	editCmd.Flags().Bool("unblock", false, "clear blocked state")
+	editCmd.Flags().BoolP("force", "f", false, "override WIP limits when changing status")
 	rootCmd.AddCommand(editCmd)
 }
 
@@ -59,19 +60,21 @@ func runEdit(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	force, _ := cmd.Flags().GetBool("force")
+
 	// Single ID: preserve exact current behavior.
 	if len(ids) == 1 {
-		return editSingleTask(cfg, ids[0], cmd)
+		return editSingleTask(cfg, ids[0], cmd, force)
 	}
 
 	// Batch mode.
 	return runBatch(ids, func(id int) error {
-		return editSingleCore(cfg, id, cmd)
+		return editSingleCore(cfg, id, cmd, force)
 	})
 }
 
 // editSingleTask handles a single task edit with full output.
-func editSingleTask(cfg *config.Config, id int, cmd *cobra.Command) error {
+func editSingleTask(cfg *config.Config, id int, cmd *cobra.Command, force bool) error {
 	path, err := task.FindByID(cfg.TasksPath(), id)
 	if err != nil {
 		return err
@@ -100,7 +103,7 @@ func editSingleTask(cfg *config.Config, id int, cmd *cobra.Command) error {
 
 	// Check WIP limit if status changed.
 	if t.Status != oldStatus {
-		if err = enforceWIPLimit(cfg, oldStatus, t.Status, false); err != nil {
+		if err = enforceWIPLimit(cfg, oldStatus, t.Status, force); err != nil {
 			return err
 		}
 	}
@@ -125,7 +128,7 @@ func editSingleTask(cfg *config.Config, id int, cmd *cobra.Command) error {
 }
 
 // editSingleCore performs the core edit logic without output (for batch mode).
-func editSingleCore(cfg *config.Config, id int, cmd *cobra.Command) error {
+func editSingleCore(cfg *config.Config, id int, cmd *cobra.Command, force bool) error {
 	path, err := task.FindByID(cfg.TasksPath(), id)
 	if err != nil {
 		return err
@@ -152,7 +155,7 @@ func editSingleCore(cfg *config.Config, id int, cmd *cobra.Command) error {
 	}
 
 	if t.Status != oldStatus {
-		if err = enforceWIPLimit(cfg, oldStatus, t.Status, false); err != nil {
+		if err = enforceWIPLimit(cfg, oldStatus, t.Status, force); err != nil {
 			return err
 		}
 	}
