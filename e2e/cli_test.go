@@ -343,6 +343,17 @@ func TestCreateWithAllFlags(t *testing.T) {
 	}
 }
 
+func TestCreateTagAlias(t *testing.T) {
+	kanbanDir := initBoard(t)
+
+	var task taskJSON
+	runKanbanJSON(t, kanbanDir, &task, "create", "Tag alias test", "--tag", "bug,feature")
+
+	if len(task.Tags) != 2 || task.Tags[0] != "bug" || task.Tags[1] != "feature" {
+		t.Errorf("Tags = %v, want [bug feature]", task.Tags)
+	}
+}
+
 func TestCreateIncrementID(t *testing.T) {
 	kanbanDir := initBoard(t)
 

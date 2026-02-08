@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 
 	"github.com/antopolskiy/kanban-md/internal/config"
 	"github.com/antopolskiy/kanban-md/internal/date"
@@ -29,6 +30,12 @@ func init() {
 	createCmd.Flags().String("priority", "", "task priority (default from config)")
 	createCmd.Flags().String("assignee", "", "task assignee")
 	createCmd.Flags().StringSlice("tags", nil, "comma-separated tags")
+	createCmd.Flags().SetNormalizeFunc(func(_ *pflag.FlagSet, name string) pflag.NormalizedName {
+		if name == "tag" {
+			name = "tags"
+		}
+		return pflag.NormalizedName(name)
+	})
 	createCmd.Flags().String("due", "", "due date (YYYY-MM-DD)")
 	createCmd.Flags().String("estimate", "", "time estimate (e.g. 4h, 2d)")
 	createCmd.Flags().Int("parent", 0, "parent task ID")
