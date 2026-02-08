@@ -103,6 +103,34 @@ func TestReadAllNonexistentDir(t *testing.T) {
 	}
 }
 
+func BenchmarkFindByID(b *testing.B) {
+	dir := b.TempDir()
+	// Create several tasks so the directory scan has realistic work.
+	for i := 1; i <= 10; i++ {
+		slug := GenerateSlug("benchmark task")
+		filename := GenerateFilename(i, slug)
+		path := filepath.Join(dir, filename)
+		task := &Task{
+			ID: i, Title: "benchmark task", Status: "backlog",
+			Priority: "medium", Created: time.Now(), Updated: time.Now(),
+		}
+		if err := Write(path, task); err != nil {
+			b.Fatalf("creating test task: %v", err)
+		}
+	}
+
+	b.ResetTimer()
+	for b.Loop() {
+		_, _ = FindByID(dir, 5)
+	}
+}
+
+func BenchmarkExtractIDFromFilename(b *testing.B) {
+	for b.Loop() {
+		_, _ = ExtractIDFromFilename("042-fix-bug.md")
+	}
+}
+
 func TestExtractIDFromFilename(t *testing.T) {
 	tests := []struct {
 		filename string
