@@ -57,6 +57,11 @@ linters:
     generated: lax
     presets:
       - std-error-handling
+    rules:
+      - path: cmd/tui-showcase/
+        linters:
+          - mnd
+          - funlen
 formatters:
   enable:
     - gofumpt

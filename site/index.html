@@ -3,98 +3,220 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>kanban-md — Agents-first file-based Kanban</title>
+  <title>kanban-md — File-based Kanban for AI agents and humans</title>
   <meta name="description" content="A file-based Kanban CLI built for multi-agent workflows. Plain Markdown files, atomic claim operations, token-efficient output. No database, no server.">
-  <meta property="og:title" content="kanban-md — Agents-first file-based Kanban">
+  <meta property="og:title" content="kanban-md — File-based Kanban for AI agents and humans">
   <meta property="og:description" content="A file-based Kanban CLI built for multi-agent workflows. Plain Markdown files, atomic claim operations, token-efficient output.">
   <meta property="og:type" content="website">
   <meta property="og:image" content="https://raw.githubusercontent.com/antopolskiy/kanban-md/main/assets/demo.gif">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <main>
-    <section class="hero">
-      <h1>kanban-md</h1>
-      <p class="tagline">Agents-first file-based Kanban for parallel coding workflows.</p>
-      <p class="sub">Multiple AI agents. One board. No conflicts. No database. Just Markdown files and a single binary.</p>
-    </section>
 
-    <section class="proof">
-      <div class="proof-item">
-        <code>pick --claim</code>
-        <span>Atomic task claiming prevents agents from stepping on each other</span>
-      </div>
-      <div class="proof-item">
-        <code>--compact</code>
-        <span>70% fewer tokens than JSON — designed for agent context windows</span>
-      </div>
-      <div class="proof-item">
-        <code>*.md</code>
-        <span>Every task is a Markdown file — grep-able, diff-able, git-tracked</span>
-      </div>
-    </section>
+<nav>
+  <a href="/" class="nav-logo">kanban-md</a>
+  <div class="nav-links">
+    <a href="https://github.com/antopolskiy/kanban-md#commands">Docs</a>
+    <a href="https://github.com/antopolskiy/kanban-md/releases/latest">Releases</a>
+    <a href="https://github.com/antopolskiy/kanban-md" class="nav-github">
+      <svg width="18" height="18" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+      GitHub
+    </a>
+  </div>
+</nav>
 
-    <section class="demo">
-      <img src="https://raw.githubusercontent.com/antopolskiy/kanban-md/main/assets/demo.gif" alt="kanban-md terminal demo" loading="lazy">
-    </section>
+<main>
 
-    <section class="install">
-      <h2>Install</h2>
-      <div class="install-methods">
-        <div class="install-method">
-          <h3>Homebrew</h3>
+  <section class="hero">
+    <p class="hero-badge">Open source &middot; MIT License</p>
+    <h1>One board.<br>Multiple agents.<br>No conflicts.</h1>
+    <p class="hero-sub">A file-based Kanban CLI for <strong>multi-agent workflows</strong>. AI agents coordinate through atomic claims, Markdown task files, and token-efficient output. No database, no server &mdash; just a single binary.</p>
+    <div class="hero-install">
+      <div class="hero-cmd" data-copy="brew install antopolskiy/tap/kanban-md">
+        <span class="prompt">$</span> brew install antopolskiy/tap/kanban-md
+        <button class="copy-btn" onclick="copyCmd(this)" aria-label="Copy to clipboard">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+        </button>
+      </div>
+    </div>
+  </section>
+
+  <section class="demo">
+    <div class="demo-window">
+      <div class="demo-titlebar">
+        <span class="demo-dot"></span>
+        <span class="demo-dot"></span>
+        <span class="demo-dot"></span>
+      </div>
+      <img src="https://raw.githubusercontent.com/antopolskiy/kanban-md/main/assets/demo.gif" alt="kanban-md terminal UI showing a board with tasks across columns" loading="lazy">
+    </div>
+  </section>
+
+  <section class="tui-section">
+    <h2>Interactive TUI</h2>
+    <p class="tui-desc">A full terminal board you can run alongside your agents. Keyboard-driven navigation, live file-watching, progressive age colors, and multi-agent claim visibility &mdash; all without leaving the terminal.</p>
+    <div class="tui-highlights">
+      <div class="tui-hl">
+        <span class="tui-hl-label">Live reload</span>
+        <span>Board updates as agents modify task files on disk</span>
+      </div>
+      <div class="tui-hl">
+        <span class="tui-hl-label">Age colors</span>
+        <span>Tasks change color based on time in current status</span>
+      </div>
+      <div class="tui-hl">
+        <span class="tui-hl-label">Agent claims</span>
+        <span>See which agent owns each task at a glance</span>
+      </div>
+    </div>
+    <div class="demo-window tui-screenshot">
+      <div class="demo-titlebar">
+        <span class="demo-dot"></span>
+        <span class="demo-dot"></span>
+        <span class="demo-dot"></span>
+      </div>
+      <img src="https://raw.githubusercontent.com/antopolskiy/kanban-md/main/assets/tui-screenshot.png" alt="kanban-md-tui interactive terminal board showing tasks across status columns with agent claims and age colors" loading="lazy">
+    </div>
+    <div class="tui-install">
+      <div class="install-cmd" data-copy="brew install antopolskiy/tap/kanban-md-tui">
+        <pre><code><span class="prompt">$</span> brew install antopolskiy/tap/kanban-md-tui</code></pre>
+        <button class="copy-btn" onclick="copyCmd(this)" aria-label="Copy to clipboard">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+        </button>
+      </div>
+    </div>
+  </section>
+
+  <section class="pillars">
+    <div class="pillar">
+      <h3>Multi-agent safe</h3>
+      <p>The <code>pick --claim</code> command atomically finds, claims, and moves the next task. No two agents work on the same thing.</p>
+    </div>
+    <div class="pillar">
+      <h3>Plain Markdown</h3>
+      <p>Every task is a <code>.md</code> file with YAML frontmatter. Grep it, diff it, track it in git. No database, no server.</p>
+    </div>
+    <div class="pillar">
+      <h3>Token-efficient</h3>
+      <p>The <code>--compact</code> format uses 70% fewer tokens than JSON. Designed for agent context windows.</p>
+    </div>
+  </section>
+
+  <section class="quickstart">
+    <h2>Quick start</h2>
+    <div class="terminal">
+      <div class="terminal-titlebar">
+        <span class="demo-dot"></span>
+        <span class="demo-dot"></span>
+        <span class="demo-dot"></span>
+      </div>
+      <pre><code><span class="c"># Initialize a board</span>
+<span class="prompt">$</span> kanban-md init --name <span class="s">"My Project"</span>
+
+<span class="c"># Create tasks</span>
+<span class="prompt">$</span> kanban-md create <span class="s">"Set up CI pipeline"</span> --priority high
+<span class="prompt">$</span> kanban-md create <span class="s">"Fix login bug"</span> --priority critical
+
+<span class="c"># Agent claims the next task atomically</span>
+<span class="prompt">$</span> kanban-md pick --claim agent-1 --move in-progress
+
+<span class="c"># Token-efficient output</span>
+<span class="prompt">$</span> kanban-md list --compact
+<span class="o">#1 [in-progress/high] Set up CI pipeline @agent-1</span>
+<span class="o">#2 [backlog/critical] Fix login bug</span>
+
+<span class="c"># Done</span>
+<span class="prompt">$</span> kanban-md move 1 done</code></pre>
+    </div>
+  </section>
+
+  <section class="features">
+    <h2>Features</h2>
+    <div class="feature-grid">
+      <div class="feature">
+        <h3>Interactive TUI</h3>
+        <p>Full terminal board with keyboard navigation, live-reloading on file changes, and progressive age colors.</p>
+      </div>
+      <div class="feature">
+        <h3>Agent skills</h3>
+        <p>Pre-written skills teach Claude Code and other agents how to use the board. Install with <code>kanban-md skill install</code>.</p>
+      </div>
+      <div class="feature">
+        <h3>Flow metrics</h3>
+        <p>Cycle time, throughput, lead time, and aging work items. Built in, not bolted on.</p>
+      </div>
+      <div class="feature">
+        <h3>Classes of service</h3>
+        <p>Expedite, fixed-date, standard, intangible — with per-class WIP limits and pick priority.</p>
+      </div>
+      <div class="feature">
+        <h3>Archive &amp; soft-delete</h3>
+        <p>Archive tasks instead of deleting them. Hidden by default, still satisfy dependencies.</p>
+      </div>
+      <div class="feature">
+        <h3>Zero dependencies</h3>
+        <p>Single static binary. Works anywhere Go compiles to. macOS, Linux, Windows.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="install">
+    <h2>Install</h2>
+    <div class="install-stack">
+      <div class="install-row">
+        <span class="install-label">Homebrew</span>
+        <div class="install-cmd" data-copy="brew install antopolskiy/tap/kanban-md">
           <pre><code>brew install antopolskiy/tap/kanban-md</code></pre>
+          <button class="copy-btn" onclick="copyCmd(this)" aria-label="Copy to clipboard">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+          </button>
         </div>
-        <div class="install-method">
-          <h3>Go</h3>
+      </div>
+      <div class="install-row">
+        <span class="install-label">Go</span>
+        <div class="install-cmd" data-copy="go install github.com/antopolskiy/kanban-md/cmd/kanban-md@latest">
           <pre><code>go install github.com/antopolskiy/kanban-md/cmd/kanban-md@latest</code></pre>
-        </div>
-        <div class="install-method">
-          <h3>Binary</h3>
-          <p><a href="https://github.com/antopolskiy/kanban-md/releases/latest">Download from Releases</a></p>
+          <button class="copy-btn" onclick="copyCmd(this)" aria-label="Copy to clipboard">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+          </button>
         </div>
       </div>
-    </section>
-
-    <section class="quickstart">
-      <h2>Quick start</h2>
-      <pre><code><span class="comment"># Initialize a board</span>
-kanban-md init --name "My Project"
-
-<span class="comment"># Create tasks</span>
-kanban-md create "Set up CI pipeline" --priority high
-kanban-md create "Fix login bug" --priority critical
-
-<span class="comment"># Agent claims next task atomically</span>
-kanban-md pick --claim agent-1 --move in-progress
-
-<span class="comment"># Token-efficient output for agents</span>
-kanban-md list --compact
-
-<span class="comment"># Done</span>
-kanban-md move 1 done</code></pre>
-    </section>
-
-    <section class="features">
-      <h2>Built for agents, friendly to humans</h2>
-      <ul>
-        <li><strong>Multi-agent safe.</strong> Claims provide cooperative locking with automatic expiry. The <code>pick</code> command atomically finds, claims, and moves the next task.</li>
-        <li><strong>Agent skills included.</strong> Pre-written skills teach agents how to use the board. Install with <code>kanban-md skill install</code>.</li>
-        <li><strong>Interactive TUI.</strong> Full terminal board with keyboard navigation. Auto-refreshes on file changes.</li>
-        <li><strong>Zero dependencies.</strong> Single static binary. No database, no server, no config service.</li>
-        <li><strong>Classes of service.</strong> Expedite, fixed-date, standard, intangible — with per-class WIP limits and pick priority.</li>
-        <li><strong>Flow metrics.</strong> Cycle time, throughput, lead time, and aging work items built in.</li>
-      </ul>
-    </section>
-
-    <footer>
-      <div class="links">
-        <a href="https://github.com/antopolskiy/kanban-md">GitHub</a>
-        <a href="https://github.com/antopolskiy/kanban-md/releases/latest">Releases</a>
-        <a href="https://github.com/antopolskiy/kanban-md#commands">Docs</a>
+      <div class="install-row">
+        <span class="install-label">Binary</span>
+        <div class="install-cmd">
+          <p>Download from <a href="https://github.com/antopolskiy/kanban-md/releases/latest">GitHub Releases</a></p>
+        </div>
       </div>
-      <p class="license">MIT License</p>
-    </footer>
-  </main>
+    </div>
+  </section>
+
+</main>
+
+<footer>
+  <div class="footer-links">
+    <a href="https://github.com/antopolskiy/kanban-md">GitHub</a>
+    <a href="https://github.com/antopolskiy/kanban-md/releases/latest">Releases</a>
+    <a href="https://github.com/antopolskiy/kanban-md#commands">Docs</a>
+  </div>
+  <p class="footer-license">MIT License &middot; Built with Go</p>
+</footer>
+
+<script>
+function copyCmd(btn) {
+  var text = btn.parentElement.getAttribute('data-copy');
+  navigator.clipboard.writeText(text).then(function() {
+    btn.classList.add('copied');
+    btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>';
+    setTimeout(function() {
+      btn.classList.remove('copied');
+      btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>';
+    }, 1500);
+  });
+}
+</script>
+
 </body>
 </html>
