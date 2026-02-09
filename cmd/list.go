@@ -38,6 +38,7 @@ func init() {
 	listCmd.Flags().String("claimed-by", "", "filter by claimant")
 	listCmd.Flags().String("class", "", "filter by class of service")
 	listCmd.Flags().StringP("search", "s", "", "search tasks by title, body, or tags (case-insensitive)")
+	listCmd.Flags().Bool("archived", false, "show only archived tasks")
 	listCmd.Flags().String("group-by", "", "group results by field ("+strings.Join(board.ValidGroupByFields(), ", ")+")")
 	rootCmd.AddCommand(listCmd)
 }
@@ -64,6 +65,7 @@ func runList(cmd *cobra.Command, _ []string) error {
 	class, _ := cmd.Flags().GetString("class")
 	search, _ := cmd.Flags().GetString("search")
 	groupBy, _ := cmd.Flags().GetString("group-by")
+	archived, _ := cmd.Flags().GetBool("archived")
 
 	if groupBy != "" && !slices.Contains(board.ValidGroupByFields(), groupBy) {
 		return clierr.Newf(clierr.InvalidGroupBy, "invalid --group-by field %q; valid: %s",
@@ -77,6 +79,14 @@ func runList(cmd *cobra.Command, _ []string) error {
 		Tag:          tag,
 		Search:       search,
 		ClaimTimeout: cfg.ClaimTimeoutDuration(),
+	}
+
+	// --archived flag: show only archived tasks.
+	// Default (no --status, no --archived): exclude archived.
+	if archived {
+		filter.Statuses = []string{config.ArchivedStatus}
+	} else if !cmd.Flags().Changed("status") {
+		filter.ExcludeStatuses = []string{config.ArchivedStatus}
 	}
 
 	if unclaimed {

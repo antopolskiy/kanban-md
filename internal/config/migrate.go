@@ -41,6 +41,7 @@ var migrations = map[int]func(*Config) error{
 	2: migrateV2ToV3,
 	3: migrateV3ToV4,
 	4: migrateV4ToV5,
+	5: migrateV5ToV6,
 }
 
 // migrateV1ToV2 adds the wip_limits field (defaults to nil/empty = unlimited).
@@ -79,5 +80,14 @@ func migrateV4ToV5(cfg *Config) error { //nolint:unparam // signature must match
 		cfg.TUI.AgeThresholds = append([]AgeThreshold{}, DefaultAgeThresholds...)
 	}
 	cfg.Version = 5
+	return nil
+}
+
+// migrateV5ToV6 adds the "archived" status for soft-delete support.
+func migrateV5ToV6(cfg *Config) error { //nolint:unparam // signature must match migrations map type
+	if !contains(cfg.Statuses, ArchivedStatus) {
+		cfg.Statuses = append(cfg.Statuses, ArchivedStatus)
+	}
+	cfg.Version = 6
 	return nil
 }

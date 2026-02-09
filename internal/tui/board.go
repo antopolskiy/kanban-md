@@ -291,19 +291,28 @@ func (b *Board) loadTasks() {
 		b.err = err
 		return
 	}
-	b.tasks = tasks
 	b.err = nil
 
-	// Sort tasks by priority (higher priority first).
-	board.Sort(tasks, "priority", true, b.cfg)
+	// Filter out archived tasks from TUI display.
+	var visibleTasks []*task.Task
+	for _, t := range tasks {
+		if !b.cfg.IsArchivedStatus(t.Status) {
+			visibleTasks = append(visibleTasks, t)
+		}
+	}
+	b.tasks = visibleTasks
 
-	// Build columns from config statuses.
-	b.columns = make([]column, len(b.cfg.Statuses))
-	for i, status := range b.cfg.Statuses {
+	// Sort tasks by priority (higher priority first).
+	board.Sort(visibleTasks, "priority", true, b.cfg)
+
+	// Build columns from board statuses (excludes archived).
+	displayStatuses := b.cfg.BoardStatuses()
+	b.columns = make([]column, len(displayStatuses))
+	for i, status := range displayStatuses {
 		b.columns[i] = column{status: status}
 	}
 
-	for _, t := range tasks {
+	for _, t := range visibleTasks {
 		for i := range b.columns {
 			if b.columns[i].status == t.Status {
 				b.columns[i].tasks = append(b.columns[i].tasks, t)
@@ -406,36 +415,48 @@ func (b *Board) ensureVisible() {
 	}
 }
 
-// moveNext moves the selected task to the next status.
+// moveNext moves the selected task to the next board status (excludes archived).
 func (b *Board) moveNext() (tea.Model, tea.Cmd) {
 	t := b.selectedTask()
 	if t == nil {
 		return b, nil
 	}
 
-	idx := b.cfg.StatusIndex(t.Status)
-	if idx < 0 || idx >= len(b.cfg.Statuses)-1 {
+	boardStatuses := b.cfg.BoardStatuses()
+	idx := indexOf(boardStatuses, t.Status)
+	if idx < 0 || idx >= len(boardStatuses)-1 {
 		b.err = fmt.Errorf("task #%d is already at the last status", t.ID)
 		return b, nil
 	}
 
-	return b.executeMove(b.cfg.Statuses[idx+1])
+	return b.executeMove(boardStatuses[idx+1])
 }
 
-// movePrev moves the selected task to the previous status.
+// movePrev moves the selected task to the previous board status (excludes archived).
 func (b *Board) movePrev() (tea.Model, tea.Cmd) {
 	t := b.selectedTask()
 	if t == nil {
 		return b, nil
 	}
 
-	idx := b.cfg.StatusIndex(t.Status)
+	boardStatuses := b.cfg.BoardStatuses()
+	idx := indexOf(boardStatuses, t.Status)
 	if idx <= 0 {
 		b.err = fmt.Errorf("task #%d is already at the first status", t.ID)
 		return b, nil
 	}
 
-	return b.executeMove(b.cfg.Statuses[idx-1])
+	return b.executeMove(boardStatuses[idx-1])
+}
+
+// indexOf returns the index of item in slice, or -1.
+func indexOf(slice []string, item string) int {
+	for i, s := range slice {
+		if s == item {
+			return i
+		}
+	}
+	return -1
 }
 
 func (b *Board) executeMove(targetStatus string) (tea.Model, tea.Cmd) {

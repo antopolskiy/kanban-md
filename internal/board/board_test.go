@@ -19,8 +19,9 @@ func TestSummaryEmptyBoard(t *testing.T) {
 	if s.TotalTasks != 0 {
 		t.Errorf("TotalTasks = %d, want 0", s.TotalTasks)
 	}
-	if len(s.Statuses) != len(cfg.Statuses) {
-		t.Errorf("Statuses len = %d, want %d", len(s.Statuses), len(cfg.Statuses))
+	wantStatuses := cfg.BoardStatuses()
+	if len(s.Statuses) != len(wantStatuses) {
+		t.Errorf("Statuses len = %d, want %d", len(s.Statuses), len(wantStatuses))
 	}
 	for _, ss := range s.Statuses {
 		if ss.Count != 0 {
@@ -165,9 +166,10 @@ func TestSummaryStatusOrder(t *testing.T) {
 	cfg := config.NewDefault("Test Board")
 	s := Summary(cfg, nil, time.Now())
 
+	boardStatuses := cfg.BoardStatuses()
 	for i, ss := range s.Statuses {
-		if ss.Status != cfg.Statuses[i] {
-			t.Errorf("Statuses[%d] = %q, want %q", i, ss.Status, cfg.Statuses[i])
+		if ss.Status != boardStatuses[i] {
+			t.Errorf("Statuses[%d] = %q, want %q", i, ss.Status, boardStatuses[i])
 		}
 	}
 }

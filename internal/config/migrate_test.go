@@ -128,3 +128,48 @@ func TestMigrateV4ToV5(t *testing.T) {
 		t.Errorf("AgeThresholds[0].After = %q, want %q", cfg.TUI.AgeThresholds[0].After, "0s")
 	}
 }
+
+func TestMigrateV5ToV6(t *testing.T) {
+	cfg := NewDefault("Test")
+	cfg.Version = 5
+	// Remove archived status to simulate a v5 config.
+	cfg.Statuses = []string{"backlog", "todo", "in-progress", "review", "done"}
+
+	if err := migrate(cfg); err != nil {
+		t.Fatalf("migrate() v5→v6: %v", err)
+	}
+	if cfg.Version != CurrentVersion {
+		t.Errorf("Version = %d, want %d", cfg.Version, CurrentVersion)
+	}
+	if !contains(cfg.Statuses, ArchivedStatus) {
+		t.Fatal("Statuses should contain 'archived' after v5→v6 migration")
+	}
+	// Verify archived is at the end.
+	if cfg.Statuses[len(cfg.Statuses)-1] != ArchivedStatus {
+		t.Errorf("last status = %q, want %q", cfg.Statuses[len(cfg.Statuses)-1], ArchivedStatus)
+	}
+}
+
+func TestMigrateV5ToV6Idempotent(t *testing.T) {
+	// If archived already exists, migration should not add a duplicate.
+	cfg := NewDefault("Test")
+	cfg.Version = 5
+	cfg.Statuses = []string{"backlog", "todo", "in-progress", "review", "done", ArchivedStatus}
+
+	if err := migrate(cfg); err != nil {
+		t.Fatalf("migrate() v5→v6 idempotent: %v", err)
+	}
+	if cfg.Version != CurrentVersion {
+		t.Errorf("Version = %d, want %d", cfg.Version, CurrentVersion)
+	}
+	// Count occurrences of "archived".
+	count := 0
+	for _, s := range cfg.Statuses {
+		if s == ArchivedStatus {
+			count++
+		}
+	}
+	if count != 1 {
+		t.Errorf("archived appears %d times, want 1", count)
+	}
+}

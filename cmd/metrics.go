@@ -30,13 +30,21 @@ func runMetrics(cmd *cobra.Command, _ []string) error {
 		return err
 	}
 
-	tasks, warnings, err := task.ReadAllLenient(cfg.TasksPath())
+	allTasks, warnings, err := task.ReadAllLenient(cfg.TasksPath())
 	if err != nil {
 		return err
 	}
 	printWarnings(warnings)
-	if tasks == nil {
-		tasks = []*task.Task{}
+	if allTasks == nil {
+		allTasks = []*task.Task{}
+	}
+
+	// Exclude archived tasks from metrics.
+	tasks := make([]*task.Task, 0, len(allTasks))
+	for _, t := range allTasks {
+		if !cfg.IsArchivedStatus(t.Status) {
+			tasks = append(tasks, t)
+		}
 	}
 
 	sinceStr, _ := cmd.Flags().GetString("since")

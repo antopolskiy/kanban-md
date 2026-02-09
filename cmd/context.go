@@ -39,11 +39,19 @@ func runContext(cmd *cobra.Command, _ []string) error {
 		return err
 	}
 
-	tasks, warnings, err := task.ReadAllLenient(cfg.TasksPath())
+	allTasks, warnings, err := task.ReadAllLenient(cfg.TasksPath())
 	if err != nil {
 		return fmt.Errorf("reading tasks: %w", err)
 	}
 	printWarnings(warnings)
+
+	// Exclude archived tasks from context.
+	tasks := make([]*task.Task, 0, len(allTasks))
+	for _, t := range allTasks {
+		if !cfg.IsArchivedStatus(t.Status) {
+			tasks = append(tasks, t)
+		}
+	}
 
 	sections, _ := cmd.Flags().GetStringSlice("sections")
 	days, _ := cmd.Flags().GetInt("days")

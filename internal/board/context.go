@@ -188,8 +188,7 @@ func buildReadySection(cfg *config.Config, tasks []*task.Task) []ContextItem {
 		return nil
 	}
 	readyStatus := cfg.Statuses[1]
-	terminalStatus := cfg.Statuses[len(cfg.Statuses)-1]
-	unblockedTasks := FilterUnblocked(tasks, terminalStatus)
+	unblockedTasks := FilterUnblocked(tasks, cfg)
 
 	var items []ContextItem
 	for _, t := range unblockedTasks {
