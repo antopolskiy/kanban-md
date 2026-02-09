@@ -651,6 +651,7 @@ func setupTestBoardWithTitleLines(t *testing.T, titleLines int) (*tui.Board, *co
 			Title:    tt.title,
 			Status:   tt.status,
 			Priority: tt.priority,
+			Updated:  testRefTime,
 		}
 		path := filepath.Join(tasksDir, task.GenerateFilename(tt.id, tt.title))
 		if err := task.Write(path, tk); err != nil {
@@ -659,6 +660,7 @@ func setupTestBoardWithTitleLines(t *testing.T, titleLines int) (*tui.Board, *co
 	}
 
 	b := tui.NewBoard(cfg)
+	b.SetNow(testNow)
 	b.Update(tea.WindowSizeMsg{Width: 80, Height: 30})
 
 	return b, cfg
@@ -694,6 +696,20 @@ func TestBoard_TitleLines2_MoreTitleVisible(t *testing.T) {
 	// and 80-width columns, it should be visible in the 2-line version.
 	if containsStr(v1, "SAML") && !containsStr(v2, "SAML") {
 		t.Error("expected title_lines=2 to show at least as much title as title_lines=1")
+	}
+}
+
+func TestBoard_TitleLines2_ContinuationUsesFullWidth(t *testing.T) {
+	b, _ := setupTestBoardWithTitleLines(t, 2)
+	// Use a wider terminal so continuation lines have enough room to show content.
+	b.Update(tea.WindowSizeMsg{Width: 120, Height: 30})
+	v := b.View()
+
+	// "authentication" is on the continuation line. With full-width wrapping,
+	// it should appear. Without full-width (old behavior), the ID-prefix
+	// indentation would steal space and truncate it further.
+	if !containsStr(v, "authentication") {
+		t.Error("expected 'authentication' visible on continuation line (full-width wrap)")
 	}
 }
 

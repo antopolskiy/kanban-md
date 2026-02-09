@@ -674,11 +674,10 @@ func (b *Board) renderCard(t *task.Task, active bool, width int) string {
 		title := truncate(t.Title, firstLineWidth)
 		contentLines = append(contentLines, idStr+" "+title)
 	} else {
-		wrapped := wrapTitle(t.Title, firstLineWidth, titleLines)
+		wrapped := wrapTitle2(t.Title, firstLineWidth, cardWidth, titleLines)
 		contentLines = append(contentLines, idStr+" "+wrapped[0])
-		padding := strings.Repeat(" ", idLen+1)
 		for i := 1; i < len(wrapped); i++ {
-			contentLines = append(contentLines, padding+wrapped[i])
+			contentLines = append(contentLines, wrapped[i])
 		}
 		// Pad to exactly titleLines for uniform card height.
 		for len(contentLines) < titleLines {
@@ -728,6 +727,58 @@ func (b *Board) renderCard(t *task.Task, active bool, width int) string {
 	}
 
 	return style.Width(width - 2).Render(content) //nolint:mnd // border width
+}
+
+// wrapTitle2 splits a title across maxLines lines with different widths:
+// firstWidth for the first line (shares space with the ID prefix),
+// restWidth for continuation lines (uses full card width).
+func wrapTitle2(title string, firstWidth, restWidth, maxLines int) []string {
+	if maxLines < 1 {
+		maxLines = 1
+	}
+	if len(title) <= firstWidth || maxLines == 1 {
+		return []string{truncate(title, firstWidth)}
+	}
+
+	words := strings.Fields(title)
+	lines := make([]string, 0, maxLines)
+	var current strings.Builder
+
+	for i, word := range words {
+		lineWidth := restWidth
+		if len(lines) == 0 {
+			lineWidth = firstWidth
+		}
+
+		if current.Len() == 0 {
+			current.WriteString(word)
+			continue
+		}
+		if current.Len()+1+len(word) <= lineWidth {
+			current.WriteByte(' ')
+			current.WriteString(word)
+		} else {
+			lines = append(lines, truncate(current.String(), lineWidth))
+			current.Reset()
+			current.WriteString(word)
+			if len(lines) == maxLines-1 {
+				// Last line: append all remaining words.
+				for _, w := range words[i+1:] {
+					current.WriteByte(' ')
+					current.WriteString(w)
+				}
+				break
+			}
+		}
+	}
+	if current.Len() > 0 {
+		w := restWidth
+		if len(lines) == 0 {
+			w = firstWidth
+		}
+		lines = append(lines, truncate(current.String(), w))
+	}
+	return lines
 }
 
 // wrapTitle splits a title across maxLines lines, word-wrapping at word
