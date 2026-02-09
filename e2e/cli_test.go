@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -3415,5 +3416,621 @@ func TestInitShowsSkillHint(t *testing.T) {
 	}
 	if !strings.Contains(r.stdout, "skill install") {
 		t.Errorf("init output should hint about skill install, got:\n%s", r.stdout)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Claim timeout / enforcement e2e tests
+// ---------------------------------------------------------------------------
+
+// writeTaskFile writes a raw task markdown file into the tasks directory.
+// The filename follows the convention: 001-<slug>.md (zero-padded ID + slug).
+// The title is extracted from the YAML frontmatter.
+func writeTaskFile(t *testing.T, kanbanDir string, id int, content string) {
+	t.Helper()
+	// Extract title from frontmatter for the slug.
+	slug := "task"
+	for _, line := range strings.Split(content, "\n") {
+		if strings.HasPrefix(line, "title:") {
+			slug = strings.TrimSpace(strings.TrimPrefix(line, "title:"))
+			slug = strings.ToLower(slug)
+			slug = strings.ReplaceAll(slug, " ", "-")
+			break
+		}
+	}
+	filename := fmt.Sprintf("%03d-%s.md", id, slug)
+	taskPath := filepath.Join(kanbanDir, "tasks", filename)
+	if err := os.WriteFile(taskPath, []byte(content), 0o600); err != nil {
+		t.Fatalf("writing task file %d: %v", id, err)
+	}
+}
+
+// setConfigClaimTimeout rewrites the claim_timeout in config.yml.
+func setConfigClaimTimeout(t *testing.T, kanbanDir, timeout string) {
+	t.Helper()
+	cfgPath := filepath.Join(kanbanDir, "config.yml")
+	data, err := os.ReadFile(cfgPath) //nolint:gosec // e2e test file
+	if err != nil {
+		t.Fatalf("reading config: %v", err)
+	}
+	content := string(data)
+	// Replace existing claim_timeout line or append if missing.
+	if strings.Contains(content, "claim_timeout:") {
+		lines := strings.Split(content, "\n")
+		for i, line := range lines {
+			if strings.HasPrefix(line, "claim_timeout:") {
+				lines[i] = "claim_timeout: " + timeout
+			}
+		}
+		content = strings.Join(lines, "\n")
+	} else {
+		content += "claim_timeout: " + timeout + "\n"
+	}
+	if err := os.WriteFile(cfgPath, []byte(content), 0o600); err != nil {
+		t.Fatalf("writing config: %v", err)
+	}
+}
+
+// bumpNextID updates next_id in config.yml so the CLI knows the next available ID.
+func bumpNextID(t *testing.T, kanbanDir string, nextID int) {
+	t.Helper()
+	cfgPath := filepath.Join(kanbanDir, "config.yml")
+	data, err := os.ReadFile(cfgPath) //nolint:gosec // e2e test file
+	if err != nil {
+		t.Fatalf("reading config: %v", err)
+	}
+	content := string(data)
+	lines := strings.Split(content, "\n")
+	for i, line := range lines {
+		if strings.HasPrefix(line, "next_id:") {
+			lines[i] = "next_id: " + strconv.Itoa(nextID)
+		}
+	}
+	content = strings.Join(lines, "\n")
+	if err := os.WriteFile(cfgPath, []byte(content), 0o600); err != nil {
+		t.Fatalf("writing config: %v", err)
+	}
+}
+
+func TestClaimBlocksOtherAgentMove(t *testing.T) {
+	kanbanDir := initBoard(t)
+
+	// Create a task and claim it by writing the file directly with a recent timestamp.
+	writeTaskFile(t, kanbanDir, 1, `---
+id: 1
+title: Claimed task
+status: todo
+priority: high
+created: 2026-01-01T00:00:00Z
+updated: 2026-01-01T00:00:00Z
+claimed_by: agent-alpha
+claimed_at: 2099-01-01T00:00:00Z
+---
+`)
+	bumpNextID(t, kanbanDir, 2)
+
+	// Another agent (no --force) tries to move — should fail.
+	r := runKanban(t, kanbanDir, "move", "1", "in-progress")
+	if r.exitCode == 0 {
+		t.Fatal("move should fail when task is claimed by another agent")
+	}
+	if !strings.Contains(r.stderr, "claimed") && !strings.Contains(r.stdout, "claimed") {
+		t.Errorf("error should mention claim, got stdout=%q stderr=%q", r.stdout, r.stderr)
+	}
+}
+
+func TestClaimBlocksOtherAgentEdit(t *testing.T) {
+	kanbanDir := initBoard(t)
+
+	writeTaskFile(t, kanbanDir, 1, `---
+id: 1
+title: Claimed task
+status: todo
+priority: high
+created: 2026-01-01T00:00:00Z
+updated: 2026-01-01T00:00:00Z
+claimed_by: agent-alpha
+claimed_at: 2099-01-01T00:00:00Z
+---
+`)
+	bumpNextID(t, kanbanDir, 2)
+
+	// Edit without --force or matching --claim should fail.
+	r := runKanban(t, kanbanDir, "edit", "1", "--priority", "low")
+	if r.exitCode == 0 {
+		t.Fatal("edit should fail when task is claimed by another agent")
+	}
+}
+
+func TestClaimBlocksOtherAgentDelete(t *testing.T) {
+	kanbanDir := initBoard(t)
+
+	writeTaskFile(t, kanbanDir, 1, `---
+id: 1
+title: Claimed task
+status: todo
+priority: high
+created: 2026-01-01T00:00:00Z
+updated: 2026-01-01T00:00:00Z
+claimed_by: agent-alpha
+claimed_at: 2099-01-01T00:00:00Z
+---
+`)
+	bumpNextID(t, kanbanDir, 2)
+
+	// Delete without --force should fail.
+	r := runKanban(t, kanbanDir, "delete", "1")
+	if r.exitCode == 0 {
+		t.Fatal("delete should fail when task is claimed by another agent")
+	}
+}
+
+func TestExpiredClaimAllowsMove(t *testing.T) {
+	kanbanDir := initBoard(t)
+	// Default claim_timeout is 1h. Set claimed_at to 2 hours in the past.
+	writeTaskFile(t, kanbanDir, 1, `---
+id: 1
+title: Expired claim task
+status: todo
+priority: high
+created: 2026-01-01T00:00:00Z
+updated: 2026-01-01T00:00:00Z
+claimed_by: agent-old
+claimed_at: 2020-01-01T00:00:00Z
+---
+`)
+	bumpNextID(t, kanbanDir, 2)
+
+	// Move should succeed — claim has expired.
+	r := runKanban(t, kanbanDir, "move", "1", "in-progress")
+	if r.exitCode != 0 {
+		t.Fatalf("move should succeed for expired claim, got exit %d: %s", r.exitCode, r.stderr)
+	}
+}
+
+func TestExpiredClaimAllowsEdit(t *testing.T) {
+	kanbanDir := initBoard(t)
+
+	writeTaskFile(t, kanbanDir, 1, `---
+id: 1
+title: Expired claim task
+status: todo
+priority: high
+created: 2026-01-01T00:00:00Z
+updated: 2026-01-01T00:00:00Z
+claimed_by: agent-old
+claimed_at: 2020-01-01T00:00:00Z
+---
+`)
+	bumpNextID(t, kanbanDir, 2)
+
+	// Edit should succeed — claim has expired.
+	r := runKanban(t, kanbanDir, "edit", "1", "--priority", "low")
+	if r.exitCode != 0 {
+		t.Fatalf("edit should succeed for expired claim, got exit %d: %s", r.exitCode, r.stderr)
+	}
+}
+
+func TestExpiredClaimAllowsDelete(t *testing.T) {
+	kanbanDir := initBoard(t)
+
+	writeTaskFile(t, kanbanDir, 1, `---
+id: 1
+title: Expired claim task
+status: todo
+priority: high
+created: 2026-01-01T00:00:00Z
+updated: 2026-01-01T00:00:00Z
+claimed_by: agent-old
+claimed_at: 2020-01-01T00:00:00Z
+---
+`)
+	bumpNextID(t, kanbanDir, 2)
+
+	// Delete requires --force in non-TTY for confirmation bypass.
+	r := runKanban(t, kanbanDir, "delete", "1", "--force")
+	if r.exitCode != 0 {
+		t.Fatalf("delete should succeed for expired claim, got exit %d: %s", r.exitCode, r.stderr)
+	}
+}
+
+func TestActiveClaimNotExpiredBeforeTimeout(t *testing.T) {
+	kanbanDir := initBoard(t)
+	// Use a long timeout (10h) and a claim from 1 minute ago.
+	setConfigClaimTimeout(t, kanbanDir, "10h")
+
+	writeTaskFile(t, kanbanDir, 1, `---
+id: 1
+title: Recently claimed
+status: todo
+priority: high
+created: 2026-01-01T00:00:00Z
+updated: 2026-01-01T00:00:00Z
+claimed_by: agent-busy
+claimed_at: 2099-01-01T00:00:00Z
+---
+`)
+	bumpNextID(t, kanbanDir, 2)
+
+	// Should still be blocked.
+	r := runKanban(t, kanbanDir, "move", "1", "in-progress")
+	if r.exitCode == 0 {
+		t.Fatal("move should fail — claim has not expired yet")
+	}
+}
+
+func TestForceOverridesActiveClaim(t *testing.T) {
+	kanbanDir := initBoard(t)
+
+	writeTaskFile(t, kanbanDir, 1, `---
+id: 1
+title: Force override test
+status: todo
+priority: high
+created: 2026-01-01T00:00:00Z
+updated: 2026-01-01T00:00:00Z
+claimed_by: agent-alpha
+claimed_at: 2099-01-01T00:00:00Z
+---
+`)
+	bumpNextID(t, kanbanDir, 2)
+
+	// Move with --force should succeed despite active claim.
+	r := runKanban(t, kanbanDir, "move", "1", "in-progress", "--force")
+	if r.exitCode != 0 {
+		t.Fatalf("move --force should succeed, got exit %d: %s", r.exitCode, r.stderr)
+	}
+}
+
+func TestForceOverridesActiveClaimEdit(t *testing.T) {
+	kanbanDir := initBoard(t)
+
+	writeTaskFile(t, kanbanDir, 1, `---
+id: 1
+title: Force edit test
+status: todo
+priority: high
+created: 2026-01-01T00:00:00Z
+updated: 2026-01-01T00:00:00Z
+claimed_by: agent-alpha
+claimed_at: 2099-01-01T00:00:00Z
+---
+`)
+	bumpNextID(t, kanbanDir, 2)
+
+	// Edit with --force should succeed.
+	r := runKanban(t, kanbanDir, "edit", "1", "--priority", "low", "--force")
+	if r.exitCode != 0 {
+		t.Fatalf("edit --force should succeed, got exit %d: %s", r.exitCode, r.stderr)
+	}
+}
+
+func TestForceOverridesActiveClaimDelete(t *testing.T) {
+	kanbanDir := initBoard(t)
+
+	writeTaskFile(t, kanbanDir, 1, `---
+id: 1
+title: Force delete test
+status: todo
+priority: high
+created: 2026-01-01T00:00:00Z
+updated: 2026-01-01T00:00:00Z
+claimed_by: agent-alpha
+claimed_at: 2099-01-01T00:00:00Z
+---
+`)
+	bumpNextID(t, kanbanDir, 2)
+
+	// Delete with --force should succeed.
+	r := runKanban(t, kanbanDir, "delete", "1", "--force")
+	if r.exitCode != 0 {
+		t.Fatalf("delete --force should succeed, got exit %d: %s", r.exitCode, r.stderr)
+	}
+}
+
+func TestSameAgentCanMoveClaimed(t *testing.T) {
+	kanbanDir := initBoard(t)
+
+	writeTaskFile(t, kanbanDir, 1, `---
+id: 1
+title: Same agent test
+status: todo
+priority: high
+created: 2026-01-01T00:00:00Z
+updated: 2026-01-01T00:00:00Z
+claimed_by: agent-alpha
+claimed_at: 2099-01-01T00:00:00Z
+---
+`)
+	bumpNextID(t, kanbanDir, 2)
+
+	// Same agent can move with --claim flag matching the current claimant.
+	r := runKanban(t, kanbanDir, "move", "1", "in-progress", "--claim", "agent-alpha")
+	if r.exitCode != 0 {
+		t.Fatalf("same agent should be able to move, got exit %d: %s", r.exitCode, r.stderr)
+	}
+}
+
+func TestSameAgentCanEditClaimed(t *testing.T) {
+	kanbanDir := initBoard(t)
+
+	writeTaskFile(t, kanbanDir, 1, `---
+id: 1
+title: Same agent edit test
+status: todo
+priority: high
+created: 2026-01-01T00:00:00Z
+updated: 2026-01-01T00:00:00Z
+claimed_by: agent-alpha
+claimed_at: 2099-01-01T00:00:00Z
+---
+`)
+	bumpNextID(t, kanbanDir, 2)
+
+	// Same agent (via --claim) can edit.
+	r := runKanban(t, kanbanDir, "edit", "1", "--priority", "low", "--claim", "agent-alpha")
+	if r.exitCode != 0 {
+		t.Fatalf("same agent should be able to edit, got exit %d: %s", r.exitCode, r.stderr)
+	}
+}
+
+func TestClaimBlocksJSONError(t *testing.T) {
+	kanbanDir := initBoard(t)
+
+	writeTaskFile(t, kanbanDir, 1, `---
+id: 1
+title: JSON error test
+status: todo
+priority: high
+created: 2026-01-01T00:00:00Z
+updated: 2026-01-01T00:00:00Z
+claimed_by: agent-alpha
+claimed_at: 2099-01-01T00:00:00Z
+---
+`)
+	bumpNextID(t, kanbanDir, 2)
+
+	// Verify structured JSON error output.
+	errResp := runKanbanJSONError(t, kanbanDir, "move", "1", "in-progress")
+	if errResp.Code != "TASK_CLAIMED" {
+		t.Errorf("error code = %q, want TASK_CLAIMED", errResp.Code)
+	}
+	if errResp.Details["claimed_by"] != "agent-alpha" {
+		t.Errorf("details.claimed_by = %v, want %q", errResp.Details["claimed_by"], "agent-alpha")
+	}
+}
+
+func TestPickSkipsClaimedTasks(t *testing.T) {
+	kanbanDir := initBoard(t)
+
+	// Task 1: claimed (should be skipped).
+	writeTaskFile(t, kanbanDir, 1, `---
+id: 1
+title: Claimed task
+status: todo
+priority: critical
+created: 2026-01-01T00:00:00Z
+updated: 2026-01-01T00:00:00Z
+claimed_by: agent-other
+claimed_at: 2099-01-01T00:00:00Z
+---
+`)
+	// Task 2: unclaimed (should be picked).
+	writeTaskFile(t, kanbanDir, 2, `---
+id: 2
+title: Available task
+status: todo
+priority: high
+created: 2026-01-01T00:00:00Z
+updated: 2026-01-01T00:00:00Z
+---
+`)
+	bumpNextID(t, kanbanDir, 3)
+
+	r := runKanban(t, kanbanDir, "pick", "--claim", "agent-me", "--json")
+	if r.exitCode != 0 {
+		t.Fatalf("pick failed (exit %d): %s", r.exitCode, r.stderr)
+	}
+
+	var picked taskJSON
+	if err := json.Unmarshal([]byte(r.stdout), &picked); err != nil {
+		t.Fatalf("parsing pick output: %v\nstdout: %s", err, r.stdout)
+	}
+
+	if picked.ID != 2 {
+		t.Errorf("pick selected task #%d, want #2 (should skip claimed #1)", picked.ID)
+	}
+}
+
+func TestPickSelectsExpiredClaimTask(t *testing.T) {
+	kanbanDir := initBoard(t)
+
+	// Task 1: expired claim (should be available for pick).
+	writeTaskFile(t, kanbanDir, 1, `---
+id: 1
+title: Expired claim
+status: todo
+priority: critical
+created: 2026-01-01T00:00:00Z
+updated: 2026-01-01T00:00:00Z
+claimed_by: agent-old
+claimed_at: 2020-01-01T00:00:00Z
+---
+`)
+	bumpNextID(t, kanbanDir, 2)
+
+	r := runKanban(t, kanbanDir, "pick", "--claim", "agent-me", "--json")
+	if r.exitCode != 0 {
+		t.Fatalf("pick should find expired-claim task, got exit %d: %s", r.exitCode, r.stderr)
+	}
+
+	var picked taskJSON
+	if err := json.Unmarshal([]byte(r.stdout), &picked); err != nil {
+		t.Fatalf("parsing pick output: %v\nstdout: %s", err, r.stdout)
+	}
+
+	if picked.ID != 1 {
+		t.Errorf("pick selected task #%d, want #1 (expired claim should be available)", picked.ID)
+	}
+}
+
+func TestListUnclaimedFilter(t *testing.T) {
+	kanbanDir := initBoard(t)
+
+	// Task 1: claimed (should be excluded from --unclaimed list).
+	writeTaskFile(t, kanbanDir, 1, `---
+id: 1
+title: Claimed task
+status: todo
+priority: high
+created: 2026-01-01T00:00:00Z
+updated: 2026-01-01T00:00:00Z
+claimed_by: agent-alpha
+claimed_at: 2099-01-01T00:00:00Z
+---
+`)
+	// Task 2: unclaimed.
+	writeTaskFile(t, kanbanDir, 2, `---
+id: 2
+title: Free task
+status: todo
+priority: medium
+created: 2026-01-01T00:00:00Z
+updated: 2026-01-01T00:00:00Z
+---
+`)
+	// Task 3: expired claim (should appear as unclaimed).
+	writeTaskFile(t, kanbanDir, 3, `---
+id: 3
+title: Expired claim task
+status: todo
+priority: low
+created: 2026-01-01T00:00:00Z
+updated: 2026-01-01T00:00:00Z
+claimed_by: agent-old
+claimed_at: 2020-01-01T00:00:00Z
+---
+`)
+	bumpNextID(t, kanbanDir, 4)
+
+	var tasks []taskJSON
+	r := runKanbanJSON(t, kanbanDir, &tasks, "list", "--unclaimed")
+	if r.exitCode != 0 {
+		t.Fatalf("list --unclaimed failed (exit %d): %s", r.exitCode, r.stderr)
+	}
+
+	if len(tasks) != 2 {
+		t.Errorf("got %d tasks, want 2 (unclaimed + expired)", len(tasks))
+		for _, tk := range tasks {
+			t.Logf("  got task #%d %q", tk.ID, tk.Title)
+		}
+	}
+
+	ids := make(map[int]bool, len(tasks))
+	for _, tk := range tasks {
+		ids[tk.ID] = true
+	}
+	if ids[1] {
+		t.Error("task #1 (active claim) should NOT appear in --unclaimed list")
+	}
+	if !ids[2] {
+		t.Error("task #2 (unclaimed) should appear in --unclaimed list")
+	}
+	if !ids[3] {
+		t.Error("task #3 (expired claim) should appear in --unclaimed list")
+	}
+}
+
+func TestListClaimedByFilter(t *testing.T) {
+	kanbanDir := initBoard(t)
+
+	writeTaskFile(t, kanbanDir, 1, `---
+id: 1
+title: Agent alpha task
+status: todo
+priority: high
+created: 2026-01-01T00:00:00Z
+updated: 2026-01-01T00:00:00Z
+claimed_by: agent-alpha
+claimed_at: 2099-01-01T00:00:00Z
+---
+`)
+	writeTaskFile(t, kanbanDir, 2, `---
+id: 2
+title: Agent beta task
+status: todo
+priority: medium
+created: 2026-01-01T00:00:00Z
+updated: 2026-01-01T00:00:00Z
+claimed_by: agent-beta
+claimed_at: 2099-01-01T00:00:00Z
+---
+`)
+	writeTaskFile(t, kanbanDir, 3, `---
+id: 3
+title: Unclaimed task
+status: todo
+priority: low
+created: 2026-01-01T00:00:00Z
+updated: 2026-01-01T00:00:00Z
+---
+`)
+	bumpNextID(t, kanbanDir, 4)
+
+	var tasks []taskJSON
+	r := runKanbanJSON(t, kanbanDir, &tasks, "list", "--claimed-by", "agent-alpha")
+	if r.exitCode != 0 {
+		t.Fatalf("list --claimed-by failed (exit %d): %s", r.exitCode, r.stderr)
+	}
+
+	if len(tasks) != 1 {
+		t.Errorf("got %d tasks, want 1", len(tasks))
+	}
+	if len(tasks) > 0 && tasks[0].ID != 1 {
+		t.Errorf("got task #%d, want #1", tasks[0].ID)
+	}
+}
+
+func TestExpiredClaimClearedAfterMutation(t *testing.T) {
+	kanbanDir := initBoard(t)
+
+	// Expired claim — move should succeed and clear the claim fields.
+	writeTaskFile(t, kanbanDir, 1, `---
+id: 1
+title: Expired claim cleared
+status: todo
+priority: high
+created: 2026-01-01T00:00:00Z
+updated: 2026-01-01T00:00:00Z
+claimed_by: agent-old
+claimed_at: 2020-01-01T00:00:00Z
+---
+`)
+	bumpNextID(t, kanbanDir, 2)
+
+	r := runKanban(t, kanbanDir, "move", "1", "in-progress")
+	if r.exitCode != 0 {
+		t.Fatalf("move should succeed for expired claim, got exit %d: %s", r.exitCode, r.stderr)
+	}
+
+	// Read the task back and verify claim fields are cleared.
+	var tk taskJSON
+	r = runKanbanJSON(t, kanbanDir, &tk, "show", "1")
+	if r.exitCode != 0 {
+		t.Fatalf("show failed (exit %d): %s", r.exitCode, r.stderr)
+	}
+
+	// Verify the task file no longer has claim fields by reading raw content.
+	taskPath := filepath.Join(kanbanDir, "tasks", "001-expired-claim-cleared.md")
+	data, err := os.ReadFile(taskPath) //nolint:gosec // e2e test file
+	if err != nil {
+		t.Fatalf("reading task file: %v", err)
+	}
+	content := string(data)
+	if strings.Contains(content, "claimed_by:") {
+		t.Error("task file should not contain claimed_by after expired claim is cleared")
+	}
+	if strings.Contains(content, "claimed_at:") {
+		t.Error("task file should not contain claimed_at after expired claim is cleared")
 	}
 }

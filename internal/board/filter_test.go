@@ -2,6 +2,7 @@ package board
 
 import (
 	"testing"
+	"time"
 
 	"github.com/antopolskiy/kanban-md/internal/task"
 )
@@ -253,5 +254,116 @@ func TestCountByStatus(t *testing.T) {
 	}
 	if counts["todo"] != 0 {
 		t.Errorf("todo count = %d, want 0", counts["todo"])
+	}
+}
+
+func TestIsUnclaimed(t *testing.T) {
+	const defaultTimeout = time.Hour
+
+	pastTime := time.Now().Add(-2 * time.Hour)      // expired
+	recentTime := time.Now().Add(-10 * time.Minute) // active
+
+	tests := []struct {
+		name    string
+		task    *task.Task
+		timeout time.Duration
+		want    bool
+	}{
+		{
+			name:    "no claim is unclaimed",
+			task:    &task.Task{ID: 1, ClaimedBy: ""},
+			timeout: defaultTimeout,
+			want:    true,
+		},
+		{
+			name:    "active claim is not unclaimed",
+			task:    &task.Task{ID: 2, ClaimedBy: "agent-1", ClaimedAt: &recentTime},
+			timeout: defaultTimeout,
+			want:    false,
+		},
+		{
+			name:    "expired claim is unclaimed",
+			task:    &task.Task{ID: 3, ClaimedBy: "agent-1", ClaimedAt: &pastTime},
+			timeout: defaultTimeout,
+			want:    true,
+		},
+		{
+			name:    "timeout zero with claim means never expires",
+			task:    &task.Task{ID: 4, ClaimedBy: "agent-1", ClaimedAt: &pastTime},
+			timeout: 0,
+			want:    false,
+		},
+		{
+			name:    "ClaimedBy set but ClaimedAt nil with timeout is not unclaimed",
+			task:    &task.Task{ID: 5, ClaimedBy: "agent-1", ClaimedAt: nil},
+			timeout: defaultTimeout,
+			want:    false,
+		},
+		{
+			name:    "ClaimedBy set but ClaimedAt nil without timeout is not unclaimed",
+			task:    &task.Task{ID: 6, ClaimedBy: "agent-1", ClaimedAt: nil},
+			timeout: 0,
+			want:    false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := IsUnclaimed(tt.task, tt.timeout)
+			if got != tt.want {
+				t.Errorf("IsUnclaimed() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestFilterUnclaimed(t *testing.T) {
+	recentTime := time.Now().Add(-10 * time.Minute) // active claim
+	pastTime := time.Now().Add(-2 * time.Hour)      // expired claim
+
+	tasks := []*task.Task{
+		{ID: 1, Title: "No claim", Status: "todo"},
+		{ID: 2, Title: "Active claim", Status: "todo", ClaimedBy: "agent-1", ClaimedAt: &recentTime},
+		{ID: 3, Title: "Expired claim", Status: "todo", ClaimedBy: "agent-2", ClaimedAt: &pastTime},
+	}
+
+	result := Filter(tasks, FilterOptions{Unclaimed: true, ClaimTimeout: time.Hour})
+	if len(result) != 2 {
+		t.Errorf("got %d tasks, want 2 (unclaimed + expired)", len(result))
+		for _, tk := range result {
+			t.Logf("  got task #%d %q", tk.ID, tk.Title)
+		}
+	}
+
+	// Verify the right tasks are returned.
+	ids := make(map[int]bool, len(result))
+	for _, tk := range result {
+		ids[tk.ID] = true
+	}
+	if !ids[1] {
+		t.Error("expected task #1 (unclaimed) in results")
+	}
+	if ids[2] {
+		t.Error("task #2 (active claim) should NOT be in results")
+	}
+	if !ids[3] {
+		t.Error("expected task #3 (expired claim) in results")
+	}
+}
+
+func TestFilterByClaimedBy(t *testing.T) {
+	now := time.Now()
+	tasks := []*task.Task{
+		{ID: 1, Title: "Agent 1", Status: "todo", ClaimedBy: "agent-1", ClaimedAt: &now},
+		{ID: 2, Title: "Agent 2", Status: "todo", ClaimedBy: "agent-2", ClaimedAt: &now},
+		{ID: 3, Title: "No claim", Status: "todo"},
+	}
+
+	result := Filter(tasks, FilterOptions{ClaimedBy: "agent-1"})
+	if len(result) != 1 {
+		t.Errorf("got %d tasks, want 1", len(result))
+	}
+	if len(result) > 0 && result[0].ID != 1 {
+		t.Errorf("got task #%d, want #1", result[0].ID)
 	}
 }

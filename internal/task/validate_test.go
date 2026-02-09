@@ -3,6 +3,7 @@ package task
 import (
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/antopolskiy/kanban-md/internal/clierr"
 )
@@ -134,5 +135,192 @@ func TestFormatDueDate(t *testing.T) {
 	}
 	if err.Details["field"] != "due" {
 		t.Errorf("details[field] = %v, want %q", err.Details["field"], "due")
+	}
+}
+
+func TestCheckClaimAllowed(t *testing.T) {
+	const defaultTimeout = time.Hour
+
+	pastTime := time.Now().Add(-2 * time.Hour)
+	recentTime := time.Now().Add(-10 * time.Minute)
+
+	tests := []struct {
+		name      string
+		task      Task
+		claimant  string
+		force     bool
+		timeout   time.Duration
+		wantClear bool // expect ClaimedBy/ClaimedAt cleared
+	}{
+		{
+			name:    "unclaimed task allows operation",
+			task:    Task{ID: 1, ClaimedBy: ""},
+			timeout: defaultTimeout,
+		},
+		{
+			name:     "same agent allows operation",
+			task:     Task{ID: 2, ClaimedBy: "agent-1", ClaimedAt: &recentTime},
+			claimant: "agent-1",
+			timeout:  defaultTimeout,
+		},
+		{
+			name:      "expired claim allows operation and clears fields",
+			task:      Task{ID: 3, ClaimedBy: "agent-1", ClaimedAt: &pastTime},
+			claimant:  "agent-2",
+			timeout:   defaultTimeout,
+			wantClear: true,
+		},
+		{
+			name:      "force overrides active claim and clears fields",
+			task:      Task{ID: 5, ClaimedBy: "agent-1", ClaimedAt: &recentTime},
+			claimant:  "agent-2",
+			force:     true,
+			timeout:   defaultTimeout,
+			wantClear: true,
+		},
+		{
+			name:    "force on unclaimed task is a no-op",
+			task:    Task{ID: 10, ClaimedBy: ""},
+			force:   true,
+			timeout: defaultTimeout,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tk := tt.task
+			if tt.task.ClaimedAt != nil {
+				cp := *tt.task.ClaimedAt
+				tk.ClaimedAt = &cp
+			}
+
+			err := CheckClaim(&tk, tt.claimant, tt.force, tt.timeout)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			if tt.wantClear {
+				if tk.ClaimedBy != "" {
+					t.Errorf("ClaimedBy = %q, want empty (cleared)", tk.ClaimedBy)
+				}
+				if tk.ClaimedAt != nil {
+					t.Errorf("ClaimedAt = %v, want nil (cleared)", tk.ClaimedAt)
+				}
+			}
+		})
+	}
+}
+
+func TestCheckClaimBlocked(t *testing.T) {
+	const defaultTimeout = time.Hour
+
+	pastTime := time.Now().Add(-2 * time.Hour)
+	recentTime := time.Now().Add(-10 * time.Minute)
+
+	tests := []struct {
+		name     string
+		task     Task
+		claimant string
+		timeout  time.Duration
+	}{
+		{
+			name:     "active claim by different agent blocks",
+			task:     Task{ID: 4, ClaimedBy: "agent-1", ClaimedAt: &recentTime},
+			claimant: "agent-2",
+			timeout:  defaultTimeout,
+		},
+		{
+			name:     "ClaimedBy set but ClaimedAt nil blocks",
+			task:     Task{ID: 6, ClaimedBy: "agent-1", ClaimedAt: nil},
+			claimant: "agent-2",
+			timeout:  defaultTimeout,
+		},
+		{
+			name:     "timeout zero means no expiry",
+			task:     Task{ID: 7, ClaimedBy: "agent-1", ClaimedAt: &pastTime},
+			claimant: "agent-2",
+			timeout:  0,
+		},
+		{
+			name:     "empty claimant on claimed task blocks",
+			task:     Task{ID: 9, ClaimedBy: "agent-1", ClaimedAt: &recentTime},
+			claimant: "",
+			timeout:  defaultTimeout,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tk := tt.task
+			if tt.task.ClaimedAt != nil {
+				cp := *tt.task.ClaimedAt
+				tk.ClaimedAt = &cp
+			}
+
+			err := CheckClaim(&tk, tt.claimant, false, tt.timeout)
+			if err == nil {
+				t.Fatal("expected error, got nil")
+			}
+
+			var cliErr *clierr.Error
+			if !errors.As(err, &cliErr) {
+				t.Fatalf("expected clierr.Error, got %T: %v", err, err)
+			}
+			if cliErr.Code != clierr.TaskClaimed {
+				t.Errorf("code = %q, want %q", cliErr.Code, clierr.TaskClaimed)
+			}
+		})
+	}
+}
+
+func TestCheckClaimErrorDetails(t *testing.T) {
+	const remainingUnknown = "unknown"
+
+	recentTime := time.Now().Add(-10 * time.Minute)
+	tk := &Task{ID: 42, ClaimedBy: "agent-x", ClaimedAt: &recentTime}
+
+	err := CheckClaim(tk, "other-agent", false, time.Hour)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+
+	var cliErr *clierr.Error
+	if !errors.As(err, &cliErr) {
+		t.Fatalf("expected clierr.Error, got %T", err)
+	}
+
+	if cliErr.Details["id"] != 42 {
+		t.Errorf("details[id] = %v, want 42", cliErr.Details["id"])
+	}
+	if cliErr.Details["claimed_by"] != "agent-x" {
+		t.Errorf("details[claimed_by] = %v, want %q", cliErr.Details["claimed_by"], "agent-x")
+	}
+	remaining, ok := cliErr.Details["remaining"].(string)
+	if !ok {
+		t.Fatalf("details[remaining] type = %T, want string", cliErr.Details["remaining"])
+	}
+	if remaining == "" || remaining == remainingUnknown {
+		t.Errorf("details[remaining] = %q, want a non-empty duration string", remaining)
+	}
+}
+
+func TestCheckClaimRemainingUnknown(t *testing.T) {
+	const remainingUnknown = "unknown"
+
+	// When ClaimedAt is nil and timeout > 0, remaining should be "unknown".
+	tk := &Task{ID: 1, ClaimedBy: "agent-1", ClaimedAt: nil}
+
+	err := CheckClaim(tk, "other", false, time.Hour)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+
+	var cliErr *clierr.Error
+	if !errors.As(err, &cliErr) {
+		t.Fatalf("expected clierr.Error, got %T", err)
+	}
+
+	if cliErr.Details["remaining"] != remainingUnknown {
+		t.Errorf("details[remaining] = %v, want %q", cliErr.Details["remaining"], remainingUnknown)
 	}
 }
