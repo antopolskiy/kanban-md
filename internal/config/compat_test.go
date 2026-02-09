@@ -4,6 +4,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"go.yaml.in/yaml/v3"
 )
 
 // copyDir recursively copies src to dst for test isolation.
@@ -191,6 +193,53 @@ func TestCompatV2ConfigMigratesToV3(t *testing.T) {
 	// Migration should set defaults.class.
 	if cfg.Defaults.Class != DefaultClass {
 		t.Errorf("Defaults.Class = %q, want %q", cfg.Defaults.Class, DefaultClass)
+	}
+}
+
+func TestMigrationPersistsToDisk(t *testing.T) {
+	// Verify that after Load() migrates a v1 config, the on-disk file
+	// is updated to the current version so re-migration is avoided.
+	tmp := t.TempDir()
+	fixture := filepath.Join("testdata", "compat", "v1")
+	copyDir(t, fixture, tmp)
+
+	// First Load triggers migration from v1→v3.
+	cfg, err := Load(tmp)
+	if err != nil {
+		t.Fatalf("Load() v1 fixture: %v", err)
+	}
+	if cfg.Version != CurrentVersion {
+		t.Fatalf("Version = %d, want %d after migration", cfg.Version, CurrentVersion)
+	}
+
+	// Read the raw config file from disk and parse without migration
+	// to verify that the persisted version is already current.
+	data, err := os.ReadFile(filepath.Join(tmp, ConfigFileName)) //nolint:gosec // test temp path
+	if err != nil {
+		t.Fatalf("reading config file: %v", err)
+	}
+
+	var raw Config
+	if err := yaml.Unmarshal(data, &raw); err != nil {
+		t.Fatalf("parsing raw config: %v", err)
+	}
+
+	if raw.Version != CurrentVersion {
+		t.Errorf("On-disk config version = %d, want %d (migration should persist)", raw.Version, CurrentVersion)
+	}
+	if raw.ClaimTimeout != DefaultClaimTimeout {
+		t.Errorf("Persisted ClaimTimeout = %q, want %q", raw.ClaimTimeout, DefaultClaimTimeout)
+	}
+	if raw.Defaults.Class != DefaultClass {
+		t.Errorf("Persisted Defaults.Class = %q, want %q", raw.Defaults.Class, DefaultClass)
+	}
+	const wantName = "Test Project"
+	if raw.Board.Name != wantName {
+		t.Errorf("Persisted Board.Name = %q, want %q", raw.Board.Name, wantName)
+	}
+	const wantNextID = 4
+	if raw.NextID != wantNextID {
+		t.Errorf("Persisted NextID = %d, want %d", raw.NextID, wantNextID)
 	}
 }
 

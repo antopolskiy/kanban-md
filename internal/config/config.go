@@ -260,8 +260,16 @@ func Load(dir string) (*Config, error) {
 	cfg.dir = absDir
 
 	// Migrate old config versions forward before validating.
+	oldVersion := cfg.Version
 	if err := migrate(&cfg); err != nil {
 		return nil, err
+	}
+
+	// Persist migrated config so future loads skip re-migration.
+	if cfg.Version != oldVersion {
+		if err := cfg.Save(); err != nil {
+			return nil, fmt.Errorf("saving migrated config: %w", err)
+		}
 	}
 
 	if err := cfg.Validate(); err != nil {
