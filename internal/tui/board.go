@@ -968,34 +968,8 @@ func detailLines(t *task.Task, width int) []string {
 	lines = append(lines, "")
 	lines = append(lines, detailLabelStyle.Render("Status:")+"  "+t.Status)
 	lines = append(lines, detailLabelStyle.Render("Priority:")+"  "+t.Priority)
-
-	if t.Assignee != "" {
-		lines = append(lines, detailLabelStyle.Render("Assignee:")+"  "+t.Assignee)
-	}
-	if len(t.Tags) > 0 {
-		lines = append(lines, detailLabelStyle.Render("Tags:")+"  "+strings.Join(t.Tags, ", "))
-	}
-	if t.Due != nil {
-		lines = append(lines, detailLabelStyle.Render("Due:")+"  "+t.Due.String())
-	}
-	if t.Estimate != "" {
-		lines = append(lines, detailLabelStyle.Render("Estimate:")+"  "+t.Estimate)
-	}
-	lines = append(lines, detailLabelStyle.Render("Created:")+"  "+t.Created.Format("2006-01-02 15:04"))
-	lines = append(lines, detailLabelStyle.Render("Updated:")+"  "+t.Updated.Format("2006-01-02 15:04"))
-
-	if t.ClaimedBy != "" {
-		lines = append(lines, detailLabelStyle.Render("Claimed:")+"  "+claimStyle.Render(t.ClaimedBy))
-	}
-	if t.Started != nil {
-		lines = append(lines, detailLabelStyle.Render("Started:")+"  "+t.Started.Format("2006-01-02 15:04"))
-	}
-	if t.Completed != nil {
-		lines = append(lines, detailLabelStyle.Render("Completed:")+"  "+t.Completed.Format("2006-01-02 15:04"))
-	}
-	if t.Started != nil && t.Completed != nil {
-		lines = append(lines, detailLabelStyle.Render("Duration:")+"  "+humanDuration(t.Completed.Sub(*t.Started)))
-	}
+	lines = append(lines, detailMetadataLines(t)...)
+	lines = append(lines, detailTimestampLines(t)...)
 	if t.Blocked {
 		lines = append(lines, "")
 		lines = append(lines, errorStyle.Render("BLOCKED: "+t.BlockReason))
@@ -1004,6 +978,62 @@ func detailLines(t *task.Task, width int) []string {
 		lines = append(lines, "")
 		wrapped := lipgloss.NewStyle().Width(width).Render(t.Body)
 		lines = append(lines, strings.Split(wrapped, "\n")...)
+	}
+	return lines
+}
+
+// detailMetadataLines renders optional metadata fields (class, assignee, tags, relations, etc.).
+func detailMetadataLines(t *task.Task) []string {
+	var lines []string
+	if t.Class != "" {
+		lines = append(lines, detailLabelStyle.Render("Class:")+"  "+t.Class)
+	}
+	if t.Assignee != "" {
+		lines = append(lines, detailLabelStyle.Render("Assignee:")+"  "+t.Assignee)
+	}
+	if len(t.Tags) > 0 {
+		lines = append(lines, detailLabelStyle.Render("Tags:")+"  "+strings.Join(t.Tags, ", "))
+	}
+	if t.Parent != nil {
+		lines = append(lines, detailLabelStyle.Render("Parent:")+"  #"+strconv.Itoa(*t.Parent))
+	}
+	if len(t.DependsOn) > 0 {
+		deps := make([]string, len(t.DependsOn))
+		for i, d := range t.DependsOn {
+			deps[i] = "#" + strconv.Itoa(d)
+		}
+		lines = append(lines, detailLabelStyle.Render("Depends on:")+"  "+strings.Join(deps, ", "))
+	}
+	if t.Due != nil {
+		lines = append(lines, detailLabelStyle.Render("Due:")+"  "+t.Due.String())
+	}
+	if t.Estimate != "" {
+		lines = append(lines, detailLabelStyle.Render("Estimate:")+"  "+t.Estimate)
+	}
+	return lines
+}
+
+// detailTimestampLines renders timestamps and claim info.
+func detailTimestampLines(t *task.Task) []string {
+	const timeFmt = "2006-01-02 15:04"
+	lines := []string{
+		detailLabelStyle.Render("Created:") + "  " + t.Created.Format(timeFmt),
+		detailLabelStyle.Render("Updated:") + "  " + t.Updated.Format(timeFmt),
+	}
+	if t.ClaimedBy != "" {
+		lines = append(lines, detailLabelStyle.Render("Claimed:")+"  "+claimStyle.Render(t.ClaimedBy))
+	}
+	if t.ClaimedAt != nil {
+		lines = append(lines, detailLabelStyle.Render("Claimed at:")+"  "+t.ClaimedAt.Format(timeFmt))
+	}
+	if t.Started != nil {
+		lines = append(lines, detailLabelStyle.Render("Started:")+"  "+t.Started.Format(timeFmt))
+	}
+	if t.Completed != nil {
+		lines = append(lines, detailLabelStyle.Render("Completed:")+"  "+t.Completed.Format(timeFmt))
+	}
+	if t.Started != nil && t.Completed != nil {
+		lines = append(lines, detailLabelStyle.Render("Duration:")+"  "+humanDuration(t.Completed.Sub(*t.Started)))
 	}
 	return lines
 }

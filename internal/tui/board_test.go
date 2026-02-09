@@ -833,7 +833,9 @@ func setupMetadataBoard(t *testing.T) *tui.Board {
 
 	started := testRefTime.Add(-1 * time.Hour)
 	completed := testRefTime
+	claimedAt := testRefTime.Add(-30 * time.Minute)
 	due := date.New(2026, 3, 15)
+	parentID := 42
 
 	tk := &task.Task{
 		ID:          1,
@@ -848,6 +850,11 @@ func setupMetadataBoard(t *testing.T) *tui.Board {
 		Completed:   &completed,
 		Blocked:     true,
 		BlockReason: "waiting on API",
+		ClaimedBy:   "agent-1",
+		ClaimedAt:   &claimedAt,
+		Class:       "expedite",
+		Parent:      &parentID,
+		DependsOn:   []int{10, 20},
 		Updated:     testRefTime,
 	}
 	path := filepath.Join(tasksDir, task.GenerateFilename(1, "Full Metadata Task"))
@@ -880,6 +887,12 @@ func TestBoard_DetailShowsAllMetadata(t *testing.T) {
 		{"Tags", "backend"},
 		{"Due", "2026-03-15"},
 		{"Estimate", "2h"},
+		{"Class", "expedite"},
+		{"Parent", "#42"},
+		{"DependsOn", "#10"},
+		{"DependsOn2", "#20"},
+		{"ClaimedBy", "agent-1"},
+		{"ClaimedAt", "Claimed at:"},
 		{"Started", "Started:"},
 		{"Completed", "Completed:"},
 		{"Duration", "Duration:"},
