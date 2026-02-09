@@ -22,7 +22,10 @@ const (
 	codeWIPLimitExceeded = "WIP_LIMIT_EXCEEDED"
 	codeInvalidInput     = "INVALID_INPUT"
 	codeInvalidDate      = "INVALID_DATE"
+	codeInvalidStatus    = "INVALID_STATUS"
 	statusBacklog        = "backlog"
+	statusInProgress     = "in-progress"
+	statusDeleted        = "deleted"
 	priorityHigh         = "high"
 )
 
@@ -73,18 +76,19 @@ type result struct {
 
 // taskJSON mirrors the task JSON output schema.
 type taskJSON struct {
-	ID       int      `json:"id"`
-	Title    string   `json:"title"`
-	Status   string   `json:"status"`
-	Priority string   `json:"priority"`
-	Assignee string   `json:"assignee,omitempty"`
-	Tags     []string `json:"tags,omitempty"`
-	Due      string   `json:"due,omitempty"`
-	Estimate string   `json:"estimate,omitempty"`
-	Body     string   `json:"body,omitempty"`
-	File     string   `json:"file,omitempty"`
-	Created  string   `json:"created"`
-	Updated  string   `json:"updated"`
+	ID        int      `json:"id"`
+	Title     string   `json:"title"`
+	Status    string   `json:"status"`
+	Priority  string   `json:"priority"`
+	Assignee  string   `json:"assignee,omitempty"`
+	Tags      []string `json:"tags,omitempty"`
+	Due       string   `json:"due,omitempty"`
+	Estimate  string   `json:"estimate,omitempty"`
+	Body      string   `json:"body,omitempty"`
+	File      string   `json:"file,omitempty"`
+	Created   string   `json:"created"`
+	Updated   string   `json:"updated"`
+	ClaimedBy string   `json:"claimed_by,omitempty"`
 }
 
 // runKanban executes the binary with --dir prepended for test isolation.
@@ -381,7 +385,7 @@ func TestCreateInvalidStatus(t *testing.T) {
 	kanbanDir := initBoard(t)
 
 	errResp := runKanbanJSONError(t, kanbanDir, "create", "Bad task", "--status", "nonexistent")
-	if errResp.Code != "INVALID_STATUS" {
+	if errResp.Code != codeInvalidStatus {
 		t.Errorf("code = %q, want INVALID_STATUS", errResp.Code)
 	}
 	if !strings.Contains(errResp.Error, "invalid status") {
@@ -706,7 +710,7 @@ func TestMoveDirectStatus(t *testing.T) {
 	var task taskJSON
 	runKanbanJSON(t, kanbanDir, &task, "move", "1", "in-progress")
 
-	if task.Status != "in-progress" {
+	if task.Status != statusInProgress {
 		t.Errorf("Status = %q, want %q", task.Status, "in-progress")
 	}
 }
@@ -725,7 +729,7 @@ func TestMoveNextPrev(t *testing.T) {
 
 	// todo -> in-progress
 	runKanbanJSON(t, kanbanDir, &task, "move", "1", "--next")
-	if task.Status != "in-progress" {
+	if task.Status != statusInProgress {
 		t.Errorf("after second --next: Status = %q, want %q", task.Status, "in-progress")
 	}
 
@@ -1350,8 +1354,8 @@ func TestDeleteWithForce(t *testing.T) {
 	if r.exitCode != 0 {
 		t.Fatalf("delete failed: %s", r.stderr)
 	}
-	if got["status"] != "deleted" {
-		t.Errorf("status = %v, want %q", got["status"], "deleted")
+	if got["status"] != statusDeleted {
+		t.Errorf("status = %v, want %q", got["status"], statusDeleted)
 	}
 
 	// File should be gone.
@@ -1481,8 +1485,8 @@ func TestFullLifecycle(t *testing.T) {
 	// Delete.
 	var deleted map[string]interface{}
 	runKanbanJSON(t, kanbanDir, &deleted, "delete", "1", "--force")
-	if deleted["status"] != "deleted" {
-		t.Errorf("delete: status = %v, want %q", deleted["status"], "deleted")
+	if deleted["status"] != statusDeleted {
+		t.Errorf("delete: status = %v, want %q", deleted["status"], statusDeleted)
 	}
 
 	// List (empty).
@@ -4247,5 +4251,278 @@ func TestLogWithBadSince(t *testing.T) {
 	errResp := runKanbanJSONError(t, kanbanDir, "log", "--since", "not-a-date")
 	if errResp.Code != codeInvalidDate {
 		t.Errorf("error code = %q, want %q", errResp.Code, codeInvalidDate)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Pick command tests
+// ---------------------------------------------------------------------------
+
+func TestPickBasic(t *testing.T) {
+	kanbanDir := initBoard(t)
+	mustCreateTask(t, kanbanDir, "Pick me", "--priority", "high")
+	mustCreateTask(t, kanbanDir, "Lower priority")
+
+	// Pick should select the highest-priority unclaimed task.
+	var picked taskJSON
+	r := runKanbanJSON(t, kanbanDir, &picked, "pick", "--claim", "agent-1")
+	if r.exitCode != 0 {
+		t.Fatalf("pick failed (exit %d): %s", r.exitCode, r.stderr)
+	}
+	if picked.Title != "Pick me" {
+		t.Errorf("picked title = %q, want %q", picked.Title, "Pick me")
+	}
+	if picked.ClaimedBy != "agent-1" {
+		t.Errorf("claimed_by = %q, want %q", picked.ClaimedBy, "agent-1")
+	}
+}
+
+func TestPickWithMove(t *testing.T) {
+	kanbanDir := initBoard(t)
+	mustCreateTask(t, kanbanDir, "Move me")
+
+	var picked taskJSON
+	r := runKanbanJSON(t, kanbanDir, &picked, "pick", "--claim", "agent-1", "--move", "in-progress")
+	if r.exitCode != 0 {
+		t.Fatalf("pick --move failed (exit %d): %s", r.exitCode, r.stderr)
+	}
+	if picked.Status != statusInProgress {
+		t.Errorf("status = %q, want %q", picked.Status, "in-progress")
+	}
+}
+
+func TestPickWithStatusFilter(t *testing.T) {
+	kanbanDir := initBoard(t)
+	mustCreateTask(t, kanbanDir, "Backlog task")
+	mustCreateTask(t, kanbanDir, "Todo task", "--status", "todo")
+
+	var picked taskJSON
+	r := runKanbanJSON(t, kanbanDir, &picked, "pick", "--claim", "agent-1", "--status", "todo")
+	if r.exitCode != 0 {
+		t.Fatalf("pick --status failed (exit %d): %s", r.exitCode, r.stderr)
+	}
+	if picked.Title != "Todo task" {
+		t.Errorf("picked title = %q, want %q", picked.Title, "Todo task")
+	}
+}
+
+func TestPickWithTagFilter(t *testing.T) {
+	kanbanDir := initBoard(t)
+	mustCreateTask(t, kanbanDir, "No tag task")
+	mustCreateTask(t, kanbanDir, "Tagged task", "--tags", "urgent")
+
+	var picked taskJSON
+	r := runKanbanJSON(t, kanbanDir, &picked, "pick", "--claim", "agent-1", "--tag", "urgent")
+	if r.exitCode != 0 {
+		t.Fatalf("pick --tag failed (exit %d): %s", r.exitCode, r.stderr)
+	}
+	if picked.Title != "Tagged task" {
+		t.Errorf("picked title = %q, want %q", picked.Title, "Tagged task")
+	}
+}
+
+func TestPickNothingAvailable(t *testing.T) {
+	kanbanDir := initBoard(t)
+
+	errResp := runKanbanJSONError(t, kanbanDir, "pick", "--claim", "agent-1")
+	if errResp.Code != "NOTHING_TO_PICK" {
+		t.Errorf("error code = %q, want NOTHING_TO_PICK", errResp.Code)
+	}
+}
+
+func TestPickTableOutput(t *testing.T) {
+	kanbanDir := initBoard(t)
+	mustCreateTask(t, kanbanDir, "Table pick task")
+
+	r := runKanban(t, kanbanDir, "pick", "--claim", "agent-1")
+	if r.exitCode != 0 {
+		t.Fatalf("pick table output failed (exit %d): %s", r.exitCode, r.stderr)
+	}
+	if !strings.Contains(r.stdout, "Picked task") {
+		t.Error("table output should contain 'Picked task'")
+	}
+	if !strings.Contains(r.stdout, "agent-1") {
+		t.Error("table output should contain claimant name")
+	}
+}
+
+func TestPickTableOutputWithMove(t *testing.T) {
+	kanbanDir := initBoard(t)
+	mustCreateTask(t, kanbanDir, "Table move task")
+
+	r := runKanban(t, kanbanDir, "pick", "--claim", "agent-1", "--move", "in-progress")
+	if r.exitCode != 0 {
+		t.Fatalf("pick --move table output failed (exit %d): %s", r.exitCode, r.stderr)
+	}
+	if !strings.Contains(r.stdout, "Picked and moved") {
+		t.Error("table output should contain 'Picked and moved'")
+	}
+}
+
+func TestPickInvalidStatus(t *testing.T) {
+	kanbanDir := initBoard(t)
+
+	errResp := runKanbanJSONError(t, kanbanDir, "pick", "--claim", "agent-1", "--status", "nonexistent")
+	if errResp.Code != codeInvalidStatus {
+		t.Errorf("error code = %q, want INVALID_STATUS", errResp.Code)
+	}
+}
+
+func TestPickInvalidMoveTarget(t *testing.T) {
+	kanbanDir := initBoard(t)
+
+	errResp := runKanbanJSONError(t, kanbanDir, "pick", "--claim", "agent-1", "--move", "nonexistent")
+	if errResp.Code != codeInvalidStatus {
+		t.Errorf("error code = %q, want INVALID_STATUS", errResp.Code)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Class-aware WIP limit tests
+// ---------------------------------------------------------------------------
+
+func TestExpediteBypassesColumnWIP(t *testing.T) {
+	kanbanDir := initBoardWithWIP(t, 1)
+	// Fill the in-progress column.
+	mustCreateTask(t, kanbanDir, "Normal task")
+	runKanban(t, kanbanDir, "move", "1", "in-progress")
+
+	// Create an expedite task and move it — should bypass the column WIP limit.
+	mustCreateTask(t, kanbanDir, "Expedite task", "--class", "expedite")
+	r := runKanban(t, kanbanDir, "move", "2", "in-progress")
+	if r.exitCode != 0 {
+		t.Fatalf("expedite move failed (exit %d): %s", r.exitCode, r.stderr)
+	}
+	if !strings.Contains(r.stdout, "Moved task #2") {
+		t.Error("expected successful move message for expedite task")
+	}
+}
+
+func TestExpediteBoardWideWIPLimit(t *testing.T) {
+	kanbanDir := initBoardWithWIP(t, 1)
+	// Create an expedite task (fills the board-wide limit of 1).
+	mustCreateTask(t, kanbanDir, "Expedite 1", "--class", "expedite")
+
+	// Write a second expedite task file directly to bypass create-time WIP check.
+	writeTaskFile(t, kanbanDir, 2, `---
+id: 2
+title: Expedite 2
+status: backlog
+priority: medium
+class: expedite
+created: 2026-01-01T00:00:00Z
+updated: 2026-01-01T00:00:00Z
+---
+`)
+	bumpNextID(t, kanbanDir, 3)
+
+	// Moving the second expedite task should be blocked by board-wide class limit.
+	errResp := runKanbanJSONError(t, kanbanDir, "move", "2", "todo")
+	if errResp.Code != "CLASS_WIP_EXCEEDED" {
+		t.Errorf("error code = %q, want CLASS_WIP_EXCEEDED", errResp.Code)
+	}
+}
+
+func TestExpediteWIPForceOverride(t *testing.T) {
+	kanbanDir := initBoardWithWIP(t, 1)
+	mustCreateTask(t, kanbanDir, "Expedite 1", "--class", "expedite")
+
+	// Write a second expedite task file directly to bypass create-time WIP check.
+	writeTaskFile(t, kanbanDir, 2, `---
+id: 2
+title: Expedite 2
+status: backlog
+priority: medium
+class: expedite
+created: 2026-01-01T00:00:00Z
+updated: 2026-01-01T00:00:00Z
+---
+`)
+	bumpNextID(t, kanbanDir, 3)
+
+	r := runKanban(t, kanbanDir, "move", "2", "todo", "--force")
+	if r.exitCode != 0 {
+		t.Fatalf("force move failed (exit %d): %s", r.exitCode, r.stderr)
+	}
+	// Stderr should contain the override warning.
+	if !strings.Contains(r.stderr, "overridden") {
+		t.Error("expected force override warning in stderr")
+	}
+}
+
+func TestCreateExpediteClassWIPCheck(t *testing.T) {
+	kanbanDir := initBoard(t)
+	// Create an expedite task.
+	mustCreateTask(t, kanbanDir, "Expedite 1", "--class", "expedite")
+
+	// Second expedite task should be blocked by the board-wide expedite limit (1).
+	errResp := runKanbanJSONError(t, kanbanDir, "create", "Expedite 2", "--class", "expedite")
+	if errResp.Code != "CLASS_WIP_EXCEEDED" {
+		t.Errorf("error code = %q, want CLASS_WIP_EXCEEDED", errResp.Code)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Move command: claim during move, compact output
+// ---------------------------------------------------------------------------
+
+func TestMoveWithClaim(t *testing.T) {
+	kanbanDir := initBoard(t)
+	mustCreateTask(t, kanbanDir, "Claim during move")
+
+	var moved taskJSON
+	r := runKanbanJSON(t, kanbanDir, &moved, "move", "1", "in-progress", "--claim", "agent-1")
+	if r.exitCode != 0 {
+		t.Fatalf("move --claim failed (exit %d): %s", r.exitCode, r.stderr)
+	}
+	if moved.ClaimedBy != "agent-1" {
+		t.Errorf("claimed_by = %q, want %q", moved.ClaimedBy, "agent-1")
+	}
+	if moved.Status != statusInProgress {
+		t.Errorf("status = %q, want %q", moved.Status, "in-progress")
+	}
+}
+
+func TestMoveCompactOutput(t *testing.T) {
+	kanbanDir := initBoard(t)
+	mustCreateTask(t, kanbanDir, "Compact move test")
+
+	r := runKanban(t, kanbanDir, "move", "1", "todo", "--compact")
+	if r.exitCode != 0 {
+		t.Fatalf("move --compact failed (exit %d): %s", r.exitCode, r.stderr)
+	}
+	if !strings.Contains(r.stdout, "Moved task #1") {
+		t.Error("compact move output should contain 'Moved task #1'")
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Delete command: compact output, JSON output
+// ---------------------------------------------------------------------------
+
+func TestDeleteJSONOutput(t *testing.T) {
+	kanbanDir := initBoard(t)
+	mustCreateTask(t, kanbanDir, "Delete JSON test")
+
+	var result map[string]interface{}
+	r := runKanbanJSON(t, kanbanDir, &result, "delete", "1", "--force")
+	if r.exitCode != 0 {
+		t.Fatalf("delete --json failed (exit %d): %s", r.exitCode, r.stderr)
+	}
+	if status, ok := result["status"].(string); !ok || status != statusDeleted {
+		t.Errorf("JSON status = %v, want %q", result["status"], statusDeleted)
+	}
+}
+
+func TestDeleteTableOutput(t *testing.T) {
+	kanbanDir := initBoard(t)
+	mustCreateTask(t, kanbanDir, "Delete table test")
+
+	r := runKanban(t, kanbanDir, "delete", "1", "--force")
+	if r.exitCode != 0 {
+		t.Fatalf("delete --force failed (exit %d): %s", r.exitCode, r.stderr)
+	}
+	if !strings.Contains(r.stdout, "Deleted task #1") {
+		t.Error("table output should contain 'Deleted task #1'")
 	}
 }
