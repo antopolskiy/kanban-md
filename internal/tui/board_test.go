@@ -323,6 +323,50 @@ func TestBoard_EmptyBoard(t *testing.T) {
 	}
 }
 
+func TestBoard_ClaimedByDisplayed(t *testing.T) {
+	dir := t.TempDir()
+	kanbanDir := filepath.Join(dir, "kanban")
+	tasksDir := filepath.Join(kanbanDir, "tasks")
+
+	if err := os.MkdirAll(tasksDir, 0o750); err != nil {
+		t.Fatalf("creating dirs: %v", err)
+	}
+
+	cfg := config.NewDefault("Test Board")
+	cfg.SetDir(kanbanDir)
+	if err := cfg.Save(); err != nil {
+		t.Fatalf("saving config: %v", err)
+	}
+
+	// Create a task with ClaimedBy set.
+	tk := &task.Task{
+		ID:        1,
+		Title:     "Claimed task",
+		Status:    "in-progress",
+		Priority:  "high",
+		ClaimedBy: "agent-1",
+	}
+	path := filepath.Join(tasksDir, task.GenerateFilename(1, "Claimed task"))
+	if err := task.Write(path, tk); err != nil {
+		t.Fatalf("writing task: %v", err)
+	}
+
+	b := tui.NewBoard(cfg)
+	b.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
+
+	v := b.View()
+	if !containsStr(v, "@agent-1") {
+		t.Error("expected @agent-1 in board view for claimed task")
+	}
+
+	// Also check detail view.
+	b = sendSpecialKey(b, tea.KeyEnter)
+	v = b.View()
+	if !containsStr(v, "agent-1") {
+		t.Error("expected agent-1 in detail view for claimed task")
+	}
+}
+
 func containsStr(haystack, needle string) bool {
 	return len(haystack) > 0 && len(needle) > 0 &&
 		haystack != needle && // avoid trivial match

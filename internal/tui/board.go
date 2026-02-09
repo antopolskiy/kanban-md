@@ -649,6 +649,10 @@ func (b *Board) renderCard(t *task.Task, active bool, width int) string {
 		details = append(details, dimStyle.Render(tagStr))
 	}
 
+	if t.ClaimedBy != "" {
+		details = append(details, dimStyle.Render("@"+t.ClaimedBy))
+	}
+
 	if t.Due != nil {
 		details = append(details, dimStyle.Render("due:"+t.Due.String()))
 	}
@@ -689,46 +693,7 @@ func (b *Board) viewDetail() string {
 		return "No task selected."
 	}
 
-	var lines []string
-	titleLine := lipgloss.NewStyle().Bold(true).Render(
-		fmt.Sprintf("Task #%d: %s", t.ID, t.Title))
-	lines = append(lines, titleLine)
-	lines = append(lines, strings.Repeat("─", lipgloss.Width(titleLine)))
-	lines = append(lines, "")
-	lines = append(lines, detailLabelStyle.Render("Status:")+"  "+t.Status)
-	lines = append(lines, detailLabelStyle.Render("Priority:")+"  "+t.Priority)
-
-	if t.Assignee != "" {
-		lines = append(lines, detailLabelStyle.Render("Assignee:")+"  "+t.Assignee)
-	}
-	if len(t.Tags) > 0 {
-		lines = append(lines, detailLabelStyle.Render("Tags:")+"  "+strings.Join(t.Tags, ", "))
-	}
-	if t.Due != nil {
-		lines = append(lines, detailLabelStyle.Render("Due:")+"  "+t.Due.String())
-	}
-	if t.Estimate != "" {
-		lines = append(lines, detailLabelStyle.Render("Estimate:")+"  "+t.Estimate)
-	}
-	lines = append(lines, detailLabelStyle.Render("Created:")+"  "+t.Created.Format("2006-01-02 15:04"))
-	lines = append(lines, detailLabelStyle.Render("Updated:")+"  "+t.Updated.Format("2006-01-02 15:04"))
-
-	if t.Started != nil {
-		lines = append(lines, detailLabelStyle.Render("Started:")+"  "+t.Started.Format("2006-01-02 15:04"))
-	}
-	if t.Completed != nil {
-		lines = append(lines, detailLabelStyle.Render("Completed:")+"  "+t.Completed.Format("2006-01-02 15:04"))
-	}
-	if t.Blocked {
-		lines = append(lines, "")
-		lines = append(lines, errorStyle.Render("BLOCKED: "+t.BlockReason))
-	}
-	if t.Body != "" {
-		lines = append(lines, "")
-		// Word-wrap body text to terminal width.
-		wrapped := lipgloss.NewStyle().Width(b.width).Render(t.Body)
-		lines = append(lines, strings.Split(wrapped, "\n")...)
-	}
+	lines := detailLines(t, b.width)
 
 	// Reserve the last line for the fixed status hint.
 	viewHeight := b.height - 1
@@ -758,6 +723,52 @@ func (b *Board) viewDetail() string {
 	}
 
 	return strings.Join(lines[off:end], "\n") + "\n" + dimStyle.Render(hint)
+}
+
+func detailLines(t *task.Task, width int) []string {
+	var lines []string
+	titleLine := lipgloss.NewStyle().Bold(true).Render(
+		fmt.Sprintf("Task #%d: %s", t.ID, t.Title))
+	lines = append(lines, titleLine)
+	lines = append(lines, strings.Repeat("─", lipgloss.Width(titleLine)))
+	lines = append(lines, "")
+	lines = append(lines, detailLabelStyle.Render("Status:")+"  "+t.Status)
+	lines = append(lines, detailLabelStyle.Render("Priority:")+"  "+t.Priority)
+
+	if t.Assignee != "" {
+		lines = append(lines, detailLabelStyle.Render("Assignee:")+"  "+t.Assignee)
+	}
+	if len(t.Tags) > 0 {
+		lines = append(lines, detailLabelStyle.Render("Tags:")+"  "+strings.Join(t.Tags, ", "))
+	}
+	if t.Due != nil {
+		lines = append(lines, detailLabelStyle.Render("Due:")+"  "+t.Due.String())
+	}
+	if t.Estimate != "" {
+		lines = append(lines, detailLabelStyle.Render("Estimate:")+"  "+t.Estimate)
+	}
+	lines = append(lines, detailLabelStyle.Render("Created:")+"  "+t.Created.Format("2006-01-02 15:04"))
+	lines = append(lines, detailLabelStyle.Render("Updated:")+"  "+t.Updated.Format("2006-01-02 15:04"))
+
+	if t.ClaimedBy != "" {
+		lines = append(lines, detailLabelStyle.Render("Claimed:")+"  "+t.ClaimedBy)
+	}
+	if t.Started != nil {
+		lines = append(lines, detailLabelStyle.Render("Started:")+"  "+t.Started.Format("2006-01-02 15:04"))
+	}
+	if t.Completed != nil {
+		lines = append(lines, detailLabelStyle.Render("Completed:")+"  "+t.Completed.Format("2006-01-02 15:04"))
+	}
+	if t.Blocked {
+		lines = append(lines, "")
+		lines = append(lines, errorStyle.Render("BLOCKED: "+t.BlockReason))
+	}
+	if t.Body != "" {
+		lines = append(lines, "")
+		wrapped := lipgloss.NewStyle().Width(width).Render(t.Body)
+		lines = append(lines, strings.Split(wrapped, "\n")...)
+	}
+	return lines
 }
 
 func (b *Board) viewMoveDialog() string {
