@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 )
@@ -18,10 +19,11 @@ const (
 // skill base directory (e.g., .claude/skills/). Files are written to
 // targetDir/<skillName>/.
 func Install(skillName, targetDir, ver string) error {
-	skillDir := filepath.Join("skills", skillName)
+	// Use path (not filepath) for embed.FS which always uses forward slashes.
+	embedDir := path.Join("skills", skillName)
 
 	// Read the embedded skill tree.
-	entries, err := fs.ReadDir(skillsFS, skillDir)
+	entries, err := fs.ReadDir(skillsFS, embedDir)
 	if err != nil {
 		return fmt.Errorf("reading embedded skill %q: %w", skillName, err)
 	}
@@ -32,27 +34,28 @@ func Install(skillName, targetDir, ver string) error {
 	}
 
 	// Walk the embedded tree and write all files.
-	return fs.WalkDir(skillsFS, skillDir, func(path string, d fs.DirEntry, walkErr error) error {
+	// Paths from fs.WalkDir on embed.FS always use forward slashes.
+	return fs.WalkDir(skillsFS, embedDir, func(embedPath string, d fs.DirEntry, walkErr error) error {
 		if walkErr != nil {
 			return walkErr
 		}
 		_ = entries // used above for validation
 
-		// Compute the relative path from the skill root.
-		relPath, err := filepath.Rel(skillDir, path)
-		if err != nil {
-			return err
+		// Compute the relative path from the skill root using path (forward slashes).
+		relPath := strings.TrimPrefix(embedPath, embedDir+"/")
+		if relPath == embedPath {
+			relPath = "."
 		}
 
-		destPath := filepath.Join(outputBase, relPath)
+		destPath := filepath.Join(outputBase, filepath.FromSlash(relPath))
 
 		if d.IsDir() {
 			return os.MkdirAll(destPath, dirMode)
 		}
 
-		data, err := fs.ReadFile(skillsFS, path)
+		data, err := fs.ReadFile(skillsFS, embedPath)
 		if err != nil {
-			return fmt.Errorf("reading embedded file %q: %w", path, err)
+			return fmt.Errorf("reading embedded file %q: %w", embedPath, err)
 		}
 
 		// Inject version comment into SKILL.md files.

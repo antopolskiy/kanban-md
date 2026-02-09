@@ -22,23 +22,25 @@ func TestAvailableSkills(t *testing.T) {
 
 func TestEmbeddedSkillsReadable(t *testing.T) {
 	for _, s := range AvailableSkills {
-		path := filepath.Join("skills", s.Name, "SKILL.md")
-		data, err := skillsFS.ReadFile(path)
+		// embed.FS always uses forward slashes, even on Windows.
+		p := "skills/" + s.Name + "/SKILL.md"
+		data, err := skillsFS.ReadFile(p)
 		if err != nil {
-			t.Errorf("reading embedded %s: %v", path, err)
+			t.Errorf("reading embedded %s: %v", p, err)
 			continue
 		}
 		if len(data) == 0 {
-			t.Errorf("embedded %s is empty", path)
+			t.Errorf("embedded %s is empty", p)
 		}
 	}
 }
 
 func TestEmbeddedKanbanMDHasReferences(t *testing.T) {
-	path := filepath.Join("skills", "kanban-md", "references", "json-schemas.md")
-	data, err := skillsFS.ReadFile(path)
+	// embed.FS always uses forward slashes, even on Windows.
+	p := "skills/kanban-md/references/json-schemas.md"
+	data, err := skillsFS.ReadFile(p)
 	if err != nil {
-		t.Fatalf("reading embedded %s: %v", path, err)
+		t.Fatalf("reading embedded %s: %v", p, err)
 	}
 	if len(data) == 0 {
 		t.Fatal("json-schemas.md is empty")
