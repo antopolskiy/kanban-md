@@ -44,8 +44,8 @@ func TestValidate(t *testing.T) {
 		{"one status", func(c *Config) { c.Statuses = []string{"only"} }, true},
 		{"duplicate statuses", func(c *Config) { c.Statuses = []string{"a", "a"} }, true},
 		{"no priorities", func(c *Config) { c.Priorities = nil }, true},
-		{"bad default status", func(c *Config) { c.Defaults.Status = "nonexistent" }, true},
-		{"bad default priority", func(c *Config) { c.Defaults.Priority = "nonexistent" }, true},
+		{"bad default status", func(c *Config) { c.Defaults.Status = nonexistentName }, true},
+		{"bad default priority", func(c *Config) { c.Defaults.Priority = nonexistentName }, true},
 		{"zero next_id", func(c *Config) { c.NextID = 0 }, true},
 		{"valid wip_limits", func(c *Config) { c.WIPLimits = map[string]int{"in-progress": 3} }, false},
 		{"wip unknown status", func(c *Config) { c.WIPLimits = map[string]int{"bogus": 3} }, true},
@@ -160,7 +160,7 @@ func TestStatusIndex(t *testing.T) {
 	if idx := cfg.StatusIndex("in-progress"); idx != 2 {
 		t.Errorf("StatusIndex('in-progress') = %d, want 2", idx)
 	}
-	if idx := cfg.StatusIndex("nonexistent"); idx != -1 {
+	if idx := cfg.StatusIndex(nonexistentName); idx != -1 {
 		t.Errorf("StatusIndex('nonexistent') = %d, want -1", idx)
 	}
 }
@@ -174,7 +174,7 @@ func TestIsTerminalStatus(t *testing.T) {
 	if cfg.IsTerminalStatus("backlog") {
 		t.Error("IsTerminalStatus('backlog') = true, want false")
 	}
-	if cfg.IsTerminalStatus("nonexistent") {
+	if cfg.IsTerminalStatus(nonexistentName) {
 		t.Error("IsTerminalStatus('nonexistent') = true, want false")
 	}
 }
@@ -192,7 +192,7 @@ func TestPriorityIndex(t *testing.T) {
 	if idx := cfg.PriorityIndex("high"); idx != 2 {
 		t.Errorf("PriorityIndex('high') = %d, want 2", idx)
 	}
-	if idx := cfg.PriorityIndex("nonexistent"); idx != -1 {
+	if idx := cfg.PriorityIndex(nonexistentName); idx != -1 {
 		t.Errorf("PriorityIndex('nonexistent') = %d, want -1", idx)
 	}
 }
