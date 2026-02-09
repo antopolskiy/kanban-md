@@ -285,10 +285,17 @@ func TestBoard_DeleteTask(t *testing.T) {
 	// Press y to confirm.
 	b = sendKey(b, "y")
 
-	// Task 1 should be gone.
-	_, err := task.FindByID(cfg.TasksPath(), 1)
-	if err == nil {
-		t.Error("expected task 1 to be deleted")
+	// Task 1 should be archived (soft delete) and remain on disk.
+	path, err := task.FindByID(cfg.TasksPath(), 1)
+	if err != nil {
+		t.Fatalf("expected task 1 file to remain, got error: %v", err)
+	}
+	tk, err := task.Read(path)
+	if err != nil {
+		t.Fatalf("reading task 1 after delete: %v", err)
+	}
+	if tk.Status != "archived" {
+		t.Errorf("status = %q, want archived", tk.Status)
 	}
 
 	_ = b.View()

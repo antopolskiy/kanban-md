@@ -27,6 +27,7 @@ const (
 	statusBacklog        = "backlog"
 	statusInProgress     = "in-progress"
 	statusDeleted        = "deleted"
+	statusArchived       = "archived"
 	priorityHigh         = "high"
 	claimTestAgent       = "test-agent"
 	claimAgent1          = "agent-1"
@@ -1324,9 +1325,15 @@ func TestDeleteWithYes(t *testing.T) {
 		t.Errorf("status = %v, want %q", got["status"], statusDeleted)
 	}
 
-	// File should be gone.
-	if _, err := os.Stat(created.File); !os.IsNotExist(err) {
-		t.Errorf("task file %q still exists after delete", created.File)
+	// File should remain on disk (soft delete).
+	if _, err := os.Stat(created.File); err != nil {
+		t.Errorf("task file %q should remain after delete, got err=%v", created.File, err)
+	}
+
+	var shown taskJSON
+	runKanbanJSON(t, kanbanDir, &shown, "show", "1")
+	if shown.Status != statusArchived {
+		t.Errorf("status = %q, want %q", shown.Status, statusArchived)
 	}
 }
 

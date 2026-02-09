@@ -3,7 +3,6 @@ package tui
 
 import (
 	"fmt"
-	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -513,8 +512,22 @@ func (b *Board) executeDelete() (tea.Model, tea.Cmd) {
 		return b, nil
 	}
 
-	if err := os.Remove(path); err != nil {
-		b.err = fmt.Errorf("deleting task #%d: %w", b.deleteID, err)
+	t, err := task.Read(path)
+	if err != nil {
+		b.err = fmt.Errorf("reading task #%d: %w", b.deleteID, err)
+		b.view = viewBoard
+		return b, nil
+	}
+
+	if t.Status != config.ArchivedStatus {
+		oldStatus := t.Status
+		t.Status = config.ArchivedStatus
+		task.UpdateTimestamps(t, oldStatus, t.Status, b.cfg)
+		t.Updated = b.now()
+	}
+
+	if err := task.Write(path, t); err != nil {
+		b.err = fmt.Errorf("archiving task #%d: %w", b.deleteID, err)
 	} else {
 		board.LogMutation(b.cfg.Dir(), "delete", b.deleteID, b.deleteTitle)
 	}

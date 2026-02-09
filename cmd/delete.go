@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
@@ -20,7 +21,7 @@ var deleteCmd = &cobra.Command{
 	Use:     "delete ID[,ID,...]",
 	Aliases: []string{"rm"},
 	Short:   "Delete a task",
-	Long: `Deletes a task file. Prompts for confirmation in interactive mode.
+	Long: `Soft-deletes a task by moving it to archived status. Prompts for confirmation in interactive mode.
 Multiple IDs can be provided as a comma-separated list (requires --yes).`,
 	Args: cobra.ExactArgs(1),
 	RunE: runDelete,
@@ -97,7 +98,7 @@ func deleteSingleTask(cfg *config.Config, id int, yes bool) error {
 		}
 	}
 
-	if err := removeAndLog(cfg, path, t); err != nil {
+	if err := softDeleteAndLog(cfg, path, t); err != nil {
 		return err
 	}
 
@@ -130,14 +131,24 @@ func executeDelete(cfg *config.Config, id int) error {
 	}
 
 	warnDependents(cfg.TasksPath(), t.ID)
-	return removeAndLog(cfg, path, t)
+	return softDeleteAndLog(cfg, path, t)
 }
 
-// removeAndLog removes the task file and logs the activity.
-func removeAndLog(cfg *config.Config, path string, t *task.Task) error {
-	if err := os.Remove(path); err != nil {
-		return fmt.Errorf("deleting task file: %w", err)
+// softDeleteAndLog archives the task and logs the delete action.
+func softDeleteAndLog(cfg *config.Config, path string, t *task.Task) error {
+	if t.Status == config.ArchivedStatus {
+		return nil
 	}
+
+	oldStatus := t.Status
+	t.Status = config.ArchivedStatus
+	task.UpdateTimestamps(t, oldStatus, t.Status, cfg)
+	t.Updated = time.Now()
+
+	if err := task.Write(path, t); err != nil {
+		return fmt.Errorf("writing task: %w", err)
+	}
+
 	logActivity(cfg, "delete", t.ID, t.Title)
 	return nil
 }
