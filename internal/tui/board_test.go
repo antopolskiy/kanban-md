@@ -256,6 +256,42 @@ func TestBoard_DeleteCancel(t *testing.T) {
 	_ = b.View()
 }
 
+func TestBoard_EscQuitFromBoard(t *testing.T) {
+	b, _ := setupTestBoard(t)
+
+	// Pressing Esc on the board view should produce a quit command.
+	_, cmd := b.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	if cmd == nil {
+		t.Fatal("expected quit command from Esc on board view, got nil")
+	}
+	// Execute the cmd to verify it produces a QuitMsg.
+	msg := cmd()
+	if _, ok := msg.(tea.QuitMsg); !ok {
+		t.Errorf("expected tea.QuitMsg, got %T", msg)
+	}
+}
+
+func TestBoard_HelpShowsEscAsQuit(t *testing.T) {
+	b, _ := setupTestBoard(t)
+
+	b = sendKey(b, "?")
+	v := b.View()
+
+	if !containsStr(v, "esc") {
+		t.Error("expected help view to mention esc as a quit key")
+	}
+}
+
+func TestBoard_StatusBarShowsEsc(t *testing.T) {
+	b, _ := setupTestBoard(t)
+
+	v := b.View()
+
+	if !containsStr(v, "esc") {
+		t.Error("expected status bar to mention esc as a quit key")
+	}
+}
+
 func TestBoard_HelpView(t *testing.T) {
 	b, _ := setupTestBoard(t)
 

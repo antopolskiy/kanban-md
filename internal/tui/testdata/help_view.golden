@@ -12,7 +12,7 @@
 │  d             Delete task                │
 │  r             Refresh board              │
 │  ?             Show this help             │
-│  q             Quit                       │
+│  esc/q         Quit                       │
 │  ctrl+c        Force quit                 │
 │                                           │
 │  Press any key to close                   │

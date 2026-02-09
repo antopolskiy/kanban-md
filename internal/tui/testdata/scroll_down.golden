@@ -26,4 +26,4 @@
                                                                                 ╰──────────────────╯
                                                                                   ↓ 4 more          
                                                                                                     
- Scroll Test | 18 tasks | hjkl:navigate enter:detail m:move M:next d:delete ?:help q:quit           
+ Scroll Test | 18 tasks | hjkl:navigate enter:detail m:move M:next d:delete ?:help esc/q:quit       

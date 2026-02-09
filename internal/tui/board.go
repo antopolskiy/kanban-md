@@ -146,7 +146,7 @@ func (b *Board) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 func (b *Board) handleBoardKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
-	case "q":
+	case "q", keyEsc:
 		return b, tea.Quit
 	case "?":
 		b.view = viewHelp
@@ -675,7 +675,7 @@ func (b *Board) renderCard(t *task.Task, active bool, width int) string {
 
 func (b *Board) renderStatusBar() string {
 	total := len(b.tasks)
-	status := fmt.Sprintf(" %s | %d tasks | hjkl:navigate enter:detail m:move M:next d:delete ?:help q:quit",
+	status := fmt.Sprintf(" %s | %d tasks | hjkl:navigate enter:detail m:move M:next d:delete ?:help esc/q:quit",
 		b.cfg.Board.Name, total)
 	status = truncate(status, b.width)
 
@@ -818,7 +818,7 @@ func (b *Board) viewHelp() string {
 		{"d", "Delete task"},
 		{"r", "Refresh board"},
 		{"?", "Show this help"},
-		{"q", "Quit"},
+		{"esc/q", "Quit"},
 		{"ctrl+c", "Force quit"},
 	}
 
