@@ -126,15 +126,16 @@ func runSkillInstall(cmd *cobra.Command, _ []string) error {
 			if err := skill.Install(s.Name, baseDir, version); err != nil {
 				return fmt.Errorf("installing %s for %s: %w", s.Name, agent.DisplayName, err)
 			}
-			output.Messagef(os.Stdout, "  %s (%s)", displayPath, version)
+			output.Messagef(os.Stdout, "  %s %s",
+				skillSuccessStyle.Render(displayPath), skillDimStyle.Render("("+version+")"))
 			installed++
 		}
 	}
 
 	if installed > 0 {
-		output.Messagef(os.Stdout, "Installed %d skill(s).", installed)
+		output.Messagef(os.Stdout, "%s", skillSuccessStyle.Render(fmt.Sprintf("Installed %d skill(s).", installed)))
 	} else {
-		output.Messagef(os.Stdout, "All skills are already up to date.")
+		output.Messagef(os.Stdout, "%s", skillDimStyle.Render("All skills are already up to date."))
 	}
 	return nil
 }
@@ -152,7 +153,8 @@ func installToPath(dir string, skills []skill.Info, force bool) error {
 
 		if !force {
 			if v := skill.InstalledVersion(destPath); v == version {
-				output.Messagef(os.Stdout, "  %s — already at %s (skipped)", destPath, version)
+				output.Messagef(os.Stdout, "  %s",
+					skillDimStyle.Render(destPath+" — already at "+version+" (skipped)"))
 				continue
 			}
 		}
@@ -160,14 +162,15 @@ func installToPath(dir string, skills []skill.Info, force bool) error {
 		if err := skill.Install(s.Name, absDir, version); err != nil {
 			return fmt.Errorf("installing %s to %s: %w", s.Name, absDir, err)
 		}
-		output.Messagef(os.Stdout, "  %s (%s)", destPath, version)
+		output.Messagef(os.Stdout, "  %s %s",
+			skillSuccessStyle.Render(destPath), skillDimStyle.Render("("+version+")"))
 		installed++
 	}
 
 	if installed > 0 {
-		output.Messagef(os.Stdout, "Installed %d skill(s).", installed)
+		output.Messagef(os.Stdout, "%s", skillSuccessStyle.Render(fmt.Sprintf("Installed %d skill(s).", installed)))
 	} else {
-		output.Messagef(os.Stdout, "All skills are already up to date.")
+		output.Messagef(os.Stdout, "%s", skillDimStyle.Render("All skills are already up to date."))
 	}
 	return nil
 }
@@ -192,7 +195,8 @@ func runSkillUpdate(cmd *cobra.Command, _ []string) error {
 			displayPath := relativePath(projectRoot, skillPath)
 
 			if !skill.IsOutdated(skillPath, version) {
-				output.Messagef(os.Stdout, "  %s — already at %s (skipped)", displayPath, version)
+				output.Messagef(os.Stdout, "  %s",
+					skillDimStyle.Render(displayPath+" — already at "+version+" (skipped)"))
 				continue
 			}
 
@@ -200,15 +204,17 @@ func runSkillUpdate(cmd *cobra.Command, _ []string) error {
 			if err := skill.Install(skillName, baseDir, version); err != nil {
 				return fmt.Errorf("updating %s for %s: %w", skillName, agent.DisplayName, err)
 			}
-			output.Messagef(os.Stdout, "  %s (%s -> %s)", displayPath, oldVer, version)
+			output.Messagef(os.Stdout, "  %s %s",
+				skillSuccessStyle.Render(displayPath),
+				skillDimStyle.Render("("+oldVer+" -> "+version+")"))
 			updated++
 		}
 	}
 
 	if updated > 0 {
-		output.Messagef(os.Stdout, "Updated %d skill(s).", updated)
+		output.Messagef(os.Stdout, "%s", skillSuccessStyle.Render(fmt.Sprintf("Updated %d skill(s).", updated)))
 	} else {
-		output.Messagef(os.Stdout, "All skills are already up to date.")
+		output.Messagef(os.Stdout, "%s", skillDimStyle.Render("All skills are already up to date."))
 	}
 	return nil
 }
@@ -235,9 +241,15 @@ func runSkillCheck(cmd *cobra.Command, _ []string) error {
 			installedVer := skill.InstalledVersion(skillPath)
 			if skill.IsOutdated(skillPath, version) {
 				anyOutdated = true
-				output.Messagef(os.Stdout, "  ✗ %s/%s (%s -> %s)", agent.DisplayName, skillName, installedVer, version)
+				output.Messagef(os.Stdout, "  %s %s %s",
+					skillWarnStyle.Render("x"),
+					skillWarnStyle.Render(agent.DisplayName+"/"+skillName),
+					skillDimStyle.Render("("+installedVer+" -> "+version+")"))
 			} else {
-				output.Messagef(os.Stdout, "  ✓ %s/%s (%s)", agent.DisplayName, skillName, installedVer)
+				output.Messagef(os.Stdout, "  %s %s %s",
+					skillSuccessStyle.Render("ok"),
+					skillSuccessStyle.Render(agent.DisplayName+"/"+skillName),
+					skillDimStyle.Render("("+installedVer+")"))
 			}
 		}
 	}
@@ -248,11 +260,11 @@ func runSkillCheck(cmd *cobra.Command, _ []string) error {
 	}
 
 	if anyOutdated {
-		output.Messagef(os.Stdout, "Run: kanban-md skill update")
+		output.Messagef(os.Stdout, "%s", skillWarnStyle.Render("Run: kanban-md skill update"))
 		return &exitCodeError{code: 1}
 	}
 
-	output.Messagef(os.Stdout, "All skills are up to date.")
+	output.Messagef(os.Stdout, "%s", skillSuccessStyle.Render("All skills are up to date."))
 	return nil
 }
 
@@ -472,6 +484,11 @@ var (
 	selectActiveStyle = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("12"))
 	selectDimStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("8"))
 	selectCheckStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("10"))
+
+	// Skill install/update/check output styles.
+	skillSuccessStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("10"))
+	skillDimStyle     = lipgloss.NewStyle().Foreground(lipgloss.Color("8"))
+	skillWarnStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("9"))
 )
 
 func (m selectModel) Init() tea.Cmd { return nil }
