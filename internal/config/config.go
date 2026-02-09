@@ -411,12 +411,52 @@ func FindDir(startDir string) (string, error) {
 	}
 }
 
-// IsTerminalStatus returns true if the given status is the last in the configured order.
+// IsTerminalStatus returns true if the given status is a terminal status.
+// Both the "done" status (immediately before archived) and "archived" itself
+// are considered terminal. If the board has no archived status, the last
+// status is terminal (backward-compatible behavior).
 func (c *Config) IsTerminalStatus(s string) bool {
 	if len(c.Statuses) == 0 {
 		return false
 	}
-	return s == c.Statuses[len(c.Statuses)-1]
+	if s == ArchivedStatus {
+		return true
+	}
+	lastIdx := len(c.Statuses) - 1
+	if c.Statuses[lastIdx] == ArchivedStatus && lastIdx > 0 {
+		return s == c.Statuses[lastIdx-1]
+	}
+	return s == c.Statuses[lastIdx]
+}
+
+// IsArchivedStatus returns true if the given status is the archived status.
+func (c *Config) IsArchivedStatus(s string) bool {
+	return s == ArchivedStatus && contains(c.Statuses, ArchivedStatus)
+}
+
+// BoardStatuses returns the statuses that should appear as board columns,
+// excluding the archived status.
+func (c *Config) BoardStatuses() []string {
+	result := make([]string, 0, len(c.Statuses))
+	for _, s := range c.Statuses {
+		if s != ArchivedStatus {
+			result = append(result, s)
+		}
+	}
+	return result
+}
+
+// ActiveStatuses returns statuses that are neither terminal nor archived,
+// i.e. statuses where work is happening. Used by pick to determine default
+// candidate pools.
+func (c *Config) ActiveStatuses() []string {
+	result := make([]string, 0, len(c.Statuses))
+	for _, s := range c.Statuses {
+		if !c.IsTerminalStatus(s) {
+			result = append(result, s)
+		}
+	}
+	return result
 }
 
 // StatusIndex returns the index of a status in the configured order, or -1.

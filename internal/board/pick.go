@@ -32,8 +32,8 @@ func Pick(cfg *config.Config, tasks []*task.Task, opts PickOptions) *task.Task {
 // pickCandidates filters tasks by status, claim, block, and tag.
 func pickCandidates(cfg *config.Config, tasks []*task.Task, opts PickOptions) []*task.Task {
 	statuses := opts.Statuses
-	if len(statuses) == 0 && len(cfg.Statuses) > 1 {
-		statuses = cfg.Statuses[:len(cfg.Statuses)-1]
+	if len(statuses) == 0 {
+		statuses = cfg.ActiveStatuses()
 	}
 
 	var candidates []*task.Task
@@ -60,14 +60,13 @@ func filterPickDeps(cfg *config.Config, allTasks, candidates []*task.Task) []*ta
 	if len(cfg.Statuses) == 0 {
 		return candidates
 	}
-	terminalStatus := cfg.Statuses[len(cfg.Statuses)-1]
 	statusByID := make(map[int]string, len(allTasks))
 	for _, t := range allTasks {
 		statusByID[t.ID] = t.Status
 	}
 	var unblocked []*task.Task
 	for _, c := range candidates {
-		if allDepsSatisfied(c.DependsOn, statusByID, terminalStatus) {
+		if allDepsSatisfied(c.DependsOn, statusByID, cfg) {
 			unblocked = append(unblocked, c)
 		}
 	}

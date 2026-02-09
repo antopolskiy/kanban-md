@@ -66,8 +66,8 @@ func TestCompatV1Config(t *testing.T) {
 		t.Errorf("NextID = %d, want %d", cfg.NextID, wantNextID)
 	}
 
-	// Verify statuses preserved in order.
-	wantStatuses := []string{"backlog", "todo", "in-progress", "review", "done"}
+	// Verify statuses preserved in order (archived added by migration).
+	wantStatuses := []string{"backlog", "todo", "in-progress", "review", "done", ArchivedStatus}
 	if len(cfg.Statuses) != len(wantStatuses) {
 		t.Fatalf("Statuses len = %d, want %d", len(cfg.Statuses), len(wantStatuses))
 	}
@@ -132,6 +132,10 @@ func TestCompatV1ConfigMigratesToCurrentVersion(t *testing.T) {
 	// v4→v5 migration should also have run.
 	if len(cfg.TUI.AgeThresholds) != len(DefaultAgeThresholds) {
 		t.Errorf("AgeThresholds len = %d, want %d (from v4→v5 migration)", len(cfg.TUI.AgeThresholds), len(DefaultAgeThresholds))
+	}
+	// v5→v6 migration should also have run.
+	if !contains(cfg.Statuses, ArchivedStatus) {
+		t.Error("Statuses should contain 'archived' after v5→v6 migration")
 	}
 }
 
@@ -295,6 +299,9 @@ func TestMigrationPersistsToDisk(t *testing.T) {
 	if len(raw.TUI.AgeThresholds) != len(DefaultAgeThresholds) {
 		t.Errorf("Persisted AgeThresholds len = %d, want %d", len(raw.TUI.AgeThresholds), len(DefaultAgeThresholds))
 	}
+	if !contains(raw.Statuses, ArchivedStatus) {
+		t.Error("Persisted Statuses should contain 'archived' after v5→v6 migration")
+	}
 	const wantName = "Test Project"
 	if raw.Board.Name != wantName {
 		t.Errorf("Persisted Board.Name = %q, want %q", raw.Board.Name, wantName)
@@ -347,6 +354,62 @@ func TestCompatV4ConfigMigratesToV5(t *testing.T) {
 		t.Errorf("AgeThresholds[0].After = %q, want %q", cfg.TUI.AgeThresholds[0].After, "0s")
 	}
 	// Existing v4 fields should be preserved.
+	if cfg.TUI.TitleLines != DefaultTitleLines {
+		t.Errorf("TUI.TitleLines = %d, want %d", cfg.TUI.TitleLines, DefaultTitleLines)
+	}
+	if cfg.ClaimTimeout != "1h" {
+		t.Errorf("ClaimTimeout = %q, want %q", cfg.ClaimTimeout, "1h")
+	}
+}
+
+func TestCompatV5Config(t *testing.T) {
+	tmp := t.TempDir()
+	fixture := filepath.Join("testdata", "compat", "v5")
+	copyDir(t, fixture, tmp)
+
+	cfg, err := Load(tmp)
+	if err != nil {
+		t.Fatalf("Load() v5 fixture: %v", err)
+	}
+
+	if cfg.Version != CurrentVersion {
+		t.Errorf("Version = %d, want %d", cfg.Version, CurrentVersion)
+	}
+	if cfg.Board.Name != "Test Project v5" {
+		t.Errorf("Board.Name = %q, want %q", cfg.Board.Name, "Test Project v5")
+	}
+	if len(cfg.TUI.AgeThresholds) != len(DefaultAgeThresholds) {
+		t.Errorf("AgeThresholds len = %d, want %d", len(cfg.TUI.AgeThresholds), len(DefaultAgeThresholds))
+	}
+}
+
+func TestCompatV5ConfigMigratesToV6(t *testing.T) {
+	tmp := t.TempDir()
+	fixture := filepath.Join("testdata", "compat", "v5")
+	copyDir(t, fixture, tmp)
+
+	cfg, err := Load(tmp)
+	if err != nil {
+		t.Fatalf("Load() v5 fixture: %v", err)
+	}
+
+	if cfg.Version != CurrentVersion {
+		t.Errorf("Version = %d, want %d (after migration)", cfg.Version, CurrentVersion)
+	}
+	// v5→v6 migration should add "archived" to statuses.
+	if !contains(cfg.Statuses, ArchivedStatus) {
+		t.Fatal("Statuses should contain 'archived' after v5→v6 migration")
+	}
+	wantStatuses := []string{"backlog", "todo", "in-progress", "review", "done", ArchivedStatus}
+	if len(cfg.Statuses) != len(wantStatuses) {
+		t.Fatalf("Statuses len = %d, want %d", len(cfg.Statuses), len(wantStatuses))
+	}
+	for i, s := range wantStatuses {
+		if cfg.Statuses[i] != s {
+			t.Errorf("Statuses[%d] = %q, want %q", i, cfg.Statuses[i], s)
+		}
+	}
+	// Existing v5 fields should be preserved.
 	if cfg.TUI.TitleLines != DefaultTitleLines {
 		t.Errorf("TUI.TitleLines = %d, want %d", cfg.TUI.TitleLines, DefaultTitleLines)
 	}

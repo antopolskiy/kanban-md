@@ -23,16 +23,16 @@ type ListOptions struct {
 // List loads all tasks, applies filters and sorting.
 // Uses lenient parsing: malformed task files are skipped and returned as warnings.
 func List(cfg *config.Config, opts ListOptions) ([]*task.Task, []task.ReadWarning, error) {
-	tasks, warnings, err := task.ReadAllLenient(cfg.TasksPath())
+	allTasks, warnings, err := task.ReadAllLenient(cfg.TasksPath())
 	if err != nil {
 		return nil, nil, err
 	}
 
-	tasks = Filter(tasks, opts.Filter)
+	tasks := Filter(allTasks, opts.Filter)
 
-	if opts.Unblocked && len(cfg.Statuses) > 0 {
-		terminalStatus := cfg.Statuses[len(cfg.Statuses)-1]
-		tasks = FilterUnblocked(tasks, terminalStatus)
+	if opts.Unblocked {
+		// Use all tasks for dep status lookup so archived deps are found.
+		tasks = FilterUnblockedWithLookup(tasks, allTasks, cfg)
 	}
 
 	sortField := opts.SortBy
@@ -102,9 +102,11 @@ type Overview struct {
 }
 
 // Summary computes a board summary from all tasks.
+// It uses BoardStatuses() to exclude the archived column from display.
 func Summary(cfg *config.Config, tasks []*task.Task, now time.Time) Overview {
-	statusMap := make(map[string]*StatusSummary, len(cfg.Statuses))
-	for _, s := range cfg.Statuses {
+	displayStatuses := cfg.BoardStatuses()
+	statusMap := make(map[string]*StatusSummary, len(displayStatuses))
+	for _, s := range displayStatuses {
 		statusMap[s] = &StatusSummary{
 			Status:   s,
 			WIPLimit: cfg.WIPLimit(s),
@@ -132,8 +134,8 @@ func Summary(cfg *config.Config, tasks []*task.Task, now time.Time) Overview {
 		classMap[cls]++
 	}
 
-	statuses := make([]StatusSummary, 0, len(cfg.Statuses))
-	for _, s := range cfg.Statuses {
+	statuses := make([]StatusSummary, 0, len(displayStatuses))
+	for _, s := range displayStatuses {
 		statuses = append(statuses, *statusMap[s])
 	}
 

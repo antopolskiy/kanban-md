@@ -158,7 +158,7 @@ func makeTasksWithDeps() []*task.Task {
 
 func TestFilterUnblockedAllDepsSatisfied(t *testing.T) {
 	tasks := makeTasksWithDeps()
-	result := FilterUnblocked(tasks, "done")
+	result := FilterUnblocked(tasks, testConfig())
 	// Tasks 1, 2, 4, 6 should pass (1: no deps, 2: dep 1 is done, 4: no deps, 6: no deps)
 	// Tasks 3, 5 should not (3: dep 4 not done, 5: dep 99 missing)
 	if len(result) != 4 {
@@ -173,7 +173,7 @@ func TestFilterUnblockedNoDeps(t *testing.T) {
 	tasks := []*task.Task{
 		{ID: 1, Title: "No deps", Status: "todo"},
 	}
-	result := FilterUnblocked(tasks, "done")
+	result := FilterUnblocked(tasks, testConfig())
 	if len(result) != 1 {
 		t.Errorf("got %d tasks, want 1 (no deps = unblocked)", len(result))
 	}
@@ -183,7 +183,7 @@ func TestFilterUnblockedMissingDep(t *testing.T) {
 	tasks := []*task.Task{
 		{ID: 1, Title: "Depends on ghost", Status: "todo", DependsOn: []int{99}},
 	}
-	result := FilterUnblocked(tasks, "done")
+	result := FilterUnblocked(tasks, testConfig())
 	if len(result) != 0 {
 		t.Errorf("got %d tasks, want 0 (missing dep = blocked)", len(result))
 	}

@@ -125,6 +125,7 @@ statuses:
   - in-progress
   - review
   - done
+  - archived
 priorities:
   - low
   - medium
@@ -161,7 +162,7 @@ kanban-md init [--name NAME] [--statuses s1,s2,s3] [--wip-limit status:N]
 | Flag | Description |
 |------|-------------|
 | `--name` | Board name (defaults to parent directory name) |
-| `--statuses` | Comma-separated status list (default: backlog,todo,in-progress,review,done) |
+| `--statuses` | Comma-separated status list (default: backlog,todo,in-progress,review,done,archived) |
 | `--wip-limit` | WIP limit per status (format: `status:N`, repeatable) |
 
 ### `create`
@@ -207,6 +208,7 @@ kanban-md list [FLAGS]
 | `--unclaimed` | false | Show only unclaimed or expired-claim tasks |
 | `--claimed-by` | | Filter by claimant name |
 | `--class` | | Filter by class of service |
+| `--archived` | false | Show only archived tasks |
 | `--group-by` | | Group results by field (assignee, tag, class, priority, status) |
 | `--sort` | id | Sort by: id, status, priority, created, updated, due |
 | `-r`, `--reverse` | false | Reverse sort order |
@@ -284,6 +286,22 @@ kanban-md delete 1,2,3 --force     # batch delete
 ```
 
 Prompts for confirmation in interactive terminals. Use `--force` to skip the prompt (required in non-interactive contexts like scripts). Batch delete always requires `--force`.
+
+### `archive`
+
+Soft-delete a task by moving it to the `archived` status. Archived tasks are hidden from all normal commands (`list`, `board`, `metrics`, `context`, TUI) but remain on disk.
+
+```bash
+kanban-md archive ID
+kanban-md archive 1,2,3    # batch archive
+```
+
+To see archived tasks:
+
+```bash
+kanban-md list --archived
+kanban-md list --status archived
+```
 
 ### `board`
 

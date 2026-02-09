@@ -75,11 +75,19 @@ func renderBoard(cfg *config.Config, groupBy string) error {
 		tasks = []*task.Task{}
 	}
 
-	if groupBy != "" {
-		return renderGroupedBoard(cfg, tasks, groupBy)
+	// Exclude archived tasks from board display.
+	var activeTasks []*task.Task
+	for _, t := range tasks {
+		if !cfg.IsArchivedStatus(t.Status) {
+			activeTasks = append(activeTasks, t)
+		}
 	}
 
-	summary := board.Summary(cfg, tasks, time.Now())
+	if groupBy != "" {
+		return renderGroupedBoard(cfg, activeTasks, groupBy)
+	}
+
+	summary := board.Summary(cfg, activeTasks, time.Now())
 
 	format := outputFormat()
 	if format == output.FormatJSON {
