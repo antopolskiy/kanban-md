@@ -200,7 +200,7 @@ func runSkillUpdate(cmd *cobra.Command, _ []string) error {
 			if err := skill.Install(skillName, baseDir, version); err != nil {
 				return fmt.Errorf("updating %s for %s: %w", skillName, agent.DisplayName, err)
 			}
-			output.Messagef(os.Stdout, "  %s (%s → %s)", displayPath, oldVer, version)
+			output.Messagef(os.Stdout, "  %s (%s -> %s)", displayPath, oldVer, version)
 			updated++
 		}
 	}
@@ -235,7 +235,7 @@ func runSkillCheck(cmd *cobra.Command, _ []string) error {
 			installedVer := skill.InstalledVersion(skillPath)
 			if skill.IsOutdated(skillPath, version) {
 				anyOutdated = true
-				output.Messagef(os.Stdout, "  ✗ %s/%s (%s → %s)", agent.DisplayName, skillName, installedVer, version)
+				output.Messagef(os.Stdout, "  ✗ %s/%s (%s -> %s)", agent.DisplayName, skillName, installedVer, version)
 			} else {
 				output.Messagef(os.Stdout, "  ✓ %s/%s (%s)", agent.DisplayName, skillName, installedVer)
 			}
@@ -578,7 +578,7 @@ func CheckSkillStaleness(projectRoot string) {
 	for _, skillPath := range installed {
 		if skill.IsOutdated(skillPath, version) {
 			oldVer := skill.InstalledVersion(skillPath)
-			fmt.Fprintf(os.Stderr, "hint: kanban-md skill outdated (%s → %s), run: kanban-md skill update\n", oldVer, version)
+			fmt.Fprintf(os.Stderr, "hint: kanban-md skill outdated (%s -> %s), run: kanban-md skill update\n", oldVer, version)
 			return // One warning is enough.
 		}
 	}

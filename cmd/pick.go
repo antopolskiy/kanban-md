@@ -128,7 +128,7 @@ func outputPickResult(picked *task.Task, oldStatus, claimant string) error {
 		return output.JSON(os.Stdout, picked)
 	}
 	if oldStatus != "" {
-		output.Messagef(os.Stdout, "Picked and moved task #%d: %s (%s → %s, claimed by %s)",
+		output.Messagef(os.Stdout, "Picked and moved task #%d: %s (%s -> %s, claimed by %s)",
 			picked.ID, picked.Title, oldStatus, picked.Status, claimant)
 	} else {
 		output.Messagef(os.Stdout, "Picked task #%d: %s (%s, claimed by %s)",

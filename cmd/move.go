@@ -76,7 +76,7 @@ func moveSingleTask(cfg *config.Config, id int, cmd *cobra.Command, args []strin
 		return outputMoveResult(t, true)
 	}
 
-	output.Messagef(os.Stdout, "Moved task #%d: %s → %s", id, oldStatus, t.Status)
+	output.Messagef(os.Stdout, "Moved task #%d: %s -> %s", id, oldStatus, t.Status)
 	return nil
 }
 
