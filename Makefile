@@ -8,11 +8,11 @@ all: mod build lint test
 
 .PHONY: precommit
 precommit: ## validate the branch before commit
-precommit: all
+precommit: all diff-worktree
 
 .PHONY: ci
 ci: ## CI build pipeline
-ci: precommit diff
+ci: precommit
 
 .PHONY: help
 help:
@@ -40,7 +40,11 @@ build: ## go build
 	go build -ldflags "-X github.com/antopolskiy/kanban-md/cmd.version=$(VERSION)" -o dist/kanban-md ./cmd/kanban-md
 
 .PHONY: lint
-lint: ## golangci-lint
+lint: ## golangci-lint (read-only)
+	golangci-lint run
+
+.PHONY: lint-fix
+lint-fix: ## golangci-lint with auto-fixes
 	golangci-lint run --fix
 
 ifeq ($(CGO_ENABLED),0)
@@ -82,3 +86,8 @@ setup-hooks: ## install git pre-commit hook
 diff: ## git diff
 	git diff --exit-code
 	RES=$$(git status --porcelain) ; if [ -n "$$RES" ]; then echo $$RES && exit 1 ; fi
+
+.PHONY: diff-worktree
+diff-worktree: ## ensure checks did not mutate tracked/untracked files
+	git diff --exit-code
+	RES=$$(git ls-files --others --exclude-standard) ; if [ -n "$$RES" ]; then echo "$$RES" && exit 1 ; fi

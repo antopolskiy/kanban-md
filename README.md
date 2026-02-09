@@ -619,6 +619,9 @@ make test-e2e
 # Lint
 make lint
 
+# Lint with autofix
+make lint-fix
+
 # Full pipeline
 make all
 ```
