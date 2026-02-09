@@ -391,3 +391,94 @@ func TestActivityLogTableEmpty(t *testing.T) {
 		t.Errorf("ActivityLogTable empty output to writer = %q, want empty", buf.String())
 	}
 }
+
+// ---------------------------------------------------------------------------
+// GroupedTable
+// ---------------------------------------------------------------------------
+
+func TestGroupedTableMultipleGroups(t *testing.T) {
+	DisableColor()
+	t.Cleanup(func() {
+		headerStyle = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("244"))
+		dimStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
+	})
+
+	gs := board.GroupedSummary{
+		Groups: []board.GroupSummary{
+			{
+				Key:   "high",
+				Total: 3,
+				Statuses: []board.StatusSummary{
+					{Status: "backlog", Count: 1},
+					{Status: "in-progress", Count: 2},
+					{Status: "done", Count: 0},
+				},
+			},
+			{
+				Key:   "low",
+				Total: 1,
+				Statuses: []board.StatusSummary{
+					{Status: "backlog", Count: 0},
+					{Status: "in-progress", Count: 1},
+				},
+			},
+		},
+	}
+
+	var buf strings.Builder
+	GroupedTable(&buf, gs)
+	out := buf.String()
+
+	for _, want := range []string{"high (3 tasks)", "low (1 tasks)", "backlog", "in-progress"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("output missing %q:\n%s", want, out)
+		}
+	}
+	// Zero-count statuses should be omitted.
+	lines := strings.Split(out, "\n")
+	for _, line := range lines {
+		if strings.Contains(line, "done") && strings.Contains(line, "0") {
+			t.Errorf("zero-count status 'done' should be omitted, found: %q", line)
+		}
+	}
+}
+
+func TestGroupedTableSingleGroup(t *testing.T) {
+	DisableColor()
+	t.Cleanup(func() {
+		headerStyle = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("244"))
+		dimStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
+	})
+
+	gs := board.GroupedSummary{
+		Groups: []board.GroupSummary{
+			{
+				Key:   "only-group",
+				Total: 2,
+				Statuses: []board.StatusSummary{
+					{Status: "todo", Count: 2},
+				},
+			},
+		},
+	}
+
+	var buf strings.Builder
+	GroupedTable(&buf, gs)
+	out := buf.String()
+
+	if !strings.Contains(out, "only-group (2 tasks)") {
+		t.Errorf("output missing group header:\n%s", out)
+	}
+	if !strings.Contains(out, "todo") {
+		t.Errorf("output missing status:\n%s", out)
+	}
+}
+
+func TestGroupedTableEmpty(t *testing.T) {
+	var buf strings.Builder
+	GroupedTable(&buf, board.GroupedSummary{})
+	// "No groups found." is written to stderr, not the writer.
+	if buf.String() != "" {
+		t.Errorf("GroupedTable empty output to writer = %q, want empty", buf.String())
+	}
+}
