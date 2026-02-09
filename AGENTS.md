@@ -82,6 +82,10 @@ Any steps users need to take, or "No action needed" with explanation of auto-mig
 
 When modifying `config.yml` schema or task file frontmatter, you must ensure backward compatibility:
 
+### Config design principles
+
+- **Collocate column settings with column definitions.** Any configuration that is per-column (e.g. `show_duration`, `require_claim`, WIP limits) must live inside the status/column entry in the `statuses` list — never as a separate top-level list or map. This keeps related settings together and avoids drift between column names and their config.
+
 ### Config changes
 
 1. **Bump `CurrentVersion`** in `internal/config/defaults.go`.

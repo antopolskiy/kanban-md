@@ -10,7 +10,7 @@ allowed-tools:
   - Bash(kanban-md *)
   - Bash(kbmd *)
 ---
-<!-- kanban-md-skill-version: 0.25.0 -->
+<!-- kanban-md-skill-version: dev -->
 
 # kanban-md
 
@@ -29,7 +29,7 @@ Each task is a `.md` file in `kanban/tasks/`. The CLI is `kanban-md`
 - Use `kanban-md show ID` (default table format) to read task details — it includes
   the full body and all fields in a human-readable layout. Only add `--json` when you
   need to pipe the output to another tool or parse fields programmatically.
-- Always pass `--force` when deleting (`kanban-md delete ID --force`).
+- Always pass `--yes` when deleting (`kanban-md delete ID --yes`).
 - Dates use `YYYY-MM-DD` format.
 - Statuses and priorities are board-specific. Check the board state above or run
   `kanban-md board` to discover valid values before using them.
@@ -63,7 +63,7 @@ Each task is a `.md` file in `kanban/tasks/`. The CLI is `kanban-md`
 | Unblock a task                          | `kanban-md edit ID --unblock`                           |
 | Add a dependency                        | `kanban-md edit ID --add-dep DEP_ID`                    |
 | Set a parent task                       | `kanban-md edit ID --parent PARENT_ID`                  |
-| Delete a task                           | `kanban-md delete ID --force`                           |
+| Delete a task                           | `kanban-md delete ID --yes`                           |
 | See flow metrics                        | `kanban-md metrics --compact`                           |
 | See activity log                        | `kanban-md log --compact --limit 20`                    |
 | See recent activity for a task          | `kanban-md log --compact --task ID`                     |
@@ -124,16 +124,16 @@ kanban-md move ID --next
 kanban-md move ID --prev
 ```
 
-Use `-f` to override WIP limits. Auto-sets Started on first move from
+Auto-sets Started on first move from
 initial status. Auto-sets Completed on move to terminal status.
 
 ### delete
 
 ```bash
-kanban-md delete ID --force
+kanban-md delete ID --yes
 ```
 
-Always pass `--force` (non-interactive context requires it).
+Always pass `--yes` (non-interactive context requires it).
 
 ### board
 
@@ -181,7 +181,7 @@ All commands accept: `--json`, `--table`, `--compact` (alias `--oneline`), `--di
 1. `kanban-md list --compact --status backlog --sort priority -r` — review backlog
 2. For items to promote: `kanban-md move ID todo`
 3. For new items: `kanban-md create "TITLE" --priority P --tags T`
-4. For stale items: `kanban-md delete ID --force`
+4. For stale items: `kanban-md delete ID --yes`
 
 ### Sprint Planning
 
@@ -212,7 +212,7 @@ All commands accept: `--json`, `--table`, `--compact` (alias `--oneline`), `--di
 
 - **DO** use `--compact` for listing, board, metrics, and log commands — it is the most token-efficient format.
 - **DO** use `kanban-md show ID` (default format) to read task details — it is readable and includes the full body.
-- **DO** pass `--force` on delete. Without it, the command hangs waiting for stdin.
+- **DO** pass `--yes` on delete. Without it, the command hangs waiting for stdin.
 - **DO NOT** use `--json` unless you are piping output to another tool or parsing fields programmatically. Default and `--compact` formats are sufficient for reading.
 - **DO NOT** hardcode status or priority values. Read them from `kanban-md board --compact`.
 - **DO NOT** use `--next` or `--prev` without checking current status. They fail at boundary statuses.

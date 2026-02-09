@@ -13,7 +13,7 @@ allowed-tools:
   - Bash(golangci-lint *)
   - Bash(awk *)
 ---
-<!-- kanban-md-skill-version: 0.25.0 -->
+<!-- kanban-md-skill-version: dev -->
 
 # Kanban-Based Development
 
@@ -131,7 +131,7 @@ git branch -d task/<ID>-<short-description>
 **Only after the merge is on main**, release the claim and move to **done**:
 
 ```bash
-kanban-md edit <ID> --release --force
+kanban-md edit <ID> --release
 kanban-md move <ID> done
 ```
 
@@ -158,12 +158,12 @@ Statuses have strict meanings. Never skip ahead.
 |---|---|---|---|
 | `in-progress` | Agent is actively working | `pick --claim --move in-progress` | Tests + lint pass, code committed |
 | `review` | Code committed, awaiting merge to main | `move <ID> review --claim <name>` | Branch merged into main |
-| `done` | Merged into main | `edit <ID> --release --force` then `move <ID> done` | Never |
+| `done` | Merged into main | `edit <ID> --release` then `move <ID> done` | Never |
 
 To abandon a task: release the claim and move back to `todo`:
 
 ```bash
-kanban-md edit <ID> --release --force
+kanban-md edit <ID> --release
 kanban-md move <ID> todo
 ```
 
@@ -179,6 +179,18 @@ git push origin main --tags
 
 Then write release notes per the project guidelines (see CLAUDE.md / AGENTS.md).
 
+## Autonomy
+
+Unless the user explicitly asks to be consulted, operate autonomously. Pick a task, implement it, merge it, and immediately pick the next one. Continue this loop until no available tasks remain.
+
+**Do not stop to ask the user** for routine decisions — choosing which task to pick, how to implement a straightforward feature, or whether to proceed after a successful merge. Just keep going.
+
+**Stop and ask only when:**
+- A task description is genuinely ambiguous and could lead to wasted work
+- A merge conflict requires a judgment call about which changes to keep
+- An external action is needed (e.g. pushing to remote, creating a release, deploying)
+- Tests or lint fail repeatedly and you cannot resolve the issue
+
 ## Rules
 
 ### Claiming (most important — prevents duplicate work)
@@ -188,7 +200,7 @@ Then write release notes per the project guidelines (see CLAUDE.md / AGENTS.md).
 - **Only pick unclaimed tasks.** Use `pick` or `list --unclaimed`. Never manually select a task that is already claimed by someone else.
 - **Never override another agent's claim.** If a task is claimed, it belongs to that agent. Pick a different task.
 - **If `pick` fails, pick again.** Another agent got there first. This is normal in a multi-agent environment. Just run `pick` again for the next available task.
-- **Release claims when done or abandoning.** Always `edit <ID> --release --force` before moving to `done` or back to `todo`.
+- **Release claims when done or abandoning.** Always `edit <ID> --release` before moving to `done` or back to `todo`.
 
 ### Status discipline
 
