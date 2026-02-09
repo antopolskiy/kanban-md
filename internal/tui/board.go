@@ -64,8 +64,6 @@ type Board struct {
 	// Delete confirmation.
 	deleteID    int
 	deleteTitle string
-
-	hasClaims bool // true when any visible task has a ClaimedBy value
 }
 
 // column groups tasks belonging to a single status.
@@ -304,15 +302,6 @@ func (b *Board) loadTasks() {
 	}
 	b.tasks = visibleTasks
 
-	// Detect whether any task has a claim for card layout.
-	b.hasClaims = false
-	for _, t := range visibleTasks {
-		if t.ClaimedBy != "" {
-			b.hasClaims = true
-			break
-		}
-	}
-
 	// Sort tasks by priority (higher priority first).
 	board.Sort(visibleTasks, "priority", true, b.cfg)
 
@@ -353,18 +342,6 @@ func (b *Board) selectedTask() *task.Task {
 	return nil
 }
 
-// cardHeight returns the height of a single card in lines:
-// top border + title lines + detail line(s) + bottom border.
-// When any task on the board has a claim, an extra line is added for the
-// claim info so all cards remain the same height.
-func (b *Board) cardHeight() int {
-	h := b.cfg.TitleLines() + 3 //nolint:mnd // borders(2) + detail line(1)
-	if b.hasClaims {
-		h++ // claim line
-	}
-	return h
-}
-
 func (b *Board) clampRow() {
 	col := b.currentColumn()
 	if col == nil || len(col.tasks) == 0 {
@@ -380,7 +357,7 @@ func (b *Board) clampRow() {
 // visibleCardsForColumn returns the number of cards that fit in the column,
 // accounting for scroll indicator lines ("↑ N more" / "↓ N more") that
 // consume vertical space.
-func (b *Board) visibleCardsForColumn(col *column) int {
+func (b *Board) visibleCardsForColumn(col *column, width int) int {
 	budget := b.height - boardChrome
 	if budget < 1 {
 		return 1
@@ -395,16 +372,12 @@ func (b *Board) visibleCardsForColumn(col *column) int {
 	}
 
 	// Compute cards assuming no down indicator.
-	ch := b.cardHeight()
-	n := avail / ch
-	if n < 1 {
-		n = 1
-	}
+	n := b.fitCardsInHeight(col, avail, width)
 
 	// Check if down indicator is needed.
 	if col.scrollOff+n < len(col.tasks) {
 		// Re-compute with 1 fewer line for the down indicator.
-		n = (avail - 1) / ch
+		n = b.fitCardsInHeight(col, avail-1, width)
 		if n < 1 {
 			n = 1
 		}
@@ -420,7 +393,7 @@ func (b *Board) ensureVisible() {
 	if col == nil {
 		return
 	}
-	maxVis := b.visibleCardsForColumn(col)
+	maxVis := b.visibleCardsForColumn(col, b.columnWidth())
 
 	// Scroll down if active row is below visible window.
 	if b.activeRow >= col.scrollOff+maxVis {
@@ -430,6 +403,34 @@ func (b *Board) ensureVisible() {
 	if b.activeRow < col.scrollOff {
 		col.scrollOff = b.activeRow
 	}
+}
+
+func (b *Board) fitCardsInHeight(col *column, avail, width int) int {
+	if len(col.tasks) == 0 {
+		return 1
+	}
+	if avail < 1 {
+		return 1
+	}
+
+	used := 0
+	count := 0
+	for i := col.scrollOff; i < len(col.tasks); i++ {
+		cardLines := b.cardHeight(col.tasks[i], width)
+		if count > 0 && used+cardLines > avail {
+			break
+		}
+		count++
+		used += cardLines
+		if used >= avail {
+			break
+		}
+	}
+
+	if count < 1 {
+		return 1
+	}
+	return count
 }
 
 // moveNext moves the selected task to the next board status (excludes archived).
@@ -676,7 +677,7 @@ func (b *Board) renderColumn(colIdx int, col column, width int) string {
 	}
 
 	// Determine visible card range.
-	maxVis := b.visibleCardsForColumn(&col)
+	maxVis := b.visibleCardsForColumn(&col, width)
 	start := col.scrollOff
 	end := start + maxVis
 	if end > len(col.tasks) {
@@ -716,6 +717,27 @@ func (b *Board) renderColumn(colIdx int, col column, width int) string {
 }
 
 func (b *Board) renderCard(t *task.Task, active bool, width int) string {
+	contentLines := b.cardContentLines(t, width)
+	content := strings.Join(contentLines, "\n")
+
+	// Pick style.
+	style := cardStyle
+	if t.Blocked {
+		style = blockedCardStyle
+	}
+	if active {
+		style = activeCardStyle
+	}
+
+	return style.Width(width - 2).Render(content) //nolint:mnd // border width
+}
+
+func (b *Board) cardHeight(t *task.Task, width int) int {
+	contentLines := b.cardContentLines(t, width)
+	return len(contentLines) + 2 //nolint:mnd // top and bottom borders
+}
+
+func (b *Board) cardContentLines(t *task.Task, width int) []string {
 	// Card content.
 	const cardChrome = 4 // border (2) + padding (2)
 	cardWidth := width - cardChrome
@@ -740,10 +762,6 @@ func (b *Board) renderCard(t *task.Task, active bool, width int) string {
 		contentLines = append(contentLines, idStr+" "+wrapped[0])
 		for i := 1; i < len(wrapped); i++ {
 			contentLines = append(contentLines, wrapped[i])
-		}
-		// Pad to exactly titleLines for uniform card height.
-		for len(contentLines) < titleLines {
-			contentLines = append(contentLines, "")
 		}
 	}
 
@@ -774,27 +792,12 @@ func (b *Board) renderCard(t *task.Task, active bool, width int) string {
 
 	contentLines = append(contentLines, strings.Join(details, " "))
 
-	// Claim info on a dedicated line (only when any task on the board is claimed).
-	if b.hasClaims {
-		if t.ClaimedBy != "" {
-			contentLines = append(contentLines, claimStyle.Render("@"+t.ClaimedBy))
-		} else {
-			contentLines = append(contentLines, "")
-		}
+	// Claim info on a dedicated line only for claimed tasks.
+	if t.ClaimedBy != "" {
+		contentLines = append(contentLines, claimStyle.Render("@"+t.ClaimedBy))
 	}
 
-	content := strings.Join(contentLines, "\n")
-
-	// Pick style.
-	style := cardStyle
-	if t.Blocked {
-		style = blockedCardStyle
-	}
-	if active {
-		style = activeCardStyle
-	}
-
-	return style.Width(width - 2).Render(content) //nolint:mnd // border width
+	return contentLines
 }
 
 // wrapTitle2 splits a title across maxLines lines with different widths:

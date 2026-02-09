@@ -1242,7 +1242,7 @@ func TestBoard_ClaimOnSeparateLine(t *testing.T) {
 	}
 }
 
-func TestBoard_CardHeightUniformWithClaims(t *testing.T) {
+func TestBoard_CardsDoNotRenderBlankPaddingLines(t *testing.T) {
 	dir := t.TempDir()
 	kanbanDir := filepath.Join(dir, "kanban")
 	tasksDir := filepath.Join(kanbanDir, "tasks")
@@ -1252,6 +1252,7 @@ func TestBoard_CardHeightUniformWithClaims(t *testing.T) {
 	}
 
 	cfg := config.NewDefault("Test Board")
+	cfg.TUI.TitleLines = 2
 	cfg.SetDir(kanbanDir)
 	if err := cfg.Save(); err != nil {
 		t.Fatalf("saving config: %v", err)
@@ -1286,10 +1287,11 @@ func TestBoard_CardHeightUniformWithClaims(t *testing.T) {
 
 	v := b.View()
 
-	// When any task has a claim, cards should have uniform height (claim line
-	// present on all cards). The claimed card should show @agent-1 and the
-	// unclaimed card should NOT show any @-prefix claim text on a separate line.
 	if !containsStr(v, "@agent-1") {
 		t.Fatalf("expected @agent-1 in view, got:\n%s", v)
+	}
+
+	if containsStr(v, "│                      │") {
+		t.Fatalf("expected no blank card content lines, got:\n%s", v)
 	}
 }
