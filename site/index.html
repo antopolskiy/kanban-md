@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>kanban-md — Agents-first file-based Kanban</title>
+  <meta name="description" content="A file-based Kanban CLI built for multi-agent workflows. Plain Markdown files, atomic claim operations, token-efficient output. No database, no server.">
+  <meta property="og:title" content="kanban-md — Agents-first file-based Kanban">
+  <meta property="og:description" content="A file-based Kanban CLI built for multi-agent workflows. Plain Markdown files, atomic claim operations, token-efficient output.">
+  <meta property="og:type" content="website">
+  <meta property="og:image" content="https://raw.githubusercontent.com/antopolskiy/kanban-md/main/assets/demo.gif">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main>
+    <section class="hero">
+      <h1>kanban-md</h1>
+      <p class="tagline">Agents-first file-based Kanban for parallel coding workflows.</p>
+      <p class="sub">Multiple AI agents. One board. No conflicts. No database. Just Markdown files and a single binary.</p>
+    </section>
+
+    <section class="proof">
+      <div class="proof-item">
+        <code>pick --claim</code>
+        <span>Atomic task claiming prevents agents from stepping on each other</span>
+      </div>
+      <div class="proof-item">
+        <code>--compact</code>
+        <span>70% fewer tokens than JSON — designed for agent context windows</span>
+      </div>
+      <div class="proof-item">
+        <code>*.md</code>
+        <span>Every task is a Markdown file — grep-able, diff-able, git-tracked</span>
+      </div>
+    </section>
+
+    <section class="demo">
+      <img src="https://raw.githubusercontent.com/antopolskiy/kanban-md/main/assets/demo.gif" alt="kanban-md terminal demo" loading="lazy">
+    </section>
+
+    <section class="install">
+      <h2>Install</h2>
+      <div class="install-methods">
+        <div class="install-method">
+          <h3>Homebrew</h3>
+          <pre><code>brew install antopolskiy/tap/kanban-md</code></pre>
+        </div>
+        <div class="install-method">
+          <h3>Go</h3>
+          <pre><code>go install github.com/antopolskiy/kanban-md/cmd/kanban-md@latest</code></pre>
+        </div>
+        <div class="install-method">
+          <h3>Binary</h3>
+          <p><a href="https://github.com/antopolskiy/kanban-md/releases/latest">Download from Releases</a></p>
+        </div>
+      </div>
+    </section>
+
+    <section class="quickstart">
+      <h2>Quick start</h2>
+      <pre><code><span class="comment"># Initialize a board</span>
+kanban-md init --name "My Project"
+
+<span class="comment"># Create tasks</span>
+kanban-md create "Set up CI pipeline" --priority high
+kanban-md create "Fix login bug" --priority critical
+
+<span class="comment"># Agent claims next task atomically</span>
+kanban-md pick --claim agent-1 --move in-progress
+
+<span class="comment"># Token-efficient output for agents</span>
+kanban-md list --compact
+
+<span class="comment"># Done</span>
+kanban-md move 1 done</code></pre>
+    </section>
+
+    <section class="features">
+      <h2>Built for agents, friendly to humans</h2>
+      <ul>
+        <li><strong>Multi-agent safe.</strong> Claims provide cooperative locking with automatic expiry. The <code>pick</code> command atomically finds, claims, and moves the next task.</li>
+        <li><strong>Agent skills included.</strong> Pre-written skills teach agents how to use the board. Install with <code>kanban-md skill install</code>.</li>
+        <li><strong>Interactive TUI.</strong> Full terminal board with keyboard navigation. Auto-refreshes on file changes.</li>
+        <li><strong>Zero dependencies.</strong> Single static binary. No database, no server, no config service.</li>
+        <li><strong>Classes of service.</strong> Expedite, fixed-date, standard, intangible — with per-class WIP limits and pick priority.</li>
+        <li><strong>Flow metrics.</strong> Cycle time, throughput, lead time, and aging work items built in.</li>
+      </ul>
+    </section>
+
+    <footer>
+      <div class="links">
+        <a href="https://github.com/antopolskiy/kanban-md">GitHub</a>
+        <a href="https://github.com/antopolskiy/kanban-md/releases/latest">Releases</a>
+        <a href="https://github.com/antopolskiy/kanban-md#commands">Docs</a>
+      </div>
+      <p class="license">MIT License</p>
+    </footer>
+  </main>
+</body>
+</html>
