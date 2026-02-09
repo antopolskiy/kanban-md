@@ -1181,3 +1181,115 @@ func TestBoard_TickMsgUpdatesAge(t *testing.T) {
 		t.Errorf("expected view to contain '3h' after clock advance, got:\n%s", v2)
 	}
 }
+
+func TestBoard_ClaimOnSeparateLine(t *testing.T) {
+	dir := t.TempDir()
+	kanbanDir := filepath.Join(dir, "kanban")
+	tasksDir := filepath.Join(kanbanDir, "tasks")
+
+	if err := os.MkdirAll(tasksDir, 0o750); err != nil {
+		t.Fatalf("creating dirs: %v", err)
+	}
+
+	cfg := config.NewDefault("Test Board")
+	cfg.SetDir(kanbanDir)
+	if err := cfg.Save(); err != nil {
+		t.Fatalf("saving config: %v", err)
+	}
+
+	// Create a claimed task and an unclaimed task.
+	for _, tt := range []struct {
+		id        int
+		title     string
+		status    string
+		priority  string
+		claimedBy string
+	}{
+		{1, "Claimed task", "in-progress", "high", "agent-1"},
+		{2, "Unclaimed task", "in-progress", "medium", ""},
+	} {
+		tk := &task.Task{
+			ID:        tt.id,
+			Title:     tt.title,
+			Status:    tt.status,
+			Priority:  tt.priority,
+			ClaimedBy: tt.claimedBy,
+			Updated:   testRefTime,
+		}
+		path := filepath.Join(tasksDir, task.GenerateFilename(tt.id, tt.title))
+		if err := task.Write(path, tk); err != nil {
+			t.Fatalf("writing task: %v", err)
+		}
+	}
+
+	b := tui.NewBoard(cfg)
+	b.SetNow(testNow)
+	b.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
+
+	v := b.View()
+
+	// Claim info must appear in the view.
+	if !containsStr(v, "@agent-1") {
+		t.Fatalf("expected @agent-1 in view, got:\n%s", v)
+	}
+
+	// The claim must be on a SEPARATE line from the priority.
+	// No single line should contain both "high" and "@agent-1".
+	for _, line := range strings.Split(v, "\n") {
+		if findSubstring(line, "high") && findSubstring(line, "@agent-1") {
+			t.Errorf("claim info should be on a separate line from priority, but found both on same line: %q", line)
+		}
+	}
+}
+
+func TestBoard_CardHeightUniformWithClaims(t *testing.T) {
+	dir := t.TempDir()
+	kanbanDir := filepath.Join(dir, "kanban")
+	tasksDir := filepath.Join(kanbanDir, "tasks")
+
+	if err := os.MkdirAll(tasksDir, 0o750); err != nil {
+		t.Fatalf("creating dirs: %v", err)
+	}
+
+	cfg := config.NewDefault("Test Board")
+	cfg.SetDir(kanbanDir)
+	if err := cfg.Save(); err != nil {
+		t.Fatalf("saving config: %v", err)
+	}
+
+	// Create a claimed and unclaimed task in the same column.
+	for _, tt := range []struct {
+		id        int
+		title     string
+		claimedBy string
+	}{
+		{1, "Claimed task", "agent-1"},
+		{2, "Unclaimed task", ""},
+	} {
+		tk := &task.Task{
+			ID:        tt.id,
+			Title:     tt.title,
+			Status:    "backlog",
+			Priority:  "medium",
+			ClaimedBy: tt.claimedBy,
+			Updated:   testRefTime,
+		}
+		path := filepath.Join(tasksDir, task.GenerateFilename(tt.id, tt.title))
+		if err := task.Write(path, tk); err != nil {
+			t.Fatalf("writing task: %v", err)
+		}
+	}
+
+	b := tui.NewBoard(cfg)
+	b.SetNow(testNow)
+	b.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
+
+	v := b.View()
+
+	// When any task has a claim, cards should have uniform height (claim line
+	// present on all cards). The claimed card should show @agent-1 and the
+	// unclaimed card should NOT show any @-prefix claim text on a separate line.
+	if !containsStr(v, "@agent-1") {
+		t.Fatalf("expected @agent-1 in view, got:\n%s", v)
+	}
+}

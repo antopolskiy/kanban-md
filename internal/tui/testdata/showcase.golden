@@ -1,28 +1,29 @@
  backlog (8)                 todo (3)                    in-progress (3)             review (2)                  done (3)                   
 ╭──────────────────────────╮╭──────────────────────────╮╭──────────────────────────╮╭──────────────────────────╮╭──────────────────────────╮
 │ #16 Email notificatio... ││ #6 Write integration ... ││ #9 Fix auth token ref... ││ #10 Implement user auth  ││ #13 Create project sc... │
-│ high backend 2w          ││ high testing 3d          ││ critical security        ││ critical backend @sage-  ││ high setup 1w            │
-╰──────────────────────────╯╰──────────────────────────╯│ @coral-dusk 5h           ││ river 1d                 │╰──────────────────────────╯
-╭──────────────────────────╮╭──────────────────────────╮╰──────────────────────────╯╰──────────────────────────╯╭──────────────────────────╮
-│ #18 Audit logging        ││ #5 Set up monitoring     │╭──────────────────────────╮╭──────────────────────────╮│ #12 Set up CI pipeline   │
-│ medium security 2w       ││ medium devops 3d         ││ #7 Build dashboard UI    ││ #11 Design REST API s... ││ high devops 1w           │
-╰──────────────────────────╯╰──────────────────────────╯│ high frontend @frost-    ││ high api @neon-drift 1d  │╰──────────────────────────╯
-╭──────────────────────────╮╭──────────────────────────╮│ maple 5h                 │╰──────────────────────────╯╭──────────────────────────╮
-│ #15 Add search autoco... ││ #4 Add rate limiting     │╰──────────────────────────╯                            │ #14 Define database s... │
-│ medium frontend 2w       ││ medium backend 3d        │╭──────────────────────────╮                            │ medium backend 1w        │
-╰──────────────────────────╯╰──────────────────────────╯│ #8 Write API docs        │                            ╰──────────────────────────╯
-╭──────────────────────────╮                            │ medium docs @amber-swift │                                                        
-│ #2 Mobile responsive ... │                            │ 5h                       │                                                        
-│ medium frontend 2w       │                            ╰──────────────────────────╯                                                        
+│ high backend 2w          ││ high testing 3d          ││ critical security 5h     ││ critical backend 1d      ││ high setup 1w            │
+│                          ││                          ││ @coral-dusk              ││ @sage-river              ││                          │
+╰──────────────────────────╯╰──────────────────────────╯╰──────────────────────────╯╰──────────────────────────╯╰──────────────────────────╯
+╭──────────────────────────╮╭──────────────────────────╮╭──────────────────────────╮╭──────────────────────────╮╭──────────────────────────╮
+│ #18 Audit logging        ││ #5 Set up monitoring     ││ #7 Build dashboard UI    ││ #11 Design REST API s... ││ #12 Set up CI pipeline   │
+│ medium security 2w       ││ medium devops 3d         ││ high frontend 5h         ││ high api 1d              ││ high devops 1w           │
+│                          ││                          ││ @frost-maple             ││ @neon-drift              ││                          │
+╰──────────────────────────╯╰──────────────────────────╯╰──────────────────────────╯╰──────────────────────────╯╰──────────────────────────╯
+╭──────────────────────────╮╭──────────────────────────╮╭──────────────────────────╮                            ╭──────────────────────────╮
+│ #15 Add search autoco... ││ #4 Add rate limiting     ││ #8 Write API docs        │                            │ #14 Define database s... │
+│ medium frontend 2w       ││ medium backend 3d        ││ medium docs 5h           │                            │ medium backend 1w        │
+│                          ││                          ││ @amber-swift             │                            │                          │
+╰──────────────────────────╯╰──────────────────────────╯╰──────────────────────────╯                            ╰──────────────────────────╯
+╭──────────────────────────╮                                                                                                                
+│ #2 Mobile responsive ... │                                                                                                                
+│ medium frontend 2w       │                                                                                                                
+│                          │                                                                                                                
 ╰──────────────────────────╯                                                                                                                
 ╭──────────────────────────╮                                                                                                                
 │ #19 Export to CSV        │                                                                                                                
 │ low feature 2w           │                                                                                                                
+│                          │                                                                                                                
 ╰──────────────────────────╯                                                                                                                
-╭──────────────────────────╮                                                                                                                
-│ #17 Localization support │                                                                                                                
-│ low i18n 2w              │                                                                                                                
-╰──────────────────────────╯                                                                                                                
-  ↓ 2 more                                                                                                                                  
+  ↓ 3 more                                                                                                                                  
                                                                                                                                             
  My Project | 19 tasks | ←↓↑→/hjkl:navigate enter:detail m:move N:next P:prev d:delete ?:help esc/q:quit                                    
