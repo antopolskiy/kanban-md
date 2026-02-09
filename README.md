@@ -5,6 +5,8 @@
 [![Go Version](https://img.shields.io/github/go-mod/go-version/antopolskiy/kanban-md)](https://go.dev/)
 [![Latest Release](https://img.shields.io/github/v/release/antopolskiy/kanban-md)](https://github.com/antopolskiy/kanban-md/releases/latest)
 [![codecov](https://codecov.io/gh/antopolskiy/kanban-md/graph/badge.svg)](https://codecov.io/gh/antopolskiy/kanban-md)
+[![Go Reference](https://pkg.go.dev/badge/github.com/antopolskiy/kanban-md.svg)](https://pkg.go.dev/github.com/antopolskiy/kanban-md)
+[![Go Report Card](https://goreportcard.com/badge/github.com/antopolskiy/kanban-md)](https://goreportcard.com/report/github.com/antopolskiy/kanban-md)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 An agents-first file-based Kanban. Built for multi-agent workflows to allow AI agents work in parallel without clashing. Ultra-fast single binary CLI. Agent skills included. Lean and future-proof: no database, no server, no SaaS — just files.
