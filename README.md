@@ -206,7 +206,7 @@ kanban-md list [FLAGS]
 | `--blocked` | false | Show only blocked tasks |
 | `--not-blocked` | false | Show only non-blocked tasks |
 | `--parent` | | Filter by parent task ID |
-| `--unblocked` | false | Show only tasks with all dependencies satisfied |
+| `--unblocked` | false | Show only tasks with all dependencies satisfied (missing dependency IDs are treated as satisfied) |
 | `--unclaimed` | false | Show only unclaimed or expired-claim tasks |
 | `--claimed-by` | | Filter by claimant name |
 | `--class` | | Filter by class of service |

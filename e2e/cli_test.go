@@ -1293,6 +1293,29 @@ func TestListUnblockedAfterDepDone(t *testing.T) {
 	}
 }
 
+func TestListUnblockedWithMissingDependencyFile(t *testing.T) {
+	kanbanDir := initBoard(t)
+	dep := mustCreateTask(t, kanbanDir, "Dep task")                      // #1
+	mustCreateTask(t, kanbanDir, "Depends on missing", "--depends-on", "1") // #2
+
+	// Simulate legacy hard-delete: dependency ID remains but file is gone.
+	if err := os.Remove(dep.File); err != nil {
+		t.Fatalf("removing dep task file: %v", err)
+	}
+
+	var tasks []taskJSON
+	r := runKanbanJSON(t, kanbanDir, &tasks, "list", "--unblocked")
+	if r.exitCode != 0 {
+		t.Fatalf("list --unblocked failed: %s", r.stderr)
+	}
+	if len(tasks) != 1 {
+		t.Fatalf("got %d unblocked tasks, want 1", len(tasks))
+	}
+	if tasks[0].ID != 2 {
+		t.Errorf("unblocked task ID = %d, want 2", tasks[0].ID)
+	}
+}
+
 func TestDeleteWithDependentsWarns(t *testing.T) {
 	kanbanDir := initBoard(t)
 	mustCreateTask(t, kanbanDir, "Dep task")                          // #1
@@ -1304,6 +1327,13 @@ func TestDeleteWithDependentsWarns(t *testing.T) {
 	}
 	if !strings.Contains(r.stderr, "depends on this task") {
 		t.Errorf("stderr = %q, want dependent warning", r.stderr)
+	}
+
+	// Dependent should remain recoverable via --unblocked after delete.
+	var tasks []taskJSON
+	runKanbanJSON(t, kanbanDir, &tasks, "list", "--unblocked")
+	if len(tasks) != 1 || tasks[0].ID != 2 {
+		t.Fatalf("unblocked tasks after delete = %+v, want only task #2", tasks)
 	}
 }
 
@@ -2686,6 +2716,13 @@ func TestBatchDeleteWarnsDependents(t *testing.T) {
 	}
 	if !strings.Contains(r.stderr, "Warning") {
 		t.Errorf("stderr should contain dependent-task warning, got: %q", r.stderr)
+	}
+
+	// Dependent task B should still be unblocked after deleting A.
+	var tasks []taskJSON
+	runKanbanJSON(t, kanbanDir, &tasks, "list", "--unblocked")
+	if len(tasks) != 1 || tasks[0].ID != 2 {
+		t.Fatalf("unblocked tasks after batch delete = %+v, want only task #2", tasks)
 	}
 }
 

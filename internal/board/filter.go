@@ -149,8 +149,9 @@ func allDepsSatisfied(deps []int, statusByID map[int]string, cfg *config.Config)
 	for _, depID := range deps {
 		s, ok := statusByID[depID]
 		if !ok {
-			// Dependency not found (deleted?) — treat as unsatisfied.
-			return false
+			// Missing dependency IDs can occur after legacy hard-deletes.
+			// Treat as satisfied so dependents are recoverable via edit/cleanup.
+			continue
 		}
 		if !cfg.IsTerminalStatus(s) {
 			return false

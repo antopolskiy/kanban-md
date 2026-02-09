@@ -33,7 +33,7 @@ func init() {
 	listCmd.Flags().Bool("blocked", false, "show only blocked tasks")
 	listCmd.Flags().Bool("not-blocked", false, "show only non-blocked tasks")
 	listCmd.Flags().Int("parent", 0, "filter by parent task ID")
-	listCmd.Flags().Bool("unblocked", false, "show only tasks with all dependencies satisfied")
+	listCmd.Flags().Bool("unblocked", false, "show only tasks with all dependencies satisfied (missing dependency IDs are treated as satisfied)")
 	listCmd.Flags().Bool("unclaimed", false, "show only unclaimed or expired-claim tasks")
 	listCmd.Flags().String("claimed-by", "", "filter by claimant")
 	listCmd.Flags().String("class", "", "filter by class of service")
