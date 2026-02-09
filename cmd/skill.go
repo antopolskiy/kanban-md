@@ -442,6 +442,9 @@ func multiSelect(prompt string, items []menuItem) []int {
 	}
 
 	final := result.(selectModel)
+	if final.canceled {
+		return nil
+	}
 	var selected []int
 	for i, item := range final.items {
 		if item.selected {
@@ -453,10 +456,11 @@ func multiSelect(prompt string, items []menuItem) []int {
 
 // selectModel is a bubbletea model for the multi-select menu.
 type selectModel struct {
-	prompt string
-	items  []menuItem
-	cursor int
-	done   bool
+	prompt   string
+	items    []menuItem
+	cursor   int
+	done     bool
+	canceled bool
 }
 
 var (
@@ -491,8 +495,9 @@ func (m selectModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case "enter":
 		m.done = true
 		return m, tea.Quit
-	case "q", "ctrl+c":
+	case "q", "esc", "ctrl+c":
 		m.done = true
+		m.canceled = true
 		return m, tea.Quit
 	}
 	return m, nil
@@ -528,7 +533,7 @@ func (m selectModel) View() string {
 		b.WriteString(fmt.Sprintf("  %s [%s] %s — %s\n", cursor, checkRendered, label, desc))
 	}
 
-	b.WriteString(selectDimStyle.Render("\n  ↑/↓ navigate • space toggle • enter confirm\n"))
+	b.WriteString(selectDimStyle.Render("\n  ↑/↓ navigate • space toggle • enter confirm • esc cancel\n"))
 	return b.String()
 }
 
