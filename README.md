@@ -577,7 +577,7 @@ kanban-md list --group-by priority      # priority distribution
 
 **No hidden state.** Everything is in `config.yml` and the task files. There's no database, no cache, no lock file. Two agents can work on the same board by editing different files and merging via git.
 
-**Minimal by default.** The tool does one thing — manage task files — and stays out of the way. It doesn't sync, notify, render boards, or integrate with anything. Those are better handled by other tools reading the same files.
+**Minimal by default.** The core CLI does one thing — manage task files — and stays out of the way. Board rendering and interactive browsing live in the separate `kanban-md-tui` binary. The tool doesn't sync, notify, or integrate with external services. Git handles collaboration; file watchers handle live updates.
 
 ## Development
 
