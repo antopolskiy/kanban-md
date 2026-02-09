@@ -1,6 +1,8 @@
 package task
 
 import (
+	"time"
+
 	"github.com/antopolskiy/kanban-md/internal/clierr"
 )
 
@@ -116,6 +118,46 @@ func ValidateClassWIPExceeded(class string, limit, current int) *clierr.Error {
 			"limit":   limit,
 			"current": current,
 		})
+}
+
+// CheckClaim verifies that a mutating operation is allowed on a claimed task.
+// If the task is unclaimed, claimed by the same agent, expired, or force is set,
+// the operation proceeds. Otherwise, returns a TaskClaimed error.
+func CheckClaim(t *Task, claimant string, force bool, timeout time.Duration) error {
+	if t.ClaimedBy == "" {
+		return nil
+	}
+	if t.ClaimedBy == claimant && claimant != "" {
+		return nil
+	}
+	if timeout > 0 && t.ClaimedAt != nil && time.Since(*t.ClaimedAt) > timeout {
+		t.ClaimedBy = ""
+		t.ClaimedAt = nil
+		return nil
+	}
+	if force {
+		t.ClaimedBy = ""
+		t.ClaimedAt = nil
+		return nil
+	}
+	remaining := "unknown"
+	if timeout > 0 && t.ClaimedAt != nil {
+		remaining = (timeout - time.Since(*t.ClaimedAt)).Truncate(time.Minute).String()
+	}
+	return ValidateTaskClaimed(t.ID, t.ClaimedBy, remaining)
+}
+
+// ValidateDependencyIDs checks that all dependency IDs exist and none are self-referencing.
+func ValidateDependencyIDs(tasksDir string, selfID int, ids []int) error {
+	for _, depID := range ids {
+		if depID == selfID {
+			return ValidateSelfReference(depID)
+		}
+		if _, err := FindByID(tasksDir, depID); err != nil {
+			return ValidateDependencyNotFound(depID)
+		}
+	}
+	return nil
 }
 
 // FormatDueDate returns a CLIError for invalid due date input.

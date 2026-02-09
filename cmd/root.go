@@ -5,8 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"strconv"
-	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -127,37 +125,13 @@ func printWarnings(warnings []task.ReadWarning) {
 
 // validateDepIDs checks that all dependency IDs exist and none are self-referencing.
 func validateDepIDs(tasksDir string, selfID int, ids []int) error {
-	for _, depID := range ids {
-		if depID == selfID {
-			return task.ValidateSelfReference(depID)
-		}
-		if _, err := task.FindByID(tasksDir, depID); err != nil {
-			return task.ValidateDependencyNotFound(depID)
-		}
-	}
-	return nil
+	return task.ValidateDependencyIDs(tasksDir, selfID, ids)
 }
 
 // checkWIPLimit verifies that adding a task to targetStatus would not exceed
 // the WIP limit. currentTaskStatus is the task's current status (empty for new tasks).
-// Returns nil if within limits, or an error describing the violation.
 func checkWIPLimit(cfg *config.Config, statusCounts map[string]int, targetStatus, currentTaskStatus string) error {
-	limit := cfg.WIPLimit(targetStatus)
-	if limit == 0 {
-		return nil
-	}
-
-	count := statusCounts[targetStatus]
-
-	// If the task is already in the target status, it doesn't add to the count.
-	if currentTaskStatus == targetStatus {
-		return nil
-	}
-
-	if count >= limit {
-		return task.ValidateWIPLimit(targetStatus, limit, count)
-	}
-	return nil
+	return board.CheckWIPLimit(cfg, statusCounts, targetStatus, currentTaskStatus)
 }
 
 // logActivity appends an entry to the activity log. Errors are silently
@@ -167,31 +141,8 @@ func logActivity(cfg *config.Config, action string, taskID int, detail string) {
 }
 
 // checkClaim verifies that a mutating operation is allowed on a claimed task.
-// If the task is unclaimed, claimed by the same agent, expired, or force is set,
-// the operation proceeds. Otherwise, returns a TaskClaimed error.
 func checkClaim(t *task.Task, claimant string, force bool, timeout time.Duration) error {
-	if t.ClaimedBy == "" {
-		return nil // unclaimed
-	}
-	if t.ClaimedBy == claimant && claimant != "" {
-		return nil // claimed by same agent
-	}
-	// Check if claim has expired.
-	if timeout > 0 && t.ClaimedAt != nil && time.Since(*t.ClaimedAt) > timeout {
-		t.ClaimedBy = ""
-		t.ClaimedAt = nil
-		return nil
-	}
-	if force {
-		t.ClaimedBy = ""
-		t.ClaimedAt = nil
-		return nil
-	}
-	remaining := "unknown"
-	if timeout > 0 && t.ClaimedAt != nil {
-		remaining = (timeout - time.Since(*t.ClaimedAt)).Truncate(time.Minute).String()
-	}
-	return task.ValidateTaskClaimed(t.ID, t.ClaimedBy, remaining)
+	return task.CheckClaim(t, claimant, force, timeout)
 }
 
 // validateDeps validates parent and dependency references for a task.
@@ -211,27 +162,7 @@ func validateDeps(cfg *config.Config, t *task.Task) error {
 
 // parseIDs splits a comma-separated ID string into deduplicated int IDs.
 func parseIDs(arg string) ([]int, error) {
-	parts := strings.Split(arg, ",")
-	seen := make(map[int]bool, len(parts))
-	ids := make([]int, 0, len(parts))
-	for _, p := range parts {
-		p = strings.TrimSpace(p)
-		if p == "" {
-			continue
-		}
-		id, err := strconv.Atoi(p)
-		if err != nil {
-			return nil, task.ValidateTaskID(p)
-		}
-		if !seen[id] {
-			ids = append(ids, id)
-			seen[id] = true
-		}
-	}
-	if len(ids) == 0 {
-		return nil, clierr.New(clierr.InvalidTaskID, "no valid task IDs provided")
-	}
-	return ids, nil
+	return board.ParseIDs(arg)
 }
 
 // runBatch executes fn for each ID and collects results. Returns a SilentError

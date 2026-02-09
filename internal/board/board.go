@@ -2,8 +2,11 @@ package board
 
 import (
 	"fmt"
+	"strconv"
+	"strings"
 	"time"
 
+	"github.com/antopolskiy/kanban-md/internal/clierr"
 	"github.com/antopolskiy/kanban-md/internal/config"
 	"github.com/antopolskiy/kanban-md/internal/task"
 )
@@ -154,6 +157,52 @@ func Summary(cfg *config.Config, tasks []*task.Task, now time.Time) Overview {
 		Priorities: priorities,
 		Classes:    classes,
 	}
+}
+
+// ParseIDs splits a comma-separated ID string into deduplicated int IDs.
+func ParseIDs(arg string) ([]int, error) {
+	parts := strings.Split(arg, ",")
+	seen := make(map[int]bool, len(parts))
+	ids := make([]int, 0, len(parts))
+	for _, p := range parts {
+		p = strings.TrimSpace(p)
+		if p == "" {
+			continue
+		}
+		id, err := strconv.Atoi(p)
+		if err != nil {
+			return nil, task.ValidateTaskID(p)
+		}
+		if !seen[id] {
+			ids = append(ids, id)
+			seen[id] = true
+		}
+	}
+	if len(ids) == 0 {
+		return nil, clierr.New(clierr.InvalidTaskID, "no valid task IDs provided")
+	}
+	return ids, nil
+}
+
+// CheckWIPLimit verifies that adding a task to targetStatus would not exceed
+// the WIP limit. currentTaskStatus is the task's current status (empty for new tasks).
+// Returns nil if within limits, or an error describing the violation.
+func CheckWIPLimit(cfg *config.Config, statusCounts map[string]int, targetStatus, currentTaskStatus string) error {
+	limit := cfg.WIPLimit(targetStatus)
+	if limit == 0 {
+		return nil
+	}
+
+	// If the task is already in the target status, it doesn't add to the count.
+	if currentTaskStatus == targetStatus {
+		return nil
+	}
+
+	count := statusCounts[targetStatus]
+	if count >= limit {
+		return task.ValidateWIPLimit(targetStatus, limit, count)
+	}
+	return nil
 }
 
 // CountByStatus returns the number of tasks in each status.
