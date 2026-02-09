@@ -4044,3 +4044,208 @@ claimed_at: 2020-01-01T00:00:00Z
 		t.Error("task file should not contain claimed_at after expired claim is cleared")
 	}
 }
+
+// ---------------------------------------------------------------------------
+// Read command coverage tests (list, show, board, log, metrics)
+// ---------------------------------------------------------------------------
+
+func TestListGroupByStatus(t *testing.T) {
+	kanbanDir := initBoard(t)
+	mustCreateTask(t, kanbanDir, "Task A", "--status", "todo")
+	mustCreateTask(t, kanbanDir, "Task B", "--status", "todo")
+	taskC := mustCreateTask(t, kanbanDir, "Task C")
+	runKanban(t, kanbanDir, "move", strconv.Itoa(taskC.ID), "in-progress")
+
+	// Table output with --group-by status.
+	r := runKanban(t, kanbanDir, "list", "--group-by", "status")
+	if r.exitCode != 0 {
+		t.Fatalf("list --group-by status failed (exit %d): %s", r.exitCode, r.stderr)
+	}
+	if !strings.Contains(r.stdout, "todo") {
+		t.Error("expected group header 'todo' in output")
+	}
+
+	// JSON output with --group-by status.
+	var grouped struct {
+		Groups []struct {
+			Key string `json:"key"`
+		} `json:"groups"`
+	}
+	r = runKanbanJSON(t, kanbanDir, &grouped, "list", "--group-by", "status")
+	if r.exitCode != 0 {
+		t.Fatalf("list --group-by --json failed (exit %d): %s", r.exitCode, r.stderr)
+	}
+	foundTodo := false
+	for _, g := range grouped.Groups {
+		if g.Key == "todo" {
+			foundTodo = true
+		}
+	}
+	if !foundTodo {
+		t.Error("JSON output should have group with key 'todo'")
+	}
+}
+
+func TestListGroupByPriority(t *testing.T) {
+	kanbanDir := initBoard(t)
+	mustCreateTask(t, kanbanDir, "High task", "--priority", "high")
+	mustCreateTask(t, kanbanDir, "Low task", "--priority", "low")
+
+	r := runKanban(t, kanbanDir, "list", "--group-by", "priority")
+	if r.exitCode != 0 {
+		t.Fatalf("list --group-by priority failed (exit %d): %s", r.exitCode, r.stderr)
+	}
+	if !strings.Contains(r.stdout, "high") {
+		t.Error("expected group header 'high' in output")
+	}
+}
+
+func TestListGroupByInvalid(t *testing.T) {
+	kanbanDir := initBoard(t)
+
+	errResp := runKanbanJSONError(t, kanbanDir, "list", "--group-by", "invalid-field")
+	if errResp.Code != "INVALID_GROUP_BY" {
+		t.Errorf("error code = %q, want INVALID_GROUP_BY", errResp.Code)
+	}
+}
+
+func TestBoardGroupByStatus(t *testing.T) {
+	kanbanDir := initBoard(t)
+	mustCreateTask(t, kanbanDir, "Task A", "--status", "todo")
+	taskB := mustCreateTask(t, kanbanDir, "Task B")
+	runKanban(t, kanbanDir, "move", strconv.Itoa(taskB.ID), "in-progress")
+
+	// Table output.
+	r := runKanban(t, kanbanDir, "board", "--group-by", "status")
+	if r.exitCode != 0 {
+		t.Fatalf("board --group-by status failed (exit %d): %s", r.exitCode, r.stderr)
+	}
+
+	// JSON output.
+	var grouped map[string]interface{}
+	r = runKanbanJSON(t, kanbanDir, &grouped, "board", "--group-by", "status")
+	if r.exitCode != 0 {
+		t.Fatalf("board --group-by --json failed (exit %d): %s", r.exitCode, r.stderr)
+	}
+}
+
+func TestBoardGroupByInvalid(t *testing.T) {
+	kanbanDir := initBoard(t)
+
+	errResp := runKanbanJSONError(t, kanbanDir, "board", "--group-by", "invalid-field")
+	if errResp.Code != "INVALID_GROUP_BY" {
+		t.Errorf("error code = %q, want INVALID_GROUP_BY", errResp.Code)
+	}
+}
+
+func TestShowCompactOutput(t *testing.T) {
+	kanbanDir := initBoard(t)
+	mustCreateTask(t, kanbanDir, "Compact show test")
+
+	r := runKanban(t, kanbanDir, "show", "1", "--compact")
+	if r.exitCode != 0 {
+		t.Fatalf("show --compact failed (exit %d): %s", r.exitCode, r.stderr)
+	}
+	if !strings.Contains(r.stdout, "Compact show test") {
+		t.Error("compact show output should contain task title")
+	}
+}
+
+func TestLogCompactOutput(t *testing.T) {
+	kanbanDir := initBoard(t)
+	mustCreateTask(t, kanbanDir, "Log test task")
+
+	r := runKanban(t, kanbanDir, "log", "--compact")
+	if r.exitCode != 0 {
+		t.Fatalf("log --compact failed (exit %d): %s", r.exitCode, r.stderr)
+	}
+	// Activity log should have the create entry.
+	if !strings.Contains(r.stdout, "create") {
+		t.Error("compact log output should contain 'create' action")
+	}
+}
+
+func TestMetricsCompactOutput(t *testing.T) {
+	kanbanDir := initBoard(t)
+	mustCreateTask(t, kanbanDir, "Metrics test task")
+
+	r := runKanban(t, kanbanDir, "metrics", "--compact")
+	if r.exitCode != 0 {
+		t.Fatalf("metrics --compact failed (exit %d): %s", r.exitCode, r.stderr)
+	}
+}
+
+func TestBoardCompactOutput(t *testing.T) {
+	kanbanDir := initBoard(t)
+	mustCreateTask(t, kanbanDir, "Board compact task")
+
+	r := runKanban(t, kanbanDir, "board", "--compact")
+	if r.exitCode != 0 {
+		t.Fatalf("board --compact failed (exit %d): %s", r.exitCode, r.stderr)
+	}
+}
+
+func TestListCompactOutput(t *testing.T) {
+	kanbanDir := initBoard(t)
+	mustCreateTask(t, kanbanDir, "Compact list task")
+
+	r := runKanban(t, kanbanDir, "list", "--compact")
+	if r.exitCode != 0 {
+		t.Fatalf("list --compact failed (exit %d): %s", r.exitCode, r.stderr)
+	}
+	if !strings.Contains(r.stdout, "Compact list task") {
+		t.Error("compact list output should contain task title")
+	}
+}
+
+func TestLogWithFilters(t *testing.T) {
+	kanbanDir := initBoard(t)
+	mustCreateTask(t, kanbanDir, "First task")
+	mustCreateTask(t, kanbanDir, "Second task")
+
+	// Filter by action.
+	r := runKanban(t, kanbanDir, "log", "--action", "create", "--json")
+	if r.exitCode != 0 {
+		t.Fatalf("log --action create failed (exit %d): %s", r.exitCode, r.stderr)
+	}
+
+	// Filter by task ID.
+	r = runKanban(t, kanbanDir, "log", "--task", "1", "--json")
+	if r.exitCode != 0 {
+		t.Fatalf("log --task 1 failed (exit %d): %s", r.exitCode, r.stderr)
+	}
+
+	// Limit.
+	r = runKanban(t, kanbanDir, "log", "--limit", "1", "--json")
+	if r.exitCode != 0 {
+		t.Fatalf("log --limit 1 failed (exit %d): %s", r.exitCode, r.stderr)
+	}
+}
+
+func TestMetricsWithSince(t *testing.T) {
+	kanbanDir := initBoard(t)
+	mustCreateTask(t, kanbanDir, "Old task")
+
+	r := runKanban(t, kanbanDir, "metrics", "--since", "2020-01-01", "--json")
+	if r.exitCode != 0 {
+		t.Fatalf("metrics --since failed (exit %d): %s", r.exitCode, r.stderr)
+	}
+}
+
+func TestMetricsWithBadSince(t *testing.T) {
+	kanbanDir := initBoard(t)
+
+	errResp := runKanbanJSONError(t, kanbanDir, "metrics", "--since", "not-a-date")
+	if errResp.Code != codeInvalidDate {
+		t.Errorf("error code = %q, want %q", errResp.Code, codeInvalidDate)
+	}
+}
+
+func TestLogWithBadSince(t *testing.T) {
+	kanbanDir := initBoard(t)
+
+	errResp := runKanbanJSONError(t, kanbanDir, "log", "--since", "not-a-date")
+	if errResp.Code != codeInvalidDate {
+		t.Errorf("error code = %q, want %q", errResp.Code, codeInvalidDate)
+	}
+}
