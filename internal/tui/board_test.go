@@ -11,11 +11,15 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 
 	"github.com/antopolskiy/kanban-md/internal/config"
+	"github.com/antopolskiy/kanban-md/internal/date"
 	"github.com/antopolskiy/kanban-md/internal/task"
 	"github.com/antopolskiy/kanban-md/internal/tui"
 )
 
-const statusTodo = "todo"
+const (
+	statusTodo  = "todo"
+	viewLoading = "Loading..."
+)
 
 // testRefTime is a fixed reference time used for task Updated timestamps in tests.
 var testRefTime = time.Date(2026, 1, 15, 10, 0, 0, 0, time.UTC) //nolint:gochecknoglobals // test helper
@@ -92,7 +96,7 @@ func TestBoard_InitialState(t *testing.T) {
 	v := b.View()
 
 	// Should show all status columns.
-	if v == "" || v == "Loading..." {
+	if v == "" || v == viewLoading {
 		t.Error("expected board view, got empty or loading")
 	}
 
@@ -119,7 +123,7 @@ func TestBoard_NavigateColumns(t *testing.T) {
 
 	// View should render without issues.
 	v := b.View()
-	if v == "" || v == "Loading..." {
+	if v == "" || v == viewLoading {
 		t.Error("expected valid board view after navigation")
 	}
 }
@@ -725,5 +729,421 @@ func TestBoard_ScrollWithTitleLines2(t *testing.T) {
 	const termHeight = 15
 	if len(lines) > termHeight {
 		t.Errorf("output has %d lines, exceeds terminal height %d", len(lines), termHeight)
+	}
+}
+
+// --- Coverage improvement tests ---
+
+func TestBoard_Init(t *testing.T) {
+	b, _ := setupTestBoard(t)
+	cmd := b.Init()
+	if cmd != nil {
+		t.Error("expected Init() to return nil cmd")
+	}
+}
+
+func TestBoard_WatchPaths(t *testing.T) {
+	b, cfg := setupTestBoard(t)
+	paths := b.WatchPaths()
+
+	// Default config has TasksDir="tasks", so Dir() != TasksPath() → 2 paths.
+	if len(paths) != 2 {
+		t.Fatalf("expected 2 watch paths, got %d: %v", len(paths), paths)
+	}
+	if paths[0] != cfg.TasksPath() {
+		t.Errorf("expected first path to be tasks path %q, got %q", cfg.TasksPath(), paths[0])
+	}
+	if paths[1] != cfg.Dir() {
+		t.Errorf("expected second path to be kanban dir %q, got %q", cfg.Dir(), paths[1])
+	}
+}
+
+func TestBoard_ReloadMsg(t *testing.T) {
+	b, cfg := setupTestBoard(t)
+
+	// Create an external task that won't show up without reload.
+	tk := &task.Task{
+		ID:       10,
+		Title:    "Reload Test Task",
+		Status:   "todo",
+		Priority: "medium",
+		Updated:  testRefTime,
+	}
+	path := filepath.Join(cfg.TasksPath(), task.GenerateFilename(10, "Reload Test Task"))
+	if err := task.Write(path, tk); err != nil {
+		t.Fatalf("writing task: %v", err)
+	}
+
+	// Before ReloadMsg, the new task shouldn't be visible.
+	v := b.View()
+	if containsStr(v, "Reload Test Task") {
+		t.Error("expected new task NOT visible before ReloadMsg")
+	}
+
+	// Send ReloadMsg.
+	m, _ := b.Update(tui.ReloadMsg{})
+	b = m.(*tui.Board)
+
+	v = b.View()
+	if !containsStr(v, "Reload Test Task") {
+		t.Error("expected new task visible after ReloadMsg")
+	}
+}
+
+func TestBoard_UnknownMsg(t *testing.T) {
+	b, _ := setupTestBoard(t)
+	vBefore := b.View()
+
+	// Send an unknown message type.
+	type customMsg struct{}
+	m, cmd := b.Update(customMsg{})
+	b = m.(*tui.Board)
+
+	if cmd != nil {
+		t.Error("expected nil cmd for unknown message")
+	}
+	if b.View() != vBefore {
+		t.Error("expected board unchanged after unknown message")
+	}
+}
+
+// setupMetadataBoard creates a board with a single task that has all metadata fields populated.
+func setupMetadataBoard(t *testing.T) *tui.Board {
+	t.Helper()
+
+	dir := t.TempDir()
+	kanbanDir := filepath.Join(dir, "kanban")
+	tasksDir := filepath.Join(kanbanDir, "tasks")
+	if err := os.MkdirAll(tasksDir, 0o750); err != nil {
+		t.Fatalf("creating dirs: %v", err)
+	}
+
+	cfg := config.NewDefault("Metadata Board")
+	cfg.SetDir(kanbanDir)
+	if err := cfg.Save(); err != nil {
+		t.Fatalf("saving config: %v", err)
+	}
+
+	started := testRefTime.Add(-1 * time.Hour)
+	completed := testRefTime
+	due := date.New(2026, 3, 15)
+
+	tk := &task.Task{
+		ID:          1,
+		Title:       "Full Metadata Task",
+		Status:      "in-progress",
+		Priority:    "high",
+		Assignee:    "alice",
+		Tags:        []string{"backend", "urgent"},
+		Due:         &due,
+		Estimate:    "2h",
+		Started:     &started,
+		Completed:   &completed,
+		Blocked:     true,
+		BlockReason: "waiting on API",
+		Updated:     testRefTime,
+	}
+	path := filepath.Join(tasksDir, task.GenerateFilename(1, "Full Metadata Task"))
+	if err := task.Write(path, tk); err != nil {
+		t.Fatalf("writing task: %v", err)
+	}
+
+	b := tui.NewBoard(cfg)
+	b.SetNow(testNow)
+	b.Update(tea.WindowSizeMsg{Width: 120, Height: 50})
+	return b
+}
+
+func TestBoard_DetailShowsAllMetadata(t *testing.T) {
+	b := setupMetadataBoard(t)
+
+	// Navigate to in-progress column (index 2).
+	b = sendKey(b, "l") // → todo
+	b = sendKey(b, "l") // → in-progress
+
+	// Enter detail view.
+	b = sendSpecialKey(b, tea.KeyEnter)
+	v := b.View()
+
+	checks := []struct {
+		label string
+		want  string
+	}{
+		{"Assignee", "alice"},
+		{"Tags", "backend"},
+		{"Due", "2026-03-15"},
+		{"Estimate", "2h"},
+		{"Started", "Started:"},
+		{"Completed", "Completed:"},
+		{"Duration", "Duration:"},
+		{"Blocked", "BLOCKED:"},
+		{"BlockReason", "waiting on API"},
+	}
+	for _, c := range checks {
+		if !containsStr(v, c.want) {
+			t.Errorf("expected %s field with %q in detail view", c.label, c.want)
+		}
+	}
+}
+
+func TestBoard_DetailScrollUp(t *testing.T) {
+	b, cfg := setupTestBoard(t)
+	addLongBodyToTask(t, cfg, 1, 50)
+	b = sendKey(b, "r")     // refresh
+	b = sendKey(b, "enter") // detail
+
+	// Scroll down 20 lines.
+	for range 20 {
+		b = sendKey(b, "j")
+	}
+	vDown := b.View()
+
+	// Scroll back up 20 lines (back to top).
+	for range 20 {
+		b = sendKey(b, "k")
+	}
+	vUp := b.View()
+
+	// After scrolling back up fully, the title should be visible again.
+	if !containsStr(vUp, "Task #1") {
+		t.Error("expected Task #1 visible after scrolling back up")
+	}
+	// The view should differ from the scrolled-down position.
+	if vDown == vUp {
+		t.Error("expected different view after scrolling up")
+	}
+}
+
+func TestBoard_DetailScrollUpAtTop(t *testing.T) {
+	b, cfg := setupTestBoard(t)
+	addLongBodyToTask(t, cfg, 1, 50)
+	b = sendKey(b, "r")
+	b = sendKey(b, "enter")
+
+	// Press k at the top — should be a no-op.
+	b = sendKey(b, "k")
+	v := b.View()
+
+	if !containsStr(v, "Task #1") {
+		t.Error("expected Task #1 still visible after k at top")
+	}
+}
+
+func TestBoard_DetailScrollToTop(t *testing.T) {
+	b, cfg := setupTestBoard(t)
+	addLongBodyToTask(t, cfg, 1, 50)
+	b = sendKey(b, "r")
+	b = sendKey(b, "enter")
+
+	// Scroll down far.
+	for range 20 {
+		b = sendKey(b, "j")
+	}
+	// Press g to jump to top.
+	b = sendKey(b, "g")
+	v := b.View()
+
+	if !containsStr(v, "Task #1") {
+		t.Error("expected Task #1 visible after pressing g")
+	}
+}
+
+func TestBoard_DetailScrollToBottom(t *testing.T) {
+	b, cfg := setupTestBoard(t)
+	addLongBodyToTask(t, cfg, 1, 50)
+	b = sendKey(b, "r")
+	b = sendKey(b, "enter")
+
+	// Press G to jump to bottom.
+	b = sendKey(b, "G")
+	v := b.View()
+
+	// Last body lines should be visible.
+	if !containsStr(v, "Body line 50") {
+		t.Error("expected last body line visible after pressing G")
+	}
+	// Title should be scrolled out.
+	if containsStr(v, "Task #1") {
+		t.Error("expected title scrolled out after pressing G")
+	}
+}
+
+func TestBoard_DetailExitBackspace(t *testing.T) {
+	b, _ := setupTestBoard(t)
+
+	b = sendKey(b, "enter") // detail view
+	v := b.View()
+	if !containsStr(v, "Status:") {
+		t.Fatal("expected detail view")
+	}
+
+	b = sendSpecialKey(b, tea.KeyBackspace) // exit detail
+	v = b.View()
+	if containsStr(v, "Press q/esc to go back") {
+		t.Error("expected to return to board view after backspace")
+	}
+}
+
+func TestBoard_MoveDialogCursorUp(t *testing.T) {
+	b, cfg := setupTestBoard(t)
+
+	// Task 1 is in backlog (index 0). Open move dialog.
+	b = sendKey(b, "m")
+	// Cursor starts at index 0 (backlog). Move down twice to in-progress (index 2).
+	b = sendKey(b, "j") // → todo (1)
+	b = sendKey(b, "j") // → in-progress (2)
+	// Move back up once to todo (index 1).
+	b = sendKey(b, "k") // → todo (1)
+	// Confirm.
+	_ = sendKey(b, "enter")
+
+	// Verify the task moved to todo.
+	path, err := task.FindByID(cfg.TasksPath(), 1)
+	if err != nil {
+		t.Fatalf("finding task: %v", err)
+	}
+	tk, err := task.Read(path)
+	if err != nil {
+		t.Fatalf("reading task: %v", err)
+	}
+	if tk.Status != "todo" {
+		t.Errorf("expected status 'todo', got %q", tk.Status)
+	}
+}
+
+func TestBoard_MoveSameStatus(t *testing.T) {
+	b, cfg := setupTestBoard(t)
+
+	// Task 1 is in backlog. Open move dialog and press enter immediately
+	// (cursor starts on "backlog", the current status).
+	b = sendKey(b, "m")
+	_ = sendKey(b, "enter")
+
+	// Task should still be in backlog.
+	path, err := task.FindByID(cfg.TasksPath(), 1)
+	if err != nil {
+		t.Fatalf("finding task: %v", err)
+	}
+	tk, err := task.Read(path)
+	if err != nil {
+		t.Fatalf("reading task: %v", err)
+	}
+	if tk.Status != "backlog" {
+		t.Errorf("expected status 'backlog' (unchanged), got %q", tk.Status)
+	}
+}
+
+func TestBoard_MoveNextAtLast(t *testing.T) {
+	b, _ := setupTestBoard(t)
+
+	// Navigate to done column (index 4): backlog → todo → in-progress → review → done.
+	for range 4 {
+		b = sendKey(b, "l")
+	}
+	// Press N on a task in "done" (last status).
+	b = sendKey(b, "N")
+	v := b.View()
+
+	if !containsStr(v, "already at the last status") {
+		t.Error("expected error message when trying to move next past last status")
+	}
+}
+
+func TestBoard_MoveNextEmptyColumn(t *testing.T) {
+	b, _ := setupTestBoard(t)
+
+	// Navigate to todo column (index 1, empty in setupTestBoard).
+	b = sendKey(b, "l")
+	// Press N — should not panic.
+	b = sendKey(b, "N")
+	v := b.View()
+
+	// Just verify it renders without panic.
+	if v == "" {
+		t.Error("expected non-empty view")
+	}
+}
+
+func TestBoard_MovePrevEmptyColumn(t *testing.T) {
+	b, _ := setupTestBoard(t)
+
+	// Navigate to todo column (index 1, empty).
+	b = sendKey(b, "l")
+	// Press P — should not panic.
+	b = sendKey(b, "P")
+	v := b.View()
+
+	if v == "" {
+		t.Error("expected non-empty view")
+	}
+}
+
+func TestBoard_DeleteTaskFileGone(t *testing.T) {
+	b, cfg := setupTestBoard(t)
+
+	// Open delete dialog for task 1.
+	b = sendKey(b, "d")
+
+	// Remove the task file behind the board's back.
+	path, err := task.FindByID(cfg.TasksPath(), 1)
+	if err != nil {
+		t.Fatalf("finding task: %v", err)
+	}
+	if err := os.Remove(path); err != nil {
+		t.Fatalf("removing task file: %v", err)
+	}
+
+	// Confirm delete — should hit the FindByID error path.
+	b = sendKey(b, "y")
+	v := b.View()
+
+	if !containsStr(v, "finding task") {
+		t.Error("expected 'finding task' error in view after file was removed")
+	}
+}
+
+func TestBoard_ColumnWidthCapped(t *testing.T) {
+	b, _ := setupTestBoard(t)
+
+	// Set very wide terminal: 300 / 5 columns = 60, but max is 50.
+	b.Update(tea.WindowSizeMsg{Width: 300, Height: 40})
+	v := b.View()
+
+	// The board should render without issues.
+	if v == "" || v == viewLoading {
+		t.Error("expected valid board view with wide terminal")
+	}
+
+	// Each column should be at most 50 chars wide. Check the header line.
+	lines := strings.Split(v, "\n")
+	if len(lines) > 0 {
+		// With 5 columns at max 50 chars, total should be <= 250.
+		if len(lines[0]) > 250 {
+			t.Errorf("header line too wide: %d chars (max expected 250)", len(lines[0]))
+		}
+	}
+}
+
+func TestBoard_ScrollUpEnsureVisible(t *testing.T) {
+	b, _ := setupManyTasksBoard(t)
+
+	// Navigate to done column (index 4) which has 15 tasks.
+	for range 4 {
+		b = sendKey(b, "l")
+	}
+	// Scroll down to trigger scrollOff > 0.
+	for range 10 {
+		b = sendKey(b, "j")
+	}
+
+	// Now scroll back up — this should trigger the activeRow < scrollOff path.
+	for range 10 {
+		b = sendKey(b, "k")
+	}
+	v := b.View()
+
+	// The first task in the done column should be visible after scrolling back.
+	if !containsStr(v, "Done task 1") {
+		t.Error("expected 'Done task 1' visible after scrolling back to top")
 	}
 }
