@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 
@@ -15,6 +16,12 @@ import (
 )
 
 const statusTodo = "todo"
+
+// testRefTime is a fixed reference time used for task Updated timestamps in tests.
+var testRefTime = time.Date(2026, 1, 15, 10, 0, 0, 0, time.UTC) //nolint:gochecknoglobals // test helper
+
+// testNow returns a fixed time 2 hours after testRefTime, so all test tasks show "2h" age.
+func testNow() time.Time { return testRefTime.Add(2 * time.Hour) }
 
 // setupTestBoard creates a temp kanban directory with a config and tasks,
 // then returns a Board model ready for testing.
@@ -54,6 +61,7 @@ func setupTestBoard(t *testing.T) (*tui.Board, *config.Config) {
 			Title:    tt.title,
 			Status:   tt.status,
 			Priority: tt.priority,
+			Updated:  testRefTime,
 		}
 		path := filepath.Join(tasksDir, task.GenerateFilename(tt.id, tt.title))
 		if err := task.Write(path, tk); err != nil {
@@ -62,6 +70,7 @@ func setupTestBoard(t *testing.T) (*tui.Board, *config.Config) {
 	}
 
 	b := tui.NewBoard(cfg)
+	b.SetNow(testNow)
 	// Simulate window size.
 	b.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 

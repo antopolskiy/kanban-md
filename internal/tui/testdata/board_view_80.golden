@@ -1,11 +1,11 @@
  backlog (2)     todo (0)        in-progress...  review (0)      done (1)       
 ╭──────────────╮  (empty)       ╭──────────────╮  (empty)       ╭──────────────╮
 │ #1 Task A    │                │ #3 Task C    │                │ #4 Task D    │
-│ high         │                │ high         │                │ low          │
+│ high 2h      │                │ high 2h      │                │ low 2h       │
 ╰──────────────╯                ╰──────────────╯                ╰──────────────╯
 ╭──────────────╮                                                                
 │ #2 Task B    │                                                                
-│ medium       │                                                                
+│ medium 2h    │                                                                
 ╰──────────────╯                                                                
                                                                                 
  Test Board | 4 tasks | ←↓↑→/hjkl:navigate enter:detail m:move N:next...        

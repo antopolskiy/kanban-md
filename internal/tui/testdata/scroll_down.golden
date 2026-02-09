@@ -1,28 +1,28 @@
  backlog (3)         todo (0)            in-progress (0)     review (0)          done (15)          
 ╭──────────────────╮  (empty)             (empty)             (empty)             ↑ 5 more          
 │ #18 Backlog t... │                                                            ╭──────────────────╮
-│ medium           │                                                            │ #5 Done task 5   │
-╰──────────────────╯                                                            │ high             │
+│ medium 2h        │                                                            │ #5 Done task 5   │
+╰──────────────────╯                                                            │ high 2h          │
 ╭──────────────────╮                                                            ╰──────────────────╯
 │ #17 Backlog t... │                                                            ╭──────────────────╮
-│ medium           │                                                            │ #1 Done task 1   │
-╰──────────────────╯                                                            │ high             │
+│ medium 2h        │                                                            │ #1 Done task 1   │
+╰──────────────────╯                                                            │ high 2h          │
 ╭──────────────────╮                                                            ╰──────────────────╯
 │ #16 Backlog t... │                                                            ╭──────────────────╮
-│ medium           │                                                            │ #14 Done task 14 │
-╰──────────────────╯                                                            │ medium           │
+│ medium 2h        │                                                            │ #14 Done task 14 │
+╰──────────────────╯                                                            │ medium 2h        │
                                                                                 ╰──────────────────╯
                                                                                 ╭──────────────────╮
                                                                                 │ #10 Done task 10 │
-                                                                                │ medium           │
+                                                                                │ medium 2h        │
                                                                                 ╰──────────────────╯
                                                                                 ╭──────────────────╮
                                                                                 │ #6 Done task 6   │
-                                                                                │ medium           │
+                                                                                │ medium 2h        │
                                                                                 ╰──────────────────╯
                                                                                 ╭──────────────────╮
                                                                                 │ #2 Done task 2   │
-                                                                                │ medium           │
+                                                                                │ medium 2h        │
                                                                                 ╰──────────────────╯
                                                                                   ↓ 4 more          
                                                                                                     

@@ -141,6 +141,7 @@ func setupManyTasksBoard(t *testing.T) (*tui.Board, *config.Config) { //nolint:u
 			Title:    fmt.Sprintf("Done task %d", i),
 			Status:   "done",
 			Priority: priorities[i%len(priorities)], //nolint:gosec // test data, no overflow
+			Updated:  testRefTime,
 		}
 		path := filepath.Join(tasksDir, task.GenerateFilename(i, tk.Title))
 		if err := task.Write(path, tk); err != nil {
@@ -155,6 +156,7 @@ func setupManyTasksBoard(t *testing.T) (*tui.Board, *config.Config) { //nolint:u
 			Title:    fmt.Sprintf("Backlog task %d", i),
 			Status:   "backlog",
 			Priority: "medium",
+			Updated:  testRefTime,
 		}
 		path := filepath.Join(tasksDir, task.GenerateFilename(i, tk.Title))
 		if err := task.Write(path, tk); err != nil {
@@ -163,6 +165,7 @@ func setupManyTasksBoard(t *testing.T) (*tui.Board, *config.Config) { //nolint:u
 	}
 
 	b := tui.NewBoard(cfg)
+	b.SetNow(testNow)
 	b.Update(tea.WindowSizeMsg{Width: 100, Height: 30})
 	return b, cfg
 }
@@ -211,34 +214,43 @@ func setupShowcaseBoard(t *testing.T) (*tui.Board, *config.Config) {
 		t.Fatalf("saving config: %v", err)
 	}
 
-	now := time.Now()
-	claimedAt := &now
+	refNow := testNow()
+	claimedAt := &refNow
+
+	// Vary ages: backlog=2w, todo=3d, in-progress=5h, review=1d, done=1w.
+	const (
+		twoWeeks  = 14 * 24 * time.Hour
+		oneWeek   = 7 * 24 * time.Hour
+		threeDays = 3 * 24 * time.Hour
+		oneDay    = 24 * time.Hour
+		recentAge = 5 * time.Hour
+	)
 
 	tasks := []task.Task{
-		// Backlog (8)
-		{ID: 1, Title: "Performance testing", Status: "backlog", Priority: "low", Tags: []string{"testing"}},
-		{ID: 2, Title: "Mobile responsive layout", Status: "backlog", Priority: "medium", Tags: []string{"frontend"}},
-		{ID: 3, Title: "Database migration tool", Status: "backlog", Priority: "low", Tags: []string{"backend"}},
-		{ID: 15, Title: "Add search autocomplete", Status: "backlog", Priority: "medium", Tags: []string{"frontend"}},
-		{ID: 16, Title: "Email notification service", Status: "backlog", Priority: "high", Tags: []string{"backend"}},
-		{ID: 17, Title: "Localization support", Status: "backlog", Priority: "low", Tags: []string{"i18n"}},
-		{ID: 18, Title: "Audit logging", Status: "backlog", Priority: "medium", Tags: []string{"security"}},
-		{ID: 19, Title: "Export to CSV", Status: "backlog", Priority: "low", Tags: []string{"feature"}},
-		// Todo (3)
-		{ID: 4, Title: "Add rate limiting", Status: "todo", Priority: "medium", Tags: []string{"backend"}},
-		{ID: 5, Title: "Set up monitoring", Status: "todo", Priority: "medium", Tags: []string{"devops"}},
-		{ID: 6, Title: "Write integration tests", Status: "todo", Priority: "high", Tags: []string{"testing"}},
-		// In-progress (3) — each claimed by a unique agent
-		{ID: 7, Title: "Build dashboard UI", Status: "in-progress", Priority: "high", Tags: []string{"frontend"}, ClaimedBy: "frost-maple", ClaimedAt: claimedAt},
-		{ID: 8, Title: "Write API docs", Status: "in-progress", Priority: "medium", Tags: []string{"docs"}, ClaimedBy: "amber-swift", ClaimedAt: claimedAt},
-		{ID: 9, Title: "Fix auth token refresh", Status: "in-progress", Priority: "critical", Tags: []string{"security"}, ClaimedBy: "coral-dusk", ClaimedAt: claimedAt},
-		// Review (2) — each claimed by a unique agent
-		{ID: 10, Title: "Implement user auth", Status: "review", Priority: "critical", Tags: []string{"backend"}, ClaimedBy: "sage-river", ClaimedAt: claimedAt},
-		{ID: 11, Title: "Design REST API schema", Status: "review", Priority: "high", Tags: []string{"api"}, ClaimedBy: "neon-drift", ClaimedAt: claimedAt},
-		// Done (3)
-		{ID: 12, Title: "Set up CI pipeline", Status: "done", Priority: "high", Tags: []string{"devops"}},
-		{ID: 13, Title: "Create project scaffold", Status: "done", Priority: "high", Tags: []string{"setup"}},
-		{ID: 14, Title: "Define database schema", Status: "done", Priority: "medium", Tags: []string{"backend"}},
+		// Backlog (8) — 2 weeks old
+		{ID: 1, Title: "Performance testing", Status: "backlog", Priority: "low", Tags: []string{"testing"}, Updated: refNow.Add(-twoWeeks)},
+		{ID: 2, Title: "Mobile responsive layout", Status: "backlog", Priority: "medium", Tags: []string{"frontend"}, Updated: refNow.Add(-twoWeeks)},
+		{ID: 3, Title: "Database migration tool", Status: "backlog", Priority: "low", Tags: []string{"backend"}, Updated: refNow.Add(-twoWeeks)},
+		{ID: 15, Title: "Add search autocomplete", Status: "backlog", Priority: "medium", Tags: []string{"frontend"}, Updated: refNow.Add(-twoWeeks)},
+		{ID: 16, Title: "Email notification service", Status: "backlog", Priority: "high", Tags: []string{"backend"}, Updated: refNow.Add(-twoWeeks)},
+		{ID: 17, Title: "Localization support", Status: "backlog", Priority: "low", Tags: []string{"i18n"}, Updated: refNow.Add(-twoWeeks)},
+		{ID: 18, Title: "Audit logging", Status: "backlog", Priority: "medium", Tags: []string{"security"}, Updated: refNow.Add(-twoWeeks)},
+		{ID: 19, Title: "Export to CSV", Status: "backlog", Priority: "low", Tags: []string{"feature"}, Updated: refNow.Add(-twoWeeks)},
+		// Todo (3) — 3 days old
+		{ID: 4, Title: "Add rate limiting", Status: "todo", Priority: "medium", Tags: []string{"backend"}, Updated: refNow.Add(-threeDays)},
+		{ID: 5, Title: "Set up monitoring", Status: "todo", Priority: "medium", Tags: []string{"devops"}, Updated: refNow.Add(-threeDays)},
+		{ID: 6, Title: "Write integration tests", Status: "todo", Priority: "high", Tags: []string{"testing"}, Updated: refNow.Add(-threeDays)},
+		// In-progress (3) — 5 hours old, each claimed by a unique agent
+		{ID: 7, Title: "Build dashboard UI", Status: "in-progress", Priority: "high", Tags: []string{"frontend"}, ClaimedBy: "frost-maple", ClaimedAt: claimedAt, Updated: refNow.Add(-recentAge)},
+		{ID: 8, Title: "Write API docs", Status: "in-progress", Priority: "medium", Tags: []string{"docs"}, ClaimedBy: "amber-swift", ClaimedAt: claimedAt, Updated: refNow.Add(-recentAge)},
+		{ID: 9, Title: "Fix auth token refresh", Status: "in-progress", Priority: "critical", Tags: []string{"security"}, ClaimedBy: "coral-dusk", ClaimedAt: claimedAt, Updated: refNow.Add(-recentAge)},
+		// Review (2) — 1 day old, each claimed by a unique agent
+		{ID: 10, Title: "Implement user auth", Status: "review", Priority: "critical", Tags: []string{"backend"}, ClaimedBy: "sage-river", ClaimedAt: claimedAt, Updated: refNow.Add(-oneDay)},
+		{ID: 11, Title: "Design REST API schema", Status: "review", Priority: "high", Tags: []string{"api"}, ClaimedBy: "neon-drift", ClaimedAt: claimedAt, Updated: refNow.Add(-oneDay)},
+		// Done (3) — 1 week old
+		{ID: 12, Title: "Set up CI pipeline", Status: "done", Priority: "high", Tags: []string{"devops"}, Updated: refNow.Add(-oneWeek)},
+		{ID: 13, Title: "Create project scaffold", Status: "done", Priority: "high", Tags: []string{"setup"}, Updated: refNow.Add(-oneWeek)},
+		{ID: 14, Title: "Define database schema", Status: "done", Priority: "medium", Tags: []string{"backend"}, Updated: refNow.Add(-oneWeek)},
 	}
 
 	for i := range tasks {
@@ -250,6 +262,7 @@ func setupShowcaseBoard(t *testing.T) (*tui.Board, *config.Config) {
 	}
 
 	b := tui.NewBoard(cfg)
+	b.SetNow(testNow)
 	b.Update(tea.WindowSizeMsg{Width: 140, Height: 30})
 	return b, cfg
 }

@@ -6,6 +6,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/charmbracelet/bubbles/key"
 	tea "github.com/charmbracelet/bubbletea"
@@ -49,6 +50,7 @@ type Board struct {
 	width     int
 	height    int
 	err       error
+	now       func() time.Time // clock for duration display; defaults to time.Now
 
 	// Detail view.
 	detailTask      *task.Task
@@ -72,9 +74,14 @@ type column struct {
 
 // NewBoard creates a new Board model from a config.
 func NewBoard(cfg *config.Config) *Board {
-	b := &Board{cfg: cfg}
+	b := &Board{cfg: cfg, now: time.Now}
 	b.loadTasks()
 	return b
+}
+
+// SetNow overrides the clock function used for duration display (for testing).
+func (b *Board) SetNow(fn func() time.Time) {
+	b.now = fn
 }
 
 // Init implements tea.Model.
@@ -704,6 +711,9 @@ func (b *Board) renderCard(t *task.Task, active bool, width int) string {
 		details = append(details, dimStyle.Render("due:"+t.Due.String()))
 	}
 
+	age := humanDuration(b.now().Sub(t.Updated))
+	details = append(details, dimStyle.Render(age))
+
 	contentLines = append(contentLines, strings.Join(details, " "))
 
 	content := strings.Join(contentLines, "\n")
@@ -848,6 +858,9 @@ func detailLines(t *task.Task, width int) []string {
 	if t.Completed != nil {
 		lines = append(lines, detailLabelStyle.Render("Completed:")+"  "+t.Completed.Format("2006-01-02 15:04"))
 	}
+	if t.Started != nil && t.Completed != nil {
+		lines = append(lines, detailLabelStyle.Render("Duration:")+"  "+humanDuration(t.Completed.Sub(*t.Started)))
+	}
 	if t.Blocked {
 		lines = append(lines, "")
 		lines = append(lines, errorStyle.Render("BLOCKED: "+t.BlockReason))
@@ -935,4 +948,32 @@ func truncate(s string, maxLen int) string {
 		return s
 	}
 	return s[:maxLen-3] + "..."
+}
+
+// humanDuration formats a duration as a compact human-readable string.
+// Examples: "<1m", "5m", "2h", "3d", "2w", "3mo", "1y".
+func humanDuration(d time.Duration) string {
+	const (
+		day   = 24 * time.Hour
+		week  = 7 * day
+		month = 30 * day
+		year  = 365 * day
+	)
+
+	switch {
+	case d < time.Minute:
+		return "<1m"
+	case d < time.Hour:
+		return strconv.Itoa(int(d.Minutes())) + "m"
+	case d < day:
+		return strconv.Itoa(int(d.Hours())) + "h"
+	case d < week:
+		return strconv.Itoa(int(d/day)) + "d"
+	case d < month:
+		return strconv.Itoa(int(d/week)) + "w"
+	case d < year:
+		return strconv.Itoa(int(d/month)) + "mo"
+	default:
+		return strconv.Itoa(int(d/year)) + "y"
+	}
 }
