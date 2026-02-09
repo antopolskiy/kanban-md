@@ -13,7 +13,8 @@ allowed-tools:
   - Bash(golangci-lint *)
   - Bash(awk *)
 ---
-<!-- kanban-md-skill-version: 0.20.0 -->
+<!-- kanban-md-skill-version: 0.21.1 -->
+
 # Kanban-Based Development
 
 A methodology for autonomous, parallel-safe development using kanban-md to manage tasks and git worktrees to isolate work.
