@@ -38,8 +38,18 @@ func TestMain(m *testing.M) {
 	}
 	binPath = filepath.Join(tmp, binName)
 
+	// Build with -cover when GOCOVERDIR is requested. The coverage-instrumented
+	// binary writes raw coverage data to the directory specified by GOCOVERDIR.
+	buildArgs := []string{"build", "-o", binPath}
+	coverDir := os.Getenv("GOCOVERDIR")
+	if coverDir != "" {
+		buildArgs = append(buildArgs, "-cover",
+			"-coverpkg=github.com/antopolskiy/kanban-md/...")
+	}
+	buildArgs = append(buildArgs, "../cmd/kanban-md")
+
 	//nolint:gosec,noctx // building test binary in TestMain (no context available)
-	build := exec.Command("go", "build", "-o", binPath, "../cmd/kanban-md")
+	build := exec.Command("go", buildArgs...)
 	build.Stderr = os.Stderr
 	if err := build.Run(); err != nil {
 		panic("building binary: " + err.Error())
