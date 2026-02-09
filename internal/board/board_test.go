@@ -51,8 +51,8 @@ func TestSummaryCountsByStatus(t *testing.T) {
 	if statusCounts["backlog"] != 2 {
 		t.Errorf("backlog count = %d, want 2", statusCounts["backlog"])
 	}
-	if statusCounts["in-progress"] != 1 {
-		t.Errorf("in-progress count = %d, want 1", statusCounts["in-progress"])
+	if statusCounts[sectionInProgress] != 1 {
+		t.Errorf("in-progress count = %d, want 1", statusCounts[sectionInProgress])
 	}
 	if statusCounts["done"] != 1 {
 		t.Errorf("done count = %d, want 1", statusCounts["done"])
@@ -61,12 +61,12 @@ func TestSummaryCountsByStatus(t *testing.T) {
 
 func TestSummaryWIPLimits(t *testing.T) {
 	cfg := config.NewDefault("Test Board")
-	cfg.WIPLimits = map[string]int{"in-progress": 3}
+	cfg.WIPLimits = map[string]int{sectionInProgress: 3}
 
 	s := Summary(cfg, nil, time.Now())
 
 	for _, ss := range s.Statuses {
-		if ss.Status == "in-progress" && ss.WIPLimit != 3 {
+		if ss.Status == sectionInProgress && ss.WIPLimit != 3 {
 			t.Errorf("in-progress WIPLimit = %d, want 3", ss.WIPLimit)
 		}
 	}
@@ -86,8 +86,8 @@ func TestSummaryBlockedCounts(t *testing.T) {
 	for _, ss := range s.Statuses {
 		statusBlocked[ss.Status] = ss.Blocked
 	}
-	if statusBlocked["in-progress"] != 1 {
-		t.Errorf("in-progress blocked = %d, want 1", statusBlocked["in-progress"])
+	if statusBlocked[sectionInProgress] != 1 {
+		t.Errorf("in-progress blocked = %d, want 1", statusBlocked[sectionInProgress])
 	}
 	if statusBlocked["todo"] != 1 {
 		t.Errorf("todo blocked = %d, want 1", statusBlocked["todo"])
