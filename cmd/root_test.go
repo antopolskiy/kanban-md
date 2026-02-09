@@ -15,6 +15,12 @@ import (
 	"github.com/antopolskiy/kanban-md/internal/task"
 )
 
+// Shared test constants for the cmd package.
+const (
+	testBoardName = "TestBoard"
+	priorityHigh  = "high"
+)
+
 func TestRootCommand(t *testing.T) {
 	if rootCmd.Use != "kanban-md" {
 		t.Errorf("rootCmd.Use = %v, want kanban-md", rootCmd.Use)
@@ -148,7 +154,7 @@ func setupBoard(t *testing.T) string {
 	t.Helper()
 	dir := t.TempDir()
 	kanbanDir := filepath.Join(dir, "kanban")
-	_, err := config.Init(kanbanDir, "TestBoard")
+	_, err := config.Init(kanbanDir, testBoardName)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -166,8 +172,8 @@ func TestLoadConfig_WithFlagDir(t *testing.T) {
 	if err != nil {
 		t.Fatalf("loadConfig() error: %v", err)
 	}
-	if cfg.Board.Name != "TestBoard" {
-		t.Errorf("board name = %q, want %q", cfg.Board.Name, "TestBoard")
+	if cfg.Board.Name != testBoardName {
+		t.Errorf("board name = %q, want %q", cfg.Board.Name, testBoardName)
 	}
 }
 
@@ -185,8 +191,8 @@ func TestLoadConfig_FromCwd(t *testing.T) {
 	if err != nil {
 		t.Fatalf("loadConfig() error: %v", err)
 	}
-	if cfg.Board.Name != "TestBoard" {
-		t.Errorf("board name = %q, want %q", cfg.Board.Name, "TestBoard")
+	if cfg.Board.Name != testBoardName {
+		t.Errorf("board name = %q, want %q", cfg.Board.Name, testBoardName)
 	}
 }
 
