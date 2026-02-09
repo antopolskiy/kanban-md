@@ -20,6 +20,8 @@ Detailed description of the changes, that can be multiline, but do not artificia
 
 To release a new version, tag and push. The release workflow triggers automatically on tag push — do NOT also run `gh workflow run release`, as that causes a duplicate build.
 
+**IMPORTANT: Never create releases locally with `gh release create`.** Always let goreleaser handle release creation through the CI pipeline. After tagging and pushing, wait for the workflow to complete, then use `gh release edit` to update the release notes.
+
 ```
 git tag vX.Y.Z
 git push origin main --tags
@@ -37,7 +39,7 @@ After the release workflow completes, edit the GitHub release with human-written
    git log vPREVIOUS..vNEW --oneline
    ```
 2. Write release notes from the user's perspective — what can they do now that they couldn't before?
-3. Publish with `gh release edit vX.Y.Z --title "vX.Y.Z — Short Theme" --notes "..."`.
+3. Publish with `gh release edit vX.Y.Z --title 'vX.Y.Z "Codename" — Short Theme' --notes "..."`.
 
 **Format:**
 
@@ -69,7 +71,7 @@ Any steps users need to take, or "No action needed" with explanation of auto-mig
 ```
 
 **Guidelines:**
-- Title format: `vX.Y.Z — Short Theme` (2-5 words capturing the release theme)
+- Title format: `vX.Y.Z "Codename" — Short Theme` (e.g. `v0.8.0 "Iron Gate" — Claim Enforcement`). The codename is a 1-2 word evocative nickname that creates a memorable association with the release — something vivid and fun that works as a mnemonic (e.g. "Quiet Storm", "Paper Trail", "Red Line"). It should loosely relate to the theme but doesn't need to be literal.
 - Start with a short TL;DR paragraph (no heading) summarizing the release for someone skimming
 - Use `## New:` for new commands/features, `## Changed:` for behavior changes, `## Fixed:` for bug fixes
 - Every feature section should include a code example
