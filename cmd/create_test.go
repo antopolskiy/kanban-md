@@ -57,7 +57,7 @@ func TestApplyCreateFlags_InvalidStatus(t *testing.T) {
 
 func TestApplyCreateFlags_Priority(t *testing.T) {
 	cmd := newCreateCmd()
-	_ = cmd.Flags().Set("priority", "high")
+	_ = cmd.Flags().Set("priority", priorityHigh)
 
 	cfg := config.NewDefault("Test")
 	tk := &task.Task{}
@@ -65,8 +65,8 @@ func TestApplyCreateFlags_Priority(t *testing.T) {
 	if err := applyCreateFlags(cmd, tk, cfg); err != nil {
 		t.Fatal(err)
 	}
-	if tk.Priority != "high" {
-		t.Errorf("priority = %q, want %q", tk.Priority, "high")
+	if tk.Priority != priorityHigh {
+		t.Errorf("priority = %q, want %q", tk.Priority, priorityHigh)
 	}
 }
 
@@ -259,7 +259,7 @@ func TestRunCreate_Integration(t *testing.T) {
 	r, w := captureStdout(t)
 
 	cmd := newCreateCmd()
-	_ = cmd.Flags().Set("priority", "high")
+	_ = cmd.Flags().Set("priority", priorityHigh)
 	_ = cmd.Flags().Set("tags", "test")
 
 	err := runCreate(cmd, []string{"Test task title"})

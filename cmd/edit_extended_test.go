@@ -786,7 +786,7 @@ func TestLogEditActivity_ReleaseTransition(t *testing.T) {
 func TestApplyEditFlags_MultipleFlags(t *testing.T) {
 	cmd := newEditCmd()
 	_ = cmd.Flags().Set("title", "Updated")
-	_ = cmd.Flags().Set("priority", "high")
+	_ = cmd.Flags().Set("priority", priorityHigh)
 	_ = cmd.Flags().Set("add-tag", "urgent")
 
 	cfg := config.NewDefault("Test")
@@ -802,8 +802,8 @@ func TestApplyEditFlags_MultipleFlags(t *testing.T) {
 	if tk.Title != "Updated" {
 		t.Errorf("title = %q, want %q", tk.Title, "Updated")
 	}
-	if tk.Priority != "high" {
-		t.Errorf("priority = %q, want %q", tk.Priority, "high")
+	if tk.Priority != priorityHigh {
+		t.Errorf("priority = %q, want %q", tk.Priority, priorityHigh)
 	}
 	if len(tk.Tags) != 1 || tk.Tags[0] != "urgent" {
 		t.Errorf("tags = %v, want [urgent]", tk.Tags)
