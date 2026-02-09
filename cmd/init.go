@@ -103,6 +103,7 @@ func runInit(cmd *cobra.Command, _ []string) error {
 	output.Messagef(os.Stdout, "  Config:  %s", cfg.ConfigPath())
 	output.Messagef(os.Stdout, "  Tasks:   %s", tasksDir)
 	output.Messagef(os.Stdout, "  Columns: %s", strings.Join(cfg.Statuses, ", "))
+	output.Messagef(os.Stdout, "  Hint:    Install agent skills with: kanban-md skill install")
 	return nil
 }
 

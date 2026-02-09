@@ -3025,3 +3025,157 @@ func TestCompactEnvVar(t *testing.T) {
 		t.Errorf("KANBAN_OUTPUT=compact should produce compact output, got:\n%s", r.stdout)
 	}
 }
+
+// ---------------------------------------------------------------------------
+// Skill command tests
+// ---------------------------------------------------------------------------
+
+// runKanbanNoDir runs the binary without the --dir flag (for skill commands).
+func runKanbanNoDir(t *testing.T, dir string, args ...string) result {
+	t.Helper()
+	cmd := exec.Command(binPath, args...) //nolint:gosec,noctx // e2e test binary
+	cmd.Dir = dir
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+	err := cmd.Run()
+	r := result{stdout: stdout.String(), stderr: stderr.String()}
+	if err != nil {
+		var exitErr *exec.ExitError
+		if errors.As(err, &exitErr) {
+			r.exitCode = exitErr.ExitCode()
+		} else {
+			t.Fatalf("running kanban-md: %v", err)
+		}
+	}
+	return r
+}
+
+func TestSkillShow(t *testing.T) {
+	dir := t.TempDir()
+	r := runKanbanNoDir(t, dir, "skill", "show", "--skill", "kanban-md")
+	if r.exitCode != 0 {
+		t.Fatalf("skill show failed: %s", r.stderr)
+	}
+	if !strings.Contains(r.stdout, "kanban-md") {
+		t.Errorf("skill show output should contain skill content, got:\n%s", r.stdout)
+	}
+}
+
+func TestSkillShowAll(t *testing.T) {
+	dir := t.TempDir()
+	r := runKanbanNoDir(t, dir, "skill", "show")
+	if r.exitCode != 0 {
+		t.Fatalf("skill show all failed: %s", r.stderr)
+	}
+	if !strings.Contains(r.stdout, "=== kanban-md ===") {
+		t.Error("skill show should include kanban-md header")
+	}
+	if !strings.Contains(r.stdout, "=== kanban-based-development ===") {
+		t.Error("skill show should include kanban-based-development header")
+	}
+}
+
+func TestSkillInstallAndCheck(t *testing.T) {
+	dir := t.TempDir()
+	// Create a .claude directory so the agent is detected.
+	if err := os.MkdirAll(filepath.Join(dir, ".claude"), 0o750); err != nil {
+		t.Fatal(err)
+	}
+
+	// Install skills for claude agent.
+	r := runKanbanNoDir(t, dir, "skill", "install", "--agent", "claude")
+	if r.exitCode != 0 {
+		t.Fatalf("skill install failed: %s", r.stderr)
+	}
+	if !strings.Contains(r.stdout, "installed") {
+		t.Errorf("expected 'installed' in output, got:\n%s", r.stdout)
+	}
+
+	// Check that SKILL.md files were created.
+	skillMD := filepath.Join(dir, ".claude", "skills", "kanban-md", "SKILL.md")
+	if _, err := os.Stat(skillMD); err != nil {
+		t.Errorf("kanban-md SKILL.md not created: %v", err)
+	}
+	devSkillMD := filepath.Join(dir, ".claude", "skills", "kanban-based-development", "SKILL.md")
+	if _, err := os.Stat(devSkillMD); err != nil {
+		t.Errorf("kanban-based-development SKILL.md not created: %v", err)
+	}
+
+	// Check that references subdir was created.
+	refPath := filepath.Join(dir, ".claude", "skills", "kanban-md", "references", "json-schemas.md")
+	if _, err := os.Stat(refPath); err != nil {
+		t.Errorf("references/json-schemas.md not created: %v", err)
+	}
+
+	// Run check — should be up to date.
+	r = runKanbanNoDir(t, dir, "skill", "check", "--agent", "claude")
+	if r.exitCode != 0 {
+		t.Errorf("skill check should pass (exit 0), got exit %d: %s", r.exitCode, r.stderr)
+	}
+	if !strings.Contains(r.stdout, "up to date") {
+		t.Errorf("expected 'up to date' in check output, got:\n%s", r.stdout)
+	}
+}
+
+func TestSkillInstallIdempotent(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(dir, ".claude"), 0o750); err != nil {
+		t.Fatal(err)
+	}
+
+	// First install.
+	r := runKanbanNoDir(t, dir, "skill", "install", "--agent", "claude")
+	if r.exitCode != 0 {
+		t.Fatalf("first install failed: %s", r.stderr)
+	}
+
+	// Second install — should skip (already installed).
+	r = runKanbanNoDir(t, dir, "skill", "install", "--agent", "claude")
+	if r.exitCode != 0 {
+		t.Fatalf("second install failed: %s", r.stderr)
+	}
+	if !strings.Contains(r.stdout, "skipped") || !strings.Contains(r.stdout, "up to date") {
+		// Either "skipped" or "up to date" is acceptable.
+		if !strings.Contains(r.stdout, "skipped") && !strings.Contains(r.stdout, "up to date") {
+			t.Errorf("expected skip message on re-install, got:\n%s", r.stdout)
+		}
+	}
+}
+
+func TestSkillInstallForce(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(dir, ".claude"), 0o750); err != nil {
+		t.Fatal(err)
+	}
+
+	// First install.
+	r := runKanbanNoDir(t, dir, "skill", "install", "--agent", "claude")
+	if r.exitCode != 0 {
+		t.Fatalf("first install failed: %s", r.stderr)
+	}
+
+	// Force re-install — should overwrite.
+	r = runKanbanNoDir(t, dir, "skill", "install", "--agent", "claude", "--force")
+	if r.exitCode != 0 {
+		t.Fatalf("force install failed: %s", r.stderr)
+	}
+	if !strings.Contains(r.stdout, "installed") {
+		t.Errorf("force install should re-install, got:\n%s", r.stdout)
+	}
+}
+
+func TestInitShowsSkillHint(t *testing.T) {
+	kanbanDir := initBoard(t)
+	_ = kanbanDir
+	// Re-run init to capture output (initBoard doesn't return stdout).
+	dir := t.TempDir()
+	kanbanDir2 := filepath.Join(dir, "kanban")
+	r := runKanban(t, kanbanDir2, "init")
+	if r.exitCode != 0 {
+		t.Fatalf("init failed: %s", r.stderr)
+	}
+	if !strings.Contains(r.stdout, "skill install") {
+		t.Errorf("init output should hint about skill install, got:\n%s", r.stdout)
+	}
+}

@@ -37,9 +37,15 @@ easy to read, edit, and version-control. Designed for AI agents and humans alike
 	Version:       version,
 	SilenceErrors: true,
 	SilenceUsage:  true,
-	PersistentPreRun: func(_ *cobra.Command, _ []string) {
+	PersistentPreRun: func(cmd *cobra.Command, _ []string) {
 		if flagNoColor || os.Getenv("NO_COLOR") != "" {
 			output.DisableColor()
+		}
+		// Check skill staleness for non-skill commands.
+		if cmd.Name() != "skill" && cmd.Parent() != nil && cmd.Parent().Name() != "skill" {
+			if root, err := findProjectRoot(); err == nil {
+				CheckSkillStaleness(root)
+			}
 		}
 	},
 }
