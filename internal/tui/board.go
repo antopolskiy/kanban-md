@@ -64,6 +64,8 @@ type Board struct {
 	// Delete confirmation.
 	deleteID    int
 	deleteTitle string
+
+	hasClaims bool // true when any visible task has a ClaimedBy value
 }
 
 // column groups tasks belonging to a single status.
@@ -302,6 +304,15 @@ func (b *Board) loadTasks() {
 	}
 	b.tasks = visibleTasks
 
+	// Detect whether any task has a claim for card layout.
+	b.hasClaims = false
+	for _, t := range visibleTasks {
+		if t.ClaimedBy != "" {
+			b.hasClaims = true
+			break
+		}
+	}
+
 	// Sort tasks by priority (higher priority first).
 	board.Sort(visibleTasks, "priority", true, b.cfg)
 
@@ -343,9 +354,15 @@ func (b *Board) selectedTask() *task.Task {
 }
 
 // cardHeight returns the height of a single card in lines:
-// top border + title lines + 1 detail line + bottom border.
+// top border + title lines + detail line(s) + bottom border.
+// When any task on the board has a claim, an extra line is added for the
+// claim info so all cards remain the same height.
 func (b *Board) cardHeight() int {
-	return b.cfg.TitleLines() + 3 //nolint:mnd // borders(2) + detail line(1)
+	h := b.cfg.TitleLines() + 3 //nolint:mnd // borders(2) + detail line(1)
+	if b.hasClaims {
+		h++ // claim line
+	}
+	return h
 }
 
 func (b *Board) clampRow() {
@@ -747,10 +764,6 @@ func (b *Board) renderCard(t *task.Task, active bool, width int) string {
 		details = append(details, dimStyle.Render(tagStr))
 	}
 
-	if t.ClaimedBy != "" {
-		details = append(details, claimStyle.Render("@"+t.ClaimedBy))
-	}
-
 	if t.Due != nil {
 		details = append(details, dimStyle.Render("due:"+t.Due.String()))
 	}
@@ -760,6 +773,15 @@ func (b *Board) renderCard(t *task.Task, active bool, width int) string {
 	details = append(details, b.ageStyle(ageDur).Render(age))
 
 	contentLines = append(contentLines, strings.Join(details, " "))
+
+	// Claim info on a dedicated line (only when any task on the board is claimed).
+	if b.hasClaims {
+		if t.ClaimedBy != "" {
+			contentLines = append(contentLines, claimStyle.Render("@"+t.ClaimedBy))
+		} else {
+			contentLines = append(contentLines, "")
+		}
+	}
 
 	content := strings.Join(contentLines, "\n")
 
