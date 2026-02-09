@@ -56,6 +56,7 @@ func init() {
 	skillInstallCmd.Flags().StringSlice("skill", nil, "skill(s) to install (kanban-md, kanban-based-development)")
 	skillInstallCmd.Flags().Bool("global", false, "install to user-level (global) skill directory")
 	skillInstallCmd.Flags().Bool("force", false, "overwrite existing skills without checking version")
+	skillInstallCmd.Flags().String("path", "", "install skills to a specific directory (skips agent selection)")
 
 	skillUpdateCmd.Flags().StringSlice("agent", nil, "agent(s) to update")
 	skillUpdateCmd.Flags().Bool("global", false, "update user-level (global) skills")
@@ -77,21 +78,7 @@ func runSkillInstall(cmd *cobra.Command, _ []string) error {
 	force, _ := cmd.Flags().GetBool("force")
 	agentFilter, _ := cmd.Flags().GetStringSlice("agent")
 	skillFilter, _ := cmd.Flags().GetStringSlice("skill")
-
-	projectRoot, err := findProjectRoot()
-	if err != nil && !global {
-		return fmt.Errorf("finding project root: %w", err)
-	}
-
-	// Determine which agents to install for.
-	selectedAgents, err := resolveAgents(cmd, agentFilter, projectRoot, global)
-	if err != nil {
-		return err
-	}
-	if len(selectedAgents) == 0 {
-		output.Messagef(os.Stdout, "No agents selected.")
-		return nil
-	}
+	pathFlag, _ := cmd.Flags().GetString("path")
 
 	// Determine which skills to install.
 	selectedSkills, err := resolveSkills(cmd, skillFilter)
@@ -103,15 +90,27 @@ func runSkillInstall(cmd *cobra.Command, _ []string) error {
 		return nil
 	}
 
+	// --path mode: install directly to the given directory, skip agent selection.
+	if pathFlag != "" {
+		return installToPath(pathFlag, selectedSkills, force)
+	}
+
+	projectRoot, err := findProjectRoot()
+	if err != nil && !global {
+		return fmt.Errorf("finding project root: %w", err)
+	}
+
+	// Determine which agents to install for.
+	selectedAgents := resolveAgents(agentFilter, projectRoot, global)
+	if len(selectedAgents) == 0 {
+		output.Messagef(os.Stdout, "No agents selected.")
+		return nil
+	}
+
 	// Install.
 	var installed int
 	for _, agent := range selectedAgents {
-		var baseDir string
-		if global {
-			baseDir = agent.GlobalPath()
-		} else {
-			baseDir = agent.ProjectPath(projectRoot)
-		}
+		baseDir := agent.SkillPath(projectRoot, global)
 
 		for _, s := range selectedSkills {
 			destPath := filepath.Join(baseDir, s.Name, "SKILL.md")
@@ -140,6 +139,39 @@ func runSkillInstall(cmd *cobra.Command, _ []string) error {
 	return nil
 }
 
+// installToPath installs skills directly to the given directory path.
+func installToPath(dir string, skills []skill.Info, force bool) error {
+	absDir, err := filepath.Abs(dir)
+	if err != nil {
+		return fmt.Errorf("resolving path: %w", err)
+	}
+
+	var installed int
+	for _, s := range skills {
+		destPath := filepath.Join(absDir, s.Name, "SKILL.md")
+
+		if !force {
+			if v := skill.InstalledVersion(destPath); v == version {
+				output.Messagef(os.Stdout, "  %s — already at %s (skipped)", destPath, version)
+				continue
+			}
+		}
+
+		if err := skill.Install(s.Name, absDir, version); err != nil {
+			return fmt.Errorf("installing %s to %s: %w", s.Name, absDir, err)
+		}
+		output.Messagef(os.Stdout, "  %s (%s)", destPath, version)
+		installed++
+	}
+
+	if installed > 0 {
+		output.Messagef(os.Stdout, "Installed %d skill(s).", installed)
+	} else {
+		output.Messagef(os.Stdout, "All skills are already up to date.")
+	}
+	return nil
+}
+
 func runSkillUpdate(cmd *cobra.Command, _ []string) error {
 	global, _ := cmd.Flags().GetBool("global")
 	agentFilter, _ := cmd.Flags().GetStringSlice("agent")
@@ -153,12 +185,7 @@ func runSkillUpdate(cmd *cobra.Command, _ []string) error {
 	var updated int
 
 	for _, agent := range agents {
-		var baseDir string
-		if global {
-			baseDir = agent.GlobalPath()
-		} else {
-			baseDir = agent.ProjectPath(projectRoot)
-		}
+		baseDir := agent.SkillPath(projectRoot, global)
 
 		installed := skill.FindInstalledSkills(baseDir)
 		for skillName, skillPath := range installed {
@@ -195,12 +222,7 @@ func runSkillCheck(cmd *cobra.Command, _ []string) error {
 	var anyFound bool
 
 	for _, agent := range agents {
-		var baseDir string
-		if global {
-			baseDir = agent.GlobalPath()
-		} else {
-			baseDir = agent.ProjectPath(projectRoot)
-		}
+		baseDir := agent.SkillPath(projectRoot, global)
 
 		installed := skill.FindInstalledSkills(baseDir)
 		for skillName, skillPath := range installed {
@@ -254,53 +276,55 @@ func runSkillShow(cmd *cobra.Command, _ []string) error {
 }
 
 // resolveAgents determines which agents to install for, using flags or interactive selection.
-func resolveAgents(_ *cobra.Command, filter []string, projectRoot string, global bool) ([]skill.Agent, error) {
+func resolveAgents(filter []string, projectRoot string, global bool) []skill.Agent {
 	// If explicit --agent flag, use those.
 	if len(filter) > 0 {
-		return resolveAgentList(filter), nil
+		return resolveAgentList(filter)
 	}
 
 	// Non-interactive: use all detected agents.
 	if !isInteractive() {
 		if global {
-			return skill.Agents(), nil
+			return skill.Agents()
 		}
-		return skill.DetectAgents(projectRoot), nil
+		return skill.DetectAgents(projectRoot)
 	}
 
-	// Interactive: detect agents and show multi-select.
-	var candidates []skill.Agent
-	if global {
-		candidates = skill.Agents()
-	} else {
-		candidates = skill.DetectAgents(projectRoot)
+	// Interactive: show all agents, pre-select detected ones.
+	// This lets users install for agents not yet detected (e.g. OpenClaw whose
+	// "skills/" directory doesn't exist until the first install).
+	allAgents := skill.Agents()
+	detected := make(map[string]bool)
+	if !global {
+		for _, a := range skill.DetectAgents(projectRoot) {
+			detected[a.Name] = true
+		}
 	}
 
-	if len(candidates) == 0 {
-		return nil, fmt.Errorf("no agents detected in %s", projectRoot)
-	}
-
-	items := make([]menuItem, len(candidates))
-	for i, a := range candidates {
+	items := make([]menuItem, len(allAgents))
+	for i, a := range allAgents {
 		var dir string
-		if global {
+		switch {
+		case global || a.GlobalOnly():
 			dir = a.GlobalPath()
-		} else {
+		default:
 			dir = a.ProjectDir + "/"
 		}
+		// Pre-select: global-only agents are always shown (they have no
+		// project detection), detected agents are pre-checked.
 		items[i] = menuItem{
 			label:       a.DisplayName,
 			description: dir,
-			selected:    true,
+			selected:    global || a.GlobalOnly() || detected[a.Name],
 		}
 	}
 
 	selected := multiSelect("Select agents to install for:", items)
 	var result []skill.Agent
 	for _, idx := range selected {
-		result = append(result, candidates[idx])
+		result = append(result, allAgents[idx])
 	}
-	return result, nil
+	return result
 }
 
 // resolveSkills determines which skills to install, using flags or interactive selection.

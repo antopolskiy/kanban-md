@@ -96,23 +96,38 @@ func TestDetectAgents(t *testing.T) {
 		t.Error("expected claude to be detected")
 	}
 	if contains(names, "openclaw") {
-		t.Error("openclaw should not be detected without skills/ dir")
+		t.Error("openclaw is global-only and should never be project-detected")
 	}
 	if contains(names, "codex") {
 		t.Error("codex should not be detected without .agents/ dir")
 	}
+}
 
-	// Create skills/ directory — now OpenClaw should be detected.
-	if err := os.MkdirAll(filepath.Join(tmp, "skills"), 0o750); err != nil {
-		t.Fatal(err)
+func TestGlobalOnlyAgent(t *testing.T) {
+	oc := AgentByName("openclaw")
+	if oc == nil {
+		t.Fatal("AgentByName(openclaw) = nil")
 	}
-	detected = DetectAgents(tmp)
-	names = nil
-	for _, a := range detected {
-		names = append(names, a.Name)
+	if !oc.GlobalOnly() {
+		t.Error("openclaw should be global-only")
 	}
-	if !contains(names, "openclaw") {
-		t.Error("expected openclaw to be detected with skills/ dir")
+	if oc.ProjectPath("/some/root") != "" {
+		t.Error("ProjectPath for global-only agent should return empty string")
+	}
+	if oc.GlobalPath() == "" {
+		t.Error("GlobalPath for openclaw should not be empty")
+	}
+
+	// SkillPath should return global path even without --global flag.
+	sp := oc.SkillPath("/some/root", false)
+	if sp != oc.GlobalPath() {
+		t.Errorf("SkillPath(false) = %q, want GlobalPath %q", sp, oc.GlobalPath())
+	}
+
+	// Claude should NOT be global-only.
+	cl := AgentByName("claude")
+	if cl.GlobalOnly() {
+		t.Error("claude should not be global-only")
 	}
 }
 

@@ -7,9 +7,7 @@
 [![codecov](https://codecov.io/gh/antopolskiy/kanban-md/graph/badge.svg)](https://codecov.io/gh/antopolskiy/kanban-md)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-An agent-first file-based Kanban. Built for multi-agent workflows where AI agents work in parallel. Ultra-fast single binary CLI. Agent skills included.
-
-No database, no server, no SaaS — just files.
+An agents-first file-based Kanban. Built for multi-agent workflows to allow AI agents work in parallel without clashing. Ultra-fast single binary CLI. Agent skills included. Lean and future-proof: no database, no server, no SaaS — just files.
 
 ![CLI](assets/cli-screenshot.png)
 
