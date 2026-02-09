@@ -8,4 +8,4 @@
 │ medium               │                                                                                                
 ╰──────────────────────╯                                                                                                
                                                                                                                         
- Test Board | 4 tasks | ←↓↑→/hjkl:navigate enter:detail m:move M:next d:delete ?:help esc/q:quit                        
+ Test Board | 4 tasks | ←↓↑→/hjkl:navigate enter:detail m:move N:next P:prev d:delete ?:help esc/q:quit                 

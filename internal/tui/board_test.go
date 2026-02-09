@@ -14,6 +14,8 @@ import (
 	"github.com/antopolskiy/kanban-md/internal/tui"
 )
 
+const statusTodo = "todo"
+
 // setupTestBoard creates a temp kanban directory with a config and tasks,
 // then returns a Board model ready for testing.
 func setupTestBoard(t *testing.T) (*tui.Board, *config.Config) {
@@ -191,7 +193,7 @@ func TestBoard_MoveTask(t *testing.T) {
 	if err != nil {
 		t.Fatalf("reading task: %v", err)
 	}
-	if tk.Status != "todo" {
+	if tk.Status != statusTodo {
 		t.Errorf("expected status 'todo', got %q", tk.Status)
 	}
 }
@@ -199,8 +201,8 @@ func TestBoard_MoveTask(t *testing.T) {
 func TestBoard_MoveNext(t *testing.T) {
 	b, cfg := setupTestBoard(t)
 
-	// Press M (shift-m) to move to next status.
-	b = sendKey(b, "M")
+	// Press N to move to next status.
+	b = sendKey(b, "N")
 
 	// Task 1 was in backlog, should now be in todo.
 	path, err := task.FindByID(cfg.TasksPath(), 1)
@@ -211,11 +213,49 @@ func TestBoard_MoveNext(t *testing.T) {
 	if err != nil {
 		t.Fatalf("reading task: %v", err)
 	}
-	if tk.Status != "todo" {
+	if tk.Status != statusTodo {
 		t.Errorf("expected status 'todo', got %q", tk.Status)
 	}
 
 	_ = b.View()
+}
+
+func TestBoard_MovePrev(t *testing.T) {
+	b, cfg := setupTestBoard(t)
+
+	// Navigate to the in-progress column (index 2) which has Task C.
+	b = sendKey(b, "l") // → todo
+	b = sendKey(b, "l") // → in-progress
+
+	// Press P to move to previous status.
+	b = sendKey(b, "P")
+
+	// Task 3 was in in-progress, should now be in todo.
+	path, err := task.FindByID(cfg.TasksPath(), 3)
+	if err != nil {
+		t.Fatalf("finding task: %v", err)
+	}
+	tk, err := task.Read(path)
+	if err != nil {
+		t.Fatalf("reading task: %v", err)
+	}
+	if tk.Status != statusTodo {
+		t.Errorf("expected status 'todo', got %q", tk.Status)
+	}
+
+	_ = b.View()
+}
+
+func TestBoard_MovePrevAtFirst(t *testing.T) {
+	b, _ := setupTestBoard(t)
+
+	// Task 1 is in backlog (first status). P should show an error.
+	b = sendKey(b, "P")
+	v := b.View()
+
+	if !containsStr(v, "already at the first status") {
+		t.Error("expected error message when trying to move past first status")
+	}
 }
 
 func TestBoard_DeleteTask(t *testing.T) {

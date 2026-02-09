@@ -156,8 +156,10 @@ func (b *Board) handleBoardKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		b.handleEnter()
 	case "m":
 		b.handleMoveStart()
-	case "M":
+	case "N":
 		return b.moveNext()
+	case "P":
+		return b.movePrev()
 	case "d":
 		b.handleDeleteStart()
 	case "r":
@@ -402,6 +404,22 @@ func (b *Board) moveNext() (tea.Model, tea.Cmd) {
 	}
 
 	return b.executeMove(b.cfg.Statuses[idx+1])
+}
+
+// movePrev moves the selected task to the previous status.
+func (b *Board) movePrev() (tea.Model, tea.Cmd) {
+	t := b.selectedTask()
+	if t == nil {
+		return b, nil
+	}
+
+	idx := b.cfg.StatusIndex(t.Status)
+	if idx <= 0 {
+		b.err = fmt.Errorf("task #%d is already at the first status", t.ID)
+		return b, nil
+	}
+
+	return b.executeMove(b.cfg.Statuses[idx-1])
 }
 
 func (b *Board) executeMove(targetStatus string) (tea.Model, tea.Cmd) {
@@ -677,7 +695,7 @@ func (b *Board) renderCard(t *task.Task, active bool, width int) string {
 
 func (b *Board) renderStatusBar() string {
 	total := len(b.tasks)
-	status := fmt.Sprintf(" %s | %d tasks | ←↓↑→/hjkl:navigate enter:detail m:move M:next d:delete ?:help esc/q:quit",
+	status := fmt.Sprintf(" %s | %d tasks | ←↓↑→/hjkl:navigate enter:detail m:move N:next P:prev d:delete ?:help esc/q:quit",
 		b.cfg.Board.Name, total)
 	status = truncate(status, b.width)
 
@@ -816,7 +834,8 @@ func (b *Board) viewHelp() string {
 		{"k/↑", "Move cursor up"},
 		{"enter", "Show task detail"},
 		{"m", "Move task (status picker)"},
-		{"M", "Move task to next status"},
+		{"N", "Move task to next status"},
+		{"P", "Move task to previous status"},
 		{"d", "Delete task"},
 		{"r", "Refresh board"},
 		{"?", "Show this help"},

@@ -1,4 +1,4 @@
  backlog (0)             todo (0)                in-progress (0)         review (0)              done (0)               
   (empty)                 (empty)                 (empty)                 (empty)                 (empty)               
                                                                                                                         
- Empty Board | 0 tasks | ←↓↑→/hjkl:navigate enter:detail m:move M:next d:delete ?:help esc/q:quit                       
+ Empty Board | 0 tasks | ←↓↑→/hjkl:navigate enter:detail m:move N:next P:prev d:delete ?:help esc/q:quit                
