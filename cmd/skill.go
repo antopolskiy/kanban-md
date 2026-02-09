@@ -9,6 +9,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/spf13/cobra"
+	"golang.org/x/term"
 
 	"github.com/antopolskiy/kanban-md/internal/output"
 	"github.com/antopolskiy/kanban-md/internal/skill"
@@ -384,13 +385,9 @@ func findProjectRoot() (string, error) {
 	}
 }
 
-// isInteractive returns true if stdin is a terminal.
+// isInteractive returns true if stdin is a real terminal (not /dev/null, NUL, or a pipe).
 func isInteractive() bool {
-	fi, err := os.Stdin.Stat()
-	if err != nil {
-		return false
-	}
-	return fi.Mode()&os.ModeCharDevice != 0
+	return term.IsTerminal(int(os.Stdin.Fd()))
 }
 
 // menuItem represents an item in a multi-select menu.

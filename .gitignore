@@ -18,6 +18,10 @@ coverage.html
 # Dependency directories (remove the comment below to include it)
 #vendor/
 
+# Built binaries (go build without -o drops them in the project root)
+/kanban-md
+/kanban-md-tui
+
 # Output of GoReleaser
 dist/
 
