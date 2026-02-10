@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
@@ -10,7 +11,36 @@ import (
 	"github.com/antopolskiy/kanban-md/internal/skill"
 )
 
-const testVersion = "v1.0.0"
+const (
+	testVersion        = "v1.0.0"
+	testVersionUpgrade = "v2.0.0"
+	agentClaude        = "claude"
+)
+
+// setupSkillProject creates a temp directory with .git, installs a skill for claude,
+// sets version, and changes cwd. Returns the project root.
+func setupSkillProject(t *testing.T, ver string) {
+	t.Helper()
+	savedVersion := version
+	version = ver
+	t.Cleanup(func() { version = savedVersion })
+
+	projectRoot := t.TempDir()
+	claude := skill.AgentByName(agentClaude)
+	if claude == nil {
+		t.Skip("claude agent not found")
+	}
+	baseDir := claude.SkillPath(projectRoot, false)
+	if err := skill.Install("kanban-md", baseDir, testVersion); err != nil {
+		t.Fatal(err)
+	}
+
+	gitDir := filepath.Join(projectRoot, ".git")
+	if err := os.MkdirAll(gitDir, 0o750); err != nil {
+		t.Fatal(err)
+	}
+	t.Chdir(projectRoot)
+}
 
 // --- resolveAgentList tests ---
 
@@ -26,17 +56,17 @@ func TestResolveAgentList_AllAgents(t *testing.T) {
 }
 
 func TestResolveAgentList_SpecificAgent(t *testing.T) {
-	agents := resolveAgentList([]string{"claude"})
+	agents := resolveAgentList([]string{agentClaude})
 	if len(agents) != 1 {
 		t.Fatalf("len = %d, want 1", len(agents))
 	}
-	if agents[0].Name != "claude" {
+	if agents[0].Name != agentClaude {
 		t.Errorf("agent name = %q, want %q", agents[0].Name, "claude")
 	}
 }
 
 func TestResolveAgentList_MultipleAgents(t *testing.T) {
-	agents := resolveAgentList([]string{"claude", "codex"})
+	agents := resolveAgentList([]string{agentClaude, "codex"})
 	if len(agents) != 2 {
 		t.Fatalf("len = %d, want 2", len(agents))
 	}
@@ -50,11 +80,11 @@ func TestResolveAgentList_UnknownAgent(t *testing.T) {
 }
 
 func TestResolveAgentList_MixedKnownUnknown(t *testing.T) {
-	agents := resolveAgentList([]string{"claude", "unknown-agent"})
+	agents := resolveAgentList([]string{agentClaude, "unknown-agent"})
 	if len(agents) != 1 {
 		t.Fatalf("len = %d, want 1 (only known agent)", len(agents))
 	}
-	if agents[0].Name != "claude" {
+	if agents[0].Name != agentClaude {
 		t.Errorf("agent name = %q, want %q", agents[0].Name, "claude")
 	}
 }
@@ -213,13 +243,14 @@ func TestCheckSkillStaleness_NoSkillsInstalled(t *testing.T) {
 }
 
 func TestCheckSkillStaleness_OutdatedSkill(t *testing.T) {
+	// setupSkillProject installs to SkillPath; CheckSkillStaleness uses ProjectPath.
+	// Set up manually for the staleness check's specific path logic.
 	savedVersion := version
-	version = "v2.0.0"
+	version = testVersionUpgrade
 	t.Cleanup(func() { version = savedVersion })
 
-	// Install a skill with an old version.
 	projectRoot := t.TempDir()
-	claude := skill.AgentByName("claude")
+	claude := skill.AgentByName(agentClaude)
 	if claude == nil {
 		t.Skip("claude agent not found")
 	}
@@ -229,10 +260,9 @@ func TestCheckSkillStaleness_OutdatedSkill(t *testing.T) {
 	}
 
 	r, w := captureStderr(t)
-
 	CheckSkillStaleness(projectRoot)
-
 	got := drainPipe(t, r, w)
+
 	if !containsSubstring(got, "outdated") {
 		t.Errorf("expected 'outdated' warning, got: %s", got)
 	}
@@ -245,7 +275,7 @@ func TestCheckSkillStaleness_UpToDate(t *testing.T) {
 
 	// Install a skill at the current version.
 	projectRoot := t.TempDir()
-	claude := skill.AgentByName("claude")
+	claude := skill.AgentByName(agentClaude)
 	if claude == nil {
 		t.Skip("claude agent not found")
 	}
@@ -302,6 +332,268 @@ func TestInstallToPath_SkipsCurrent(t *testing.T) {
 
 	if err != nil {
 		t.Fatalf("second installToPath error: %v", err)
+	}
+	if !containsSubstring(got, "skipped") {
+		t.Errorf("expected 'skipped' in output, got: %s", got)
+	}
+}
+
+// --- resolveAgents tests (non-interactive) ---
+
+func TestResolveAgents_WithFilter(t *testing.T) {
+	// Explicit --agent filter bypasses detection.
+	agents := resolveAgents([]string{agentClaude}, t.TempDir(), false)
+	if len(agents) != 1 {
+		t.Fatalf("len = %d, want 1", len(agents))
+	}
+	if agents[0].Name != agentClaude {
+		t.Errorf("agent = %q, want %q", agents[0].Name, "claude")
+	}
+}
+
+func TestResolveAgents_NonInteractiveGlobal(t *testing.T) {
+	// global=true, no filter, non-interactive → returns all agents.
+	agents := resolveAgents(nil, t.TempDir(), true)
+	if len(agents) == 0 {
+		t.Fatal("expected non-empty agent list for global mode")
+	}
+	if len(agents) != len(skill.Agents()) {
+		t.Errorf("len = %d, want %d", len(agents), len(skill.Agents()))
+	}
+}
+
+func TestResolveAgents_NonInteractiveDetect(t *testing.T) {
+	// non-interactive, not global → returns detected agents.
+	// In a temp dir with no agent dirs, detected set may be empty.
+	projectRoot := t.TempDir()
+	agents := resolveAgents(nil, projectRoot, false)
+	// Result depends on detection; just verify it doesn't panic.
+	// For an empty project root, DetectAgents returns empty.
+	_ = agents
+}
+
+func TestResolveAgents_NonInteractiveDetectWithClaude(t *testing.T) {
+	// Create a fake .claude directory so DetectAgents finds it.
+	projectRoot := t.TempDir()
+	claudeDir := filepath.Join(projectRoot, ".claude", "skills")
+	if err := os.MkdirAll(claudeDir, 0o750); err != nil {
+		t.Fatal(err)
+	}
+
+	agents := resolveAgents(nil, projectRoot, false)
+	found := false
+	for _, a := range agents {
+		if a.Name == agentClaude {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Error("expected claude in detected agents")
+	}
+}
+
+// --- resolveSkills additional tests ---
+
+func TestResolveSkills_MultipleSkills(t *testing.T) {
+	skills, err := resolveSkills(newSkillCmd(), []string{"kanban-md", "kanban-based-development"})
+	if err != nil {
+		t.Fatalf("resolveSkills error: %v", err)
+	}
+	if len(skills) != 2 {
+		t.Fatalf("len = %d, want 2", len(skills))
+	}
+}
+
+// --- runSkillCheck tests ---
+
+func newSkillCheckCmd() *cobra.Command {
+	cmd := &cobra.Command{Use: "check"}
+	cmd.Flags().StringSlice("agent", nil, "")
+	cmd.Flags().Bool("global", false, "")
+	return cmd
+}
+
+func TestRunSkillCheck_NoSkillsInstalled(t *testing.T) {
+	savedVersion := version
+	version = testVersion
+	t.Cleanup(func() { version = savedVersion })
+
+	// Empty project root with .git and no skills.
+	projectRoot := t.TempDir()
+	gitDir := filepath.Join(projectRoot, ".git")
+	if err := os.MkdirAll(gitDir, 0o750); err != nil {
+		t.Fatal(err)
+	}
+	t.Chdir(projectRoot)
+
+	r, w := captureStdout(t)
+	cmd := newSkillCheckCmd()
+	// Use a specific agent to avoid checking global dirs with real installed skills.
+	_ = cmd.Flags().Set("agent", agentClaude)
+
+	err := runSkillCheck(cmd, nil)
+	got := drainPipe(t, r, w)
+
+	if err != nil {
+		t.Fatalf("runSkillCheck error: %v", err)
+	}
+	if !containsSubstring(got, "No kanban-md skills installed") {
+		t.Errorf("expected 'No kanban-md skills installed', got: %s", got)
+	}
+}
+
+func TestRunSkillCheck_AllUpToDate(t *testing.T) {
+	// Install at testVersion, then check with version=testVersion → up to date.
+	setupSkillProject(t, testVersion)
+
+	r, w := captureStdout(t)
+	cmd := newSkillCheckCmd()
+	_ = cmd.Flags().Set("agent", agentClaude)
+
+	err := runSkillCheck(cmd, nil)
+	got := drainPipe(t, r, w)
+
+	if err != nil {
+		t.Fatalf("runSkillCheck error: %v", err)
+	}
+	if !containsSubstring(got, "ok") {
+		t.Errorf("expected 'ok' for up-to-date skill, got: %s", got)
+	}
+}
+
+func TestRunSkillCheck_Outdated(t *testing.T) {
+	// Install at testVersion, then check with version=testVersionUpgrade → outdated.
+	setupSkillProject(t, testVersionUpgrade)
+
+	r, w := captureStdout(t)
+	cmd := newSkillCheckCmd()
+	_ = cmd.Flags().Set("agent", agentClaude)
+
+	err := runSkillCheck(cmd, nil)
+	got := drainPipe(t, r, w)
+
+	if err == nil {
+		t.Fatal("expected error for outdated skills")
+	}
+	var exitErr *exitCodeError
+	if !errors.As(err, &exitErr) {
+		t.Fatalf("expected exitCodeError, got %T", err)
+	}
+	if !containsSubstring(got, "x") {
+		t.Errorf("expected 'x' marker for outdated, got: %s", got)
+	}
+}
+
+// --- runSkillShow tests ---
+
+func newSkillShowCmd() *cobra.Command {
+	cmd := &cobra.Command{Use: "show"}
+	cmd.Flags().String("skill", "", "")
+	return cmd
+}
+
+func TestRunSkillShow_SpecificSkill(t *testing.T) {
+	r, w := captureStdout(t)
+	cmd := newSkillShowCmd()
+	_ = cmd.Flags().Set("skill", "kanban-md")
+
+	err := runSkillShow(cmd, nil)
+	got := drainPipe(t, r, w)
+
+	if err != nil {
+		t.Fatalf("runSkillShow error: %v", err)
+	}
+	if !containsSubstring(got, "kanban") {
+		t.Errorf("expected skill content, got: %s", got[:min(len(got), 200)])
+	}
+}
+
+func TestRunSkillShow_AllSkills(t *testing.T) {
+	r, w := captureStdout(t)
+	cmd := newSkillShowCmd()
+	// No filter — shows all skills.
+
+	err := runSkillShow(cmd, nil)
+	got := drainPipe(t, r, w)
+
+	if err != nil {
+		t.Fatalf("runSkillShow error: %v", err)
+	}
+	// All skills should have separator headers.
+	if !containsSubstring(got, "===") {
+		t.Errorf("expected '===' separators for multi-skill output, got: %s", got[:min(len(got), 200)])
+	}
+}
+
+// --- runSkillUpdate tests ---
+
+func newSkillUpdateCmd() *cobra.Command {
+	cmd := &cobra.Command{Use: "update"}
+	cmd.Flags().StringSlice("agent", nil, "")
+	cmd.Flags().Bool("global", false, "")
+	return cmd
+}
+
+func TestRunSkillUpdate_NoSkillsInstalled(t *testing.T) {
+	savedVersion := version
+	version = testVersion
+	t.Cleanup(func() { version = savedVersion })
+
+	projectRoot := t.TempDir()
+	gitDir := filepath.Join(projectRoot, ".git")
+	if err := os.MkdirAll(gitDir, 0o750); err != nil {
+		t.Fatal(err)
+	}
+	t.Chdir(projectRoot)
+
+	r, w := captureStdout(t)
+	cmd := newSkillUpdateCmd()
+	_ = cmd.Flags().Set("agent", agentClaude)
+
+	err := runSkillUpdate(cmd, nil)
+	got := drainPipe(t, r, w)
+
+	if err != nil {
+		t.Fatalf("runSkillUpdate error: %v", err)
+	}
+	if !containsSubstring(got, "up to date") {
+		t.Errorf("expected 'up to date' message, got: %s", got)
+	}
+}
+
+func TestRunSkillUpdate_UpdatesOutdated(t *testing.T) {
+	// Install at testVersion, then update with version=testVersionUpgrade.
+	setupSkillProject(t, testVersionUpgrade)
+
+	r, w := captureStdout(t)
+	cmd := newSkillUpdateCmd()
+	_ = cmd.Flags().Set("agent", agentClaude)
+
+	err := runSkillUpdate(cmd, nil)
+	got := drainPipe(t, r, w)
+
+	if err != nil {
+		t.Fatalf("runSkillUpdate error: %v", err)
+	}
+	if !containsSubstring(got, "Updated") {
+		t.Errorf("expected 'Updated' in output, got: %s", got)
+	}
+}
+
+func TestRunSkillUpdate_SkipsUpToDate(t *testing.T) {
+	// Install at testVersion, then update with version=testVersion → already up to date.
+	setupSkillProject(t, testVersion)
+
+	r, w := captureStdout(t)
+	cmd := newSkillUpdateCmd()
+	_ = cmd.Flags().Set("agent", agentClaude)
+
+	err := runSkillUpdate(cmd, nil)
+	got := drainPipe(t, r, w)
+
+	if err != nil {
+		t.Fatalf("runSkillUpdate error: %v", err)
 	}
 	if !containsSubstring(got, "skipped") {
 		t.Errorf("expected 'skipped' in output, got: %s", got)
