@@ -178,9 +178,9 @@ func (b *Board) handleBoardKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return b.moveNext()
 	case "P":
 		return b.movePrev()
-	case "+":
+	case "+", "=":
 		return b.raisePriority()
-	case "-":
+	case "-", "_":
 		return b.lowerPriority()
 	case "c":
 		b.handleCreateStart()
@@ -1257,8 +1257,8 @@ func (b *Board) viewHelp() string {
 		{"m", "Move task (status picker)"},
 		{"N", "Move task to next status"},
 		{"P", "Move task to previous status"},
-		{"+", "Raise task priority"},
-		{"-", "Lower task priority"},
+		{"+/=", "Raise task priority"},
+		{"-/_", "Lower task priority"},
 		{"d", "Delete task"},
 		{"r", "Refresh board"},
 		{"?", "Show this help"},
