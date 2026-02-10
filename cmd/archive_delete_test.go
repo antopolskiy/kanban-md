@@ -23,7 +23,7 @@ func TestExecuteArchiveCore_ArchivesAndIsIdempotent(t *testing.T) {
 	if err != nil {
 		t.Fatalf("executeArchiveCore: %v", err)
 	}
-	if oldStatus != "backlog" {
+	if oldStatus != testBacklogStatus {
 		t.Errorf("oldStatus = %q, want backlog", oldStatus)
 	}
 	if archived.Status != config.ArchivedStatus {
