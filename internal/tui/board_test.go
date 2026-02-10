@@ -17,8 +17,9 @@ import (
 )
 
 const (
-	statusTodo  = "todo"
-	viewLoading = "Loading..."
+	statusTodo       = "todo"
+	priorityCritical = "critical"
+	viewLoading      = "Loading..."
 )
 
 // testRefTime is a fixed reference time used for task Updated timestamps in tests.
@@ -1109,7 +1110,7 @@ func TestBoard_RaisePriority(t *testing.T) {
 	if err != nil {
 		t.Fatalf("reading task: %v", err)
 	}
-	if tk.Priority != "critical" {
+	if tk.Priority != priorityCritical {
 		t.Errorf("expected priority 'critical', got %q", tk.Priority)
 	}
 
@@ -1121,6 +1122,48 @@ func TestBoard_LowerPriority(t *testing.T) {
 
 	// Task A (ID 1) starts at "high" priority. Press - to lower to "medium".
 	b = sendKey(b, "-")
+
+	path, err := task.FindByID(cfg.TasksPath(), 1)
+	if err != nil {
+		t.Fatalf("finding task: %v", err)
+	}
+	tk, err := task.Read(path)
+	if err != nil {
+		t.Fatalf("reading task: %v", err)
+	}
+	if tk.Priority != "medium" {
+		t.Errorf("expected priority 'medium', got %q", tk.Priority)
+	}
+
+	_ = b.View()
+}
+
+func TestBoard_RaisePriorityWithEquals(t *testing.T) {
+	b, cfg := setupTestBoard(t)
+
+	// Task A (ID 1) starts at "high" priority. Press = to raise to "critical".
+	b = sendKey(b, "=")
+
+	path, err := task.FindByID(cfg.TasksPath(), 1)
+	if err != nil {
+		t.Fatalf("finding task: %v", err)
+	}
+	tk, err := task.Read(path)
+	if err != nil {
+		t.Fatalf("reading task: %v", err)
+	}
+	if tk.Priority != priorityCritical {
+		t.Errorf("expected priority 'critical', got %q", tk.Priority)
+	}
+
+	_ = b.View()
+}
+
+func TestBoard_LowerPriorityWithUnderscore(t *testing.T) {
+	b, cfg := setupTestBoard(t)
+
+	// Task A (ID 1) starts at "high" priority. Press _ to lower to "medium".
+	b = sendKey(b, "_")
 
 	path, err := task.FindByID(cfg.TasksPath(), 1)
 	if err != nil {
@@ -1159,7 +1202,7 @@ func TestBoard_RaisePriorityAtMax(t *testing.T) {
 	if err != nil {
 		t.Fatalf("reading task: %v", err)
 	}
-	if tk.Priority != "critical" {
+	if tk.Priority != priorityCritical {
 		t.Errorf("expected priority 'critical', got %q", tk.Priority)
 	}
 }

@@ -11,8 +11,8 @@
 │  m             Move task (status picker)     │
 │  N             Move task to next status      │
 │  P             Move task to previous status  │
-│  +             Raise task priority           │
-│  -             Lower task priority           │
+│  +/=           Raise task priority           │
+│  -/_           Lower task priority           │
 │  d             Delete task                   │
 │  r             Refresh board                 │
 │  ?             Show this help                │
