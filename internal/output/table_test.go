@@ -253,6 +253,28 @@ func TestStyledValueFallback(t *testing.T) {
 	}
 }
 
+func TestTaskTableNoTrailingWhitespace(t *testing.T) {
+	disableColorForTest(t)
+
+	now := time.Now()
+	tasks := []*task.Task{
+		{ID: 1, Title: "Set up CI pipeline", Status: "backlog", Priority: "high", Tags: []string{"devops"}, Created: now, Updated: now},
+		{ID: 2, Title: "Write API docs", Status: "done", Priority: "medium", Tags: []string{"docs"}, Created: now, Updated: now},
+		{ID: 3, Title: "Fix login bug", Status: "in-progress", Priority: "critical", Tags: []string{"backend"}, Created: now, Updated: now},
+	}
+
+	var buf strings.Builder
+	TaskTable(&buf, tasks)
+
+	lines := strings.Split(strings.TrimRight(buf.String(), "\n"), "\n")
+	for i, line := range lines {
+		if line != strings.TrimRight(line, " ") {
+			t.Errorf("line %d has trailing whitespace (%d trailing spaces):\n%q",
+				i, len(line)-len(strings.TrimRight(line, " ")), line)
+		}
+	}
+}
+
 func abs(x int) int {
 	if x < 0 {
 		return -x

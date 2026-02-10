@@ -2,55 +2,47 @@
 # Demo recording script for asciinema + agg.
 # Produces a .cast file that agg converts to a GIF.
 #
-# Usage:
-#   # 1. Build kanban-md to /tmp
-#   go build -o /tmp/kanban-md ./cmd/kanban-md
+# Usage (from repo root):
+#   bash assets/demo-gen.sh
 #
-#   # 2. Record the demo
-#   asciinema rec assets/demo.cast --cols 80 --rows 20 \
-#     --command "bash assets/demo-record.sh" --overwrite
-#
-#   # 3. Convert to GIF
-#   agg assets/demo.cast assets/demo.gif \
-#     --font-size 16 --theme dracula --idle-time-limit 3 --last-frame-duration 3
-#
-# Requirements: asciinema, agg, kanban-md binary at /tmp/kanban-md
+# Requirements: asciinema, agg, python3, kanban-md binary at /tmp/kanban-md
 
 set -e
 export PATH=/tmp:$PATH
-export NO_COLOR=1
-export TERM=dumb
+# Force 256-color output even without a real TTY.
+export CLICOLOR_FORCE=1
+export COLORFGBG="15;0"
 cd "$(mktemp -d)"
 
 # Silent setup — create board and tasks before recording starts
 kanban-md init --name "My Project" >/dev/null 2>&1
-kanban-md create "Set up CI pipeline" --priority high --tags devops >/dev/null 2>&1
-kanban-md create "Write API docs" --tags docs >/dev/null 2>&1
-kanban-md create "Fix login bug" --priority critical --tags backend >/dev/null 2>&1
+kanban-md create "Fix login bypass" --priority critical --tags security >/dev/null 2>&1
+kanban-md create "Add rate limiter" --priority high --tags backend >/dev/null 2>&1
+kanban-md create "Write API docs" --priority medium --tags docs >/dev/null 2>&1
 
-# Show compact list
-printf '\033[38;5;75m$\033[0m kanban-md list --compact\n'
+# 1. Show initial board — three tasks, all unclaimed
+printf '\033[38;5;75m$\033[0m kanban-md list\n'
 sleep 0.3
-kanban-md list --compact 2>/dev/null
-sleep 1.2
+kanban-md list 2>/dev/null
+sleep 1.5
 echo
 
-# Agent picks highest priority task atomically
-printf '\033[38;5;75m$\033[0m kanban-md pick --claim agent-1 --move in-progress\n'
+# 2. Agent 1 picks — gets the critical task
+printf '\033[38;5;75m$\033[0m kanban-md pick --claim frost-maple --move in-progress\n'
 sleep 0.3
-kanban-md pick --claim agent-1 --move in-progress 2>/dev/null
-sleep 1.2
+kanban-md pick --claim frost-maple --move in-progress 2>/dev/null
+sleep 1.5
 echo
 
-# Move task to done
-printf '\033[38;5;75m$\033[0m kanban-md move 2 done --force\n'
+# 3. Agent 2 picks — skips claimed task, gets the next one
+printf '\033[38;5;75m$\033[0m kanban-md pick --claim amber-swift --move in-progress\n'
 sleep 0.3
-kanban-md move 2 done --force 2>/dev/null
-sleep 1.2
+kanban-md pick --claim amber-swift --move in-progress 2>/dev/null
+sleep 1.5
 echo
 
-# Final state — show updated compact list
-printf '\033[38;5;75m$\033[0m kanban-md list --compact\n'
+# 4. Final state — two agents, no conflicts
+printf '\033[38;5;75m$\033[0m kanban-md list\n'
 sleep 0.3
-kanban-md list --compact 2>/dev/null
-sleep 2
+kanban-md list 2>/dev/null
+sleep 3
