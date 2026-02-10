@@ -77,11 +77,11 @@ func TestConfigAccessors_SetDefaultsStatus_Valid(t *testing.T) {
 	accessors := configAccessors()
 	cfg := config.NewDefault("Test")
 
-	if err := accessors["defaults.status"].set(cfg, "in-progress"); err != nil {
+	if err := accessors["defaults.status"].set(cfg, statusInProgress); err != nil {
 		t.Fatal(err)
 	}
-	if cfg.Defaults.Status != "in-progress" {
-		t.Errorf("defaults.status = %q, want %q", cfg.Defaults.Status, "in-progress")
+	if cfg.Defaults.Status != statusInProgress {
+		t.Errorf("defaults.status = %q, want %q", cfg.Defaults.Status, statusInProgress)
 	}
 }
 

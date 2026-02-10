@@ -18,8 +18,9 @@ import (
 
 // Shared test constants for the cmd package.
 const (
-	testBoardName = "TestBoard"
-	priorityHigh  = "high"
+	testBoardName    = "TestBoard"
+	priorityHigh     = "high"
+	statusInProgress = "in-progress"
 )
 
 func TestRootCommand(t *testing.T) {
