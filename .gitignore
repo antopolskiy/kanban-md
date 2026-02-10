@@ -24,7 +24,6 @@ coverage-e2e-raw/
 
 # Built binaries (go build without -o drops them in the project root)
 /kanban-md
-/kanban-md-tui
 
 # Output of GoReleaser
 dist/

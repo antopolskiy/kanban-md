@@ -441,7 +441,7 @@ kanban-md tui             # launch from any directory with a kanban/ board
 kanban-md tui --dir PATH  # point to a specific kanban directory
 ```
 
-> **Note:** The standalone `kanban-md-tui` binary is still included for backward compatibility but simply delegates to `kanban-md tui`.
+> **Note:** Older releases shipped a standalone `kanban-md-tui` binary. It has been retired — use `kanban-md tui` instead.
 
 ### Keyboard shortcuts
 

@@ -32,8 +32,7 @@ func init() {
 	rootCmd.AddCommand(tuiCmd)
 }
 
-// RunTUI launches the interactive TUI. Exported so the kanban-md-tui
-// binary can delegate to this function for backward compatibility.
+// RunTUI launches the interactive TUI.
 func RunTUI(dir string) error {
 	if dir != "" {
 		flagDir = dir

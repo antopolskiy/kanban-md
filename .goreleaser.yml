@@ -18,25 +18,10 @@ builds:
     goarch:
       - amd64
       - arm64
-  - id: kanban-md-tui
-    main: ./cmd/kanban-md-tui
-    binary: kanban-md-tui
-    ldflags:
-      - -s -w
-    env:
-      - CGO_ENABLED=0
-    goos:
-      - darwin
-      - linux
-      - windows
-    goarch:
-      - amd64
-      - arm64
 archives:
   - id: default
     builds:
       - kanban-md
-      - kanban-md-tui
     name_template: "kanban-md_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
     format_overrides:
       - goos: windows
@@ -55,7 +40,6 @@ brews:
     license: MIT
     install: |
       bin.install "kanban-md"
-      bin.install "kanban-md-tui"
       bin.install_symlink bin/"kanban-md" => "kbmd"
       generate_completions_from_executable(bin/"kanban-md", "completion")
       generate_completions_from_executable(bin/"kbmd", "completion")

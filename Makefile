@@ -38,7 +38,6 @@ VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 .PHONY: build
 build: ## go build
 	go build -ldflags "-X github.com/antopolskiy/kanban-md/cmd.version=$(VERSION)" -o dist/kanban-md ./cmd/kanban-md
-	go build -o dist/kanban-md-tui ./cmd/kanban-md-tui
 
 .PHONY: lint
 lint: ## golangci-lint (read-only)
