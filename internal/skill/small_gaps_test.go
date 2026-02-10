@@ -3,6 +3,7 @@ package skill
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 )
 
@@ -70,6 +71,10 @@ func TestInstall_WriteProtectedTarget(t *testing.T) {
 	if err := os.MkdirAll(skillDir, 0o750); err != nil {
 		t.Fatal(err)
 	}
+	if runtime.GOOS == "windows" {
+		t.Skip("chmod does not restrict directory writes on Windows")
+	}
+
 	if err := os.Chmod(skillDir, 0o444); err != nil { //nolint:gosec // intentionally restrict for test
 		t.Fatal(err)
 	}

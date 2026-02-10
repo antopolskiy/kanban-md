@@ -3,6 +3,7 @@ package tui_test
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -249,6 +250,10 @@ func TestBoundary_ExecuteCreate_WriteError(t *testing.T) {
 	b := tui.NewBoard(cfg)
 	b.SetNow(testNow)
 	b.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
+
+	if runtime.GOOS == "windows" {
+		t.Skip("chmod does not restrict directory writes on Windows")
+	}
 
 	if err := os.Chmod(tasksDir, 0o555); err != nil { //nolint:gosec // test intentionally restricts dir
 		t.Fatal(err)

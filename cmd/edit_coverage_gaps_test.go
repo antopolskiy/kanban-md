@@ -4,6 +4,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 	"time"
 
@@ -398,6 +399,10 @@ func TestExecuteEdit_WriteAndRenameError(t *testing.T) {
 	}
 	createTaskFile(t, cfg.TasksPath(), 1, "test-task")
 
+	if runtime.GOOS == "windows" { //nolint:goconst // idiomatic platform check
+		t.Skip("chmod does not restrict directory writes on Windows")
+	}
+
 	// Make the tasks directory read-only so creating the renamed file fails.
 	tasksDir := cfg.TasksPath()
 	chmodErr := os.Chmod(tasksDir, 0o500) //nolint:gosec // intentionally restricting dir for test
@@ -424,6 +429,10 @@ func TestDeleteSingleTask_SoftDeleteWriteError(t *testing.T) {
 		t.Fatal(err)
 	}
 	createTaskFile(t, cfg.TasksPath(), 1, "fail-delete-task")
+
+	if runtime.GOOS == "windows" {
+		t.Skip("chmod does not restrict file writes on Windows")
+	}
 
 	// Make the task file read-only to trigger a write error.
 	path, findErr := task.FindByID(cfg.TasksPath(), 1)

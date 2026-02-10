@@ -3,6 +3,7 @@ package cmd
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 
 	"github.com/antopolskiy/kanban-md/internal/config"
@@ -240,6 +241,10 @@ func TestRunCreate_WriteError(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	if runtime.GOOS == "windows" {
+		t.Skip("chmod does not restrict directory writes on Windows")
+	}
+
 	tasksDir := cfg.TasksPath()
 	chmodErr := os.Chmod(tasksDir, 0o500) //nolint:gosec // intentionally restricting dir for test
 	if chmodErr != nil {
@@ -283,6 +288,10 @@ func TestRenderBoard_ReadAllError(t *testing.T) {
 	cfg, err := config.Load(kanbanDir)
 	if err != nil {
 		t.Fatal(err)
+	}
+
+	if runtime.GOOS == "windows" {
+		t.Skip("chmod does not prevent reads on Windows")
 	}
 
 	// Make the tasks directory unreadable to trigger ReadAllLenient error.
