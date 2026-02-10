@@ -21,8 +21,13 @@ func TestInstall_InvalidSkillName(t *testing.T) {
 }
 
 func TestInstall_MkdirError(t *testing.T) {
-	// Use an invalid base directory that can't be created.
-	err := Install("kanban-md", "/dev/null/invalid", "1.0.0")
+	// Create a file, then try to use it as a parent directory —
+	// this triggers MkdirAll failure on all platforms.
+	blocker := filepath.Join(t.TempDir(), "blocker")
+	if err := os.WriteFile(blocker, []byte("x"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	err := Install("kanban-md", filepath.Join(blocker, "subdir"), "1.0.0")
 	if err == nil {
 		t.Fatal("expected error when output directory can't be created")
 	}

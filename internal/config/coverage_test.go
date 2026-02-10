@@ -4,6 +4,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 	"time"
 )
@@ -27,6 +28,9 @@ func TestLoad_InvalidYAML(t *testing.T) {
 }
 
 func TestLoad_UnreadableFile(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("chmod 0o000 does not prevent reads on Windows")
+	}
 	dir := t.TempDir()
 	path := filepath.Join(dir, ConfigFileName)
 	if err := os.WriteFile(path, []byte("version: 1"), 0o000); err != nil {

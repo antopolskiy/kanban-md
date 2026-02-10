@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"sync"
 	"testing"
 	"time"
 
@@ -561,8 +562,15 @@ func TestValidateDeps_SelfReferenceParent(t *testing.T) {
 
 // --- runBatch tests ---
 
+// pipeReaders maps pipe read-ends to their async drain goroutines.
+// This prevents pipe buffer deadlocks on Windows where the default
+// anonymous pipe buffer is only 4 KB. Without an async reader, writing
+// more than 4 KB to the pipe blocks the writer indefinitely because
+// drainPipe (which reads the pipe) hasn't been called yet.
+var pipeReaders sync.Map // *os.File → chan string
+
 // captureStdout replaces os.Stdout with a pipe and returns it.
-// The cleanup function restores the original stdout.
+// An async reader goroutine drains the read end to prevent deadlocks.
 func captureStdout(t *testing.T) (*os.File, *os.File) {
 	t.Helper()
 	oldStdout := os.Stdout
@@ -572,10 +580,12 @@ func captureStdout(t *testing.T) (*os.File, *os.File) {
 	}
 	os.Stdout = w
 	t.Cleanup(func() { os.Stdout = oldStdout })
+	startPipeReader(r)
 	return r, w
 }
 
 // captureStderr replaces os.Stderr with a pipe and returns it.
+// An async reader goroutine drains the read end to prevent deadlocks.
 func captureStderr(t *testing.T) (*os.File, *os.File) {
 	t.Helper()
 	oldStderr := os.Stderr
@@ -585,16 +595,32 @@ func captureStderr(t *testing.T) (*os.File, *os.File) {
 	}
 	os.Stderr = w
 	t.Cleanup(func() { os.Stderr = oldStderr })
+	startPipeReader(r)
 	return r, w
 }
 
-// drainPipe closes the writer and reads all content from the reader.
+// startPipeReader spawns a goroutine that reads all data from the pipe
+// read-end into a buffer, storing the result channel in pipeReaders.
+func startPipeReader(r *os.File) {
+	ch := make(chan string, 1)
+	go func() {
+		var buf bytes.Buffer
+		_, _ = buf.ReadFrom(r)
+		ch <- buf.String()
+	}()
+	pipeReaders.Store(r, ch)
+}
+
+// drainPipe closes the writer, waits for the async reader goroutine
+// to finish, and returns the captured output.
 func drainPipe(t *testing.T, r, w *os.File) string {
 	t.Helper()
 	_ = w.Close()
-	var buf bytes.Buffer
-	_, _ = buf.ReadFrom(r)
-	return buf.String()
+	v, ok := pipeReaders.LoadAndDelete(r)
+	if !ok {
+		t.Fatal("drainPipe: no async reader for pipe — was captureStdout/captureStderr called?")
+	}
+	return <-(v.(chan string))
 }
 
 // setFlags overrides the global output flags and restores them on cleanup.

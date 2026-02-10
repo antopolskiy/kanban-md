@@ -3,6 +3,7 @@ package board
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -17,6 +18,9 @@ import (
 // ---------------------------------------------------------------------------
 
 func TestAppendLog_ReadOnlyDir(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("chmod does not restrict directory writes on Windows")
+	}
 	dir := t.TempDir()
 	readOnlyDir := filepath.Join(dir, "readonly")
 	if err := os.MkdirAll(readOnlyDir, 0o750); err != nil {

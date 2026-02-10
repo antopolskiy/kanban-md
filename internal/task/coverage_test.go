@@ -3,6 +3,7 @@ package task
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -237,6 +238,9 @@ func TestReadAll_MalformedFile(t *testing.T) {
 }
 
 func TestReadAll_ReadDirError(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("os.ReadDir on a file path does not reliably error on Windows")
+	}
 	// Use a file path instead of a directory to trigger ReadDir error.
 	tmpFile := filepath.Join(t.TempDir(), "not-a-dir")
 	if err := os.WriteFile(tmpFile, []byte("x"), 0o600); err != nil {
@@ -265,6 +269,9 @@ func TestReadAllLenient_NonexistentDir(t *testing.T) {
 }
 
 func TestReadAllLenient_ReadDirError(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("os.ReadDir on a file path does not reliably error on Windows")
+	}
 	// Use a file path instead of a directory.
 	tmpFile := filepath.Join(t.TempDir(), "not-a-dir")
 	if err := os.WriteFile(tmpFile, []byte("x"), 0o600); err != nil {

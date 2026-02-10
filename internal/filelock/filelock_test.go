@@ -5,6 +5,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/antopolskiy/kanban-md/internal/filelock"
 )
@@ -62,7 +63,19 @@ func TestLockConcurrent(t *testing.T) {
 			}
 		}()
 	}
-	wg.Wait()
+	done := make(chan struct{})
+	go func() {
+		wg.Wait()
+		close(done)
+	}()
+
+	const lockTimeout = 30 * time.Second
+	select {
+	case <-done:
+		// All goroutines completed.
+	case <-time.After(lockTimeout):
+		t.Fatal("timed out waiting for concurrent lock test — possible deadlock")
+	}
 
 	if mc := atomic.LoadInt64(&maxConcurrent); mc > 1 {
 		t.Errorf("max concurrent holders = %d, want 1", mc)
