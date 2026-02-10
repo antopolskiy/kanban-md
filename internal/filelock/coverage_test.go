@@ -49,3 +49,23 @@ func TestLock_SequentialLockUnlock(t *testing.T) {
 		t.Fatalf("second unlock() error: %v", unlockErr)
 	}
 }
+
+func TestLock_DoubleUnlockReturnsError(t *testing.T) {
+	lockPath := filepath.Join(t.TempDir(), ".lock")
+
+	unlock, err := filelock.Lock(lockPath)
+	if err != nil {
+		t.Fatalf("Lock() error: %v", err)
+	}
+
+	// First unlock should succeed.
+	if unlockErr := unlock(); unlockErr != nil {
+		t.Fatalf("first unlock() error: %v", unlockErr)
+	}
+
+	// Second unlock operates on a closed fd — should return an error.
+	err = unlock()
+	if err == nil {
+		t.Error("expected error on double unlock (closed fd)")
+	}
+}
