@@ -63,9 +63,9 @@ func TestPickWithTagFilter(t *testing.T) {
 	mustCreateTask(t, kanbanDir, "Tagged task", "--tags", "urgent")
 
 	var picked taskJSON
-	r := runKanbanJSON(t, kanbanDir, &picked, "pick", "--claim", claimAgent1, "--tag", "urgent")
+	r := runKanbanJSON(t, kanbanDir, &picked, "pick", "--claim", claimAgent1, "--tags", "urgent")
 	if r.exitCode != 0 {
-		t.Fatalf("pick --tag failed (exit %d): %s", r.exitCode, r.stderr)
+		t.Fatalf("pick --tags failed (exit %d): %s", r.exitCode, r.stderr)
 	}
 	if picked.Title != "Tagged task" {
 		t.Errorf("picked title = %q, want %q", picked.Title, "Tagged task")

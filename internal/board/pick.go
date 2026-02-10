@@ -12,7 +12,7 @@ import (
 type PickOptions struct {
 	Statuses     []string      // status columns to pick from (empty = all non-terminal)
 	ClaimTimeout time.Duration // claim expiration for filtering
-	Tag          string        // optional tag filter
+	Tags         []string      // optional tag filter (OR logic: task must have at least one)
 }
 
 // Pick finds the highest-priority unclaimed, unblocked task matching criteria.
@@ -47,7 +47,7 @@ func pickCandidates(cfg *config.Config, tasks []*task.Task, opts PickOptions) []
 		if t.Blocked {
 			continue
 		}
-		if opts.Tag != "" && !containsStr(t.Tags, opts.Tag) {
+		if len(opts.Tags) > 0 && !hasAnyTag(t.Tags, opts.Tags) {
 			continue
 		}
 		candidates = append(candidates, t)
@@ -91,6 +91,16 @@ func sortPickCandidates(candidates []*task.Task, cfg *config.Config) {
 		}
 		return cfg.PriorityIndex(candidates[i].Priority) > cfg.PriorityIndex(candidates[j].Priority)
 	})
+}
+
+// hasAnyTag returns true if the task has at least one of the given tags.
+func hasAnyTag(taskTags, filterTags []string) bool {
+	for _, ft := range filterTags {
+		if containsStr(taskTags, ft) {
+			return true
+		}
+	}
+	return false
 }
 
 // classOrder returns a sort key for a task's class. Lower is higher priority.

@@ -26,7 +26,7 @@ func init() {
 	pickCmd.Flags().String("claim", "", "agent name to claim as (required)")
 	pickCmd.Flags().String("status", "", "status column to pick from (default: all non-terminal)")
 	pickCmd.Flags().String("move", "", "also move the picked task to this status")
-	pickCmd.Flags().String("tag", "", "filter by tag")
+	pickCmd.Flags().StringSlice("tags", nil, "filter by tags (comma-separated, OR logic)")
 	_ = pickCmd.MarkFlagRequired("claim")
 	rootCmd.AddCommand(pickCmd)
 }
@@ -40,13 +40,13 @@ func runPick(cmd *cobra.Command, _ []string) error {
 	claimant, _ := cmd.Flags().GetString("claim")
 	statusFilter, _ := cmd.Flags().GetString("status")
 	moveTarget, _ := cmd.Flags().GetString("move")
-	tag, _ := cmd.Flags().GetString("tag")
+	tags, _ := cmd.Flags().GetStringSlice("tags")
 
 	if err = validatePickFlags(cfg, statusFilter, moveTarget); err != nil {
 		return err
 	}
 
-	picked, oldStatus, err := executePick(cfg, claimant, statusFilter, moveTarget, tag)
+	picked, oldStatus, err := executePick(cfg, claimant, statusFilter, moveTarget, tags)
 	if err != nil {
 		return err
 	}
@@ -68,7 +68,7 @@ func validatePickFlags(cfg *config.Config, statusFilter, moveTarget string) erro
 	return nil
 }
 
-func executePick(cfg *config.Config, claimant, statusFilter, moveTarget, tag string) (*task.Task, string, error) {
+func executePick(cfg *config.Config, claimant, statusFilter, moveTarget string, tags []string) (*task.Task, string, error) {
 	allTasks, warnings, err := task.ReadAllLenient(cfg.TasksPath())
 	if err != nil {
 		return nil, "", err
@@ -77,7 +77,7 @@ func executePick(cfg *config.Config, claimant, statusFilter, moveTarget, tag str
 
 	opts := board.PickOptions{
 		ClaimTimeout: cfg.ClaimTimeoutDuration(),
-		Tag:          tag,
+		Tags:         tags,
 	}
 	if statusFilter != "" {
 		opts.Statuses = []string{statusFilter}

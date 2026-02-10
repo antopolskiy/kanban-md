@@ -232,7 +232,7 @@ func TestREADMEDocumentsAllCommands(t *testing.T) {
 		"move":    {"--claim"},
 		"list":    {"--blocked", "--not-blocked", "--parent", "--unblocked", "--unclaimed", "--claimed-by", "--class", "--group-by"},
 		"board":   {"--group-by"},
-		"pick":    {"--claim", "--status", "--move", "--tag"},
+		"pick":    {"--claim", "--status", "--move", "--tags"},
 		"metrics": {"--since"},
 		"log":     {"--since", "--limit", "--action", "--task"},
 	}

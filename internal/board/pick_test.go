@@ -161,12 +161,30 @@ func TestPickWithTagFilter(t *testing.T) {
 		{ID: 2, Status: "todo", Priority: "high", Tags: []string{"frontend"}},
 	}
 
-	picked := Pick(cfg, tasks, PickOptions{Tag: "frontend"})
+	picked := Pick(cfg, tasks, PickOptions{Tags: []string{"frontend"}})
 	if picked == nil {
 		t.Fatal("Pick() returned nil, want task #2")
 	}
 	if picked.ID != 2 {
 		t.Errorf("Pick() ID = %d, want 2 (tag filter)", picked.ID)
+	}
+}
+
+func TestPickWithMultipleTagFilter(t *testing.T) {
+	cfg := newPickTestConfig()
+	tasks := []*task.Task{
+		{ID: 1, Status: "todo", Priority: "critical", Tags: []string{"backend"}},
+		{ID: 2, Status: "todo", Priority: "high", Tags: []string{"frontend"}},
+		{ID: 3, Status: "todo", Priority: "medium", Tags: []string{"coverage"}},
+	}
+
+	// Filter by frontend OR coverage — should pick #2 (highest priority among matches).
+	picked := Pick(cfg, tasks, PickOptions{Tags: []string{"frontend", "coverage"}})
+	if picked == nil {
+		t.Fatal("Pick() returned nil, want task #2")
+	}
+	if picked.ID != 2 {
+		t.Errorf("Pick() ID = %d, want 2 (multi-tag filter, highest priority)", picked.ID)
 	}
 }
 
