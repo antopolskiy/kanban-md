@@ -27,6 +27,35 @@ git tag vX.Y.Z
 git push origin main --tags
 ```
 
+### CI verification (required)
+
+After pushing the tag, **watch the GitHub Actions `release` workflow**:
+
+```
+gh run list --workflow release --limit 10
+gh run watch <RUN_ID>
+```
+
+If the workflow fails:
+
+1. Inspect logs:
+   ```
+   gh run view <RUN_ID> --log-failed
+   ```
+2. Fix the underlying issue in `main` (code/tests/lint/goreleaser config, etc.).
+3. Re-run the release by tagging a new version and pushing tags (preferred), or rerun the failed run only if it was clearly transient:
+   - Preferred:
+     ```
+     git tag vX.Y.Z+1
+     git push origin main --tags
+     ```
+   - Transient-only rerun:
+     ```
+     gh run rerun <RUN_ID> --failed
+     ```
+
+Only proceed to release notes once the `release` workflow is green.
+
 ### Release notes
 
 After the release workflow completes, edit the GitHub release with human-written notes (not commit logs). Use `gh release edit` to update the release created by goreleaser.
