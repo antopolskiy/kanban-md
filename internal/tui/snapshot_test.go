@@ -26,6 +26,7 @@ func init() {
 
 func assertGolden(t *testing.T, name, got string) {
 	t.Helper()
+	got = stripANSI(got) // strip glamour ANSI codes not covered by lipgloss Ascii profile
 	path := filepath.Join("testdata", name+".golden")
 
 	if *update {

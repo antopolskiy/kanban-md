@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -474,19 +475,20 @@ func TestBoard_ClaimedByDisplayed(t *testing.T) {
 	}
 }
 
+// ansiRe matches ANSI escape sequences (SGR and other CSI sequences).
+var ansiRe = regexp.MustCompile(`\x1b\[[0-9;]*[a-zA-Z]`)
+
+func stripANSI(s string) string { return ansiRe.ReplaceAllString(s, "") }
+
 func containsStr(haystack, needle string) bool {
-	return len(haystack) > 0 && len(needle) > 0 &&
-		haystack != needle && // avoid trivial match
-		findSubstring(haystack, needle)
+	// Strip ANSI codes so glamour-rendered body text is searchable.
+	haystack = stripANSI(haystack)
+	return strings.Contains(haystack, needle)
 }
 
 func findSubstring(s, sub string) bool {
-	for i := 0; i <= len(s)-len(sub); i++ {
-		if s[i:i+len(sub)] == sub {
-			return true
-		}
-	}
-	return false
+	s = stripANSI(s)
+	return strings.Contains(s, sub)
 }
 
 // addLongBodyToTask modifies a task file to have a multi-line body.
@@ -585,10 +587,11 @@ func TestBoard_DetailWrapsLongLines(t *testing.T) {
 	b = sendKey(b, "enter")
 	v := b.View()
 
-	// No line should exceed terminal width.
+	// No line should exceed terminal width (measure visual width, not raw bytes).
 	for i, line := range strings.Split(v, "\n") {
-		if len(line) > 120 {
-			t.Errorf("line %d exceeds width 120: len=%d", i, len(line))
+		visual := stripANSI(line)
+		if len(visual) > 120 {
+			t.Errorf("line %d exceeds width 120: len=%d", i, len(visual))
 		}
 	}
 }
@@ -1032,6 +1035,50 @@ func TestBoard_DetailUnescapesBody(t *testing.T) {
 	}
 	if !containsStr(v, "second line") {
 		t.Error("expected 'second line' in output")
+	}
+}
+
+func TestBoard_DetailRendersMarkdown(t *testing.T) {
+	b, cfg := setupTestBoard(t)
+
+	path, err := task.FindByID(cfg.TasksPath(), 1)
+	if err != nil {
+		t.Fatalf("finding task: %v", err)
+	}
+	tk, err := task.Read(path)
+	if err != nil {
+		t.Fatalf("reading task: %v", err)
+	}
+	tk.Body = "## Overview\n\nThis is **bold** text and `inline code`.\n\n- Item one\n- Item two"
+	if err := task.Write(path, tk); err != nil {
+		t.Fatalf("writing task: %v", err)
+	}
+
+	b = sendKey(b, "r")     // refresh
+	b = sendKey(b, "enter") // open detail
+	v := b.View()
+
+	// Markdown bold markers should be stripped by glamour rendering.
+	if containsStr(v, "**bold**") {
+		t.Error("raw **bold** markers should not appear in rendered output")
+	}
+	// Content should still be present.
+	if !containsStr(v, "bold") {
+		t.Error("expected 'bold' text in output")
+	}
+	// Backtick markers should be stripped.
+	if containsStr(v, "`inline code`") {
+		t.Error("raw backtick markers should not appear in rendered output")
+	}
+	if !containsStr(v, "inline code") {
+		t.Error("expected 'inline code' in output")
+	}
+	// Bullet list items rendered (glamour converts - to •).
+	if !containsStr(v, "Item one") {
+		t.Error("expected 'Item one' in output")
+	}
+	if !containsStr(v, "Item two") {
+		t.Error("expected 'Item two' in output")
 	}
 }
 

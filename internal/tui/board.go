@@ -10,6 +10,7 @@ import (
 
 	"github.com/charmbracelet/bubbles/key"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/glamour"
 	"github.com/charmbracelet/lipgloss"
 
 	"github.com/antopolskiy/kanban-md/internal/board"
@@ -1140,10 +1141,28 @@ func detailLines(t *task.Task, width int) []string {
 	if t.Body != "" {
 		lines = append(lines, "")
 		body := unescapeBody(t.Body)
-		wrapped := lipgloss.NewStyle().Width(width).Render(body)
-		lines = append(lines, strings.Split(wrapped, "\n")...)
+		rendered := renderMarkdown(body, width)
+		lines = append(lines, strings.Split(rendered, "\n")...)
 	}
 	return lines
+}
+
+// renderMarkdown renders body text as terminal-friendly markdown using glamour.
+// Single newlines are preserved as hard line breaks via WithPreservedNewLines.
+func renderMarkdown(body string, width int) string {
+	r, err := glamour.NewTermRenderer(
+		glamour.WithStandardStyle("dark"),
+		glamour.WithWordWrap(width),
+		glamour.WithPreservedNewLines(),
+	)
+	if err != nil {
+		return lipgloss.NewStyle().Width(width).Render(body)
+	}
+	out, err := r.Render(body)
+	if err != nil {
+		return lipgloss.NewStyle().Width(width).Render(body)
+	}
+	return strings.TrimRight(out, "\n")
 }
 
 // unescapeBody replaces literal escape sequences in body text with their
