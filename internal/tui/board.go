@@ -1139,10 +1139,24 @@ func detailLines(t *task.Task, width int) []string {
 	}
 	if t.Body != "" {
 		lines = append(lines, "")
-		wrapped := lipgloss.NewStyle().Width(width).Render(t.Body)
+		body := unescapeBody(t.Body)
+		wrapped := lipgloss.NewStyle().Width(width).Render(body)
 		lines = append(lines, strings.Split(wrapped, "\n")...)
 	}
 	return lines
+}
+
+// unescapeBody replaces literal escape sequences in body text with their
+// corresponding whitespace characters. This handles bodies set via CLI flags
+// where \n and \t are passed as literal two-character sequences.
+func unescapeBody(s string) string {
+	r := strings.NewReplacer(
+		`\n`, "\n",
+		`\t`, "\t",
+		`\r`, "",
+		`\\`, `\`,
+	)
+	return r.Replace(s)
 }
 
 // detailMetadataLines renders optional metadata fields (class, assignee, tags, relations, etc.).

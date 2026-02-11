@@ -1002,6 +1002,39 @@ func TestBoard_DetailExitBackspace(t *testing.T) {
 	}
 }
 
+func TestBoard_DetailUnescapesBody(t *testing.T) {
+	b, cfg := setupTestBoard(t)
+
+	// Set body with literal escape sequences (as a CLI --body flag would produce).
+	path, err := task.FindByID(cfg.TasksPath(), 1)
+	if err != nil {
+		t.Fatalf("finding task: %v", err)
+	}
+	tk, err := task.Read(path)
+	if err != nil {
+		t.Fatalf("reading task: %v", err)
+	}
+	tk.Body = `first line\nsecond line\tindented`
+	if err := task.Write(path, tk); err != nil {
+		t.Fatalf("writing task: %v", err)
+	}
+
+	b = sendKey(b, "r")     // refresh
+	b = sendKey(b, "enter") // open detail
+	v := b.View()
+
+	// The literal \n should have been rendered as a newline, producing two lines.
+	if containsStr(v, `\n`) {
+		t.Error("literal \\n should not appear in rendered output")
+	}
+	if !containsStr(v, "first line") {
+		t.Error("expected 'first line' in output")
+	}
+	if !containsStr(v, "second line") {
+		t.Error("expected 'second line' in output")
+	}
+}
+
 func TestBoard_MoveDialogCursorUp(t *testing.T) {
 	b, cfg := setupTestBoard(t)
 
