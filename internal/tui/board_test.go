@@ -1823,3 +1823,41 @@ func TestBoard_ScrollFollowsSelectedTask(t *testing.T) {
 		}
 	}
 }
+
+func TestBoard_ErrorDoesNotHideColumnHeaders(t *testing.T) {
+	// Bug #165: When an error is displayed, the status bar grows from 1 to 2
+	// lines (error + status), but the board padding assumes a fixed chrome
+	// height. This causes the total output to exceed the terminal height,
+	// pushing the column header row off-screen.
+	const termHeight = 40
+	b, _ := setupTestBoard(t)
+	b.Update(tea.WindowSizeMsg{Width: 120, Height: termHeight})
+
+	// Navigate to "done" column (col 4) and trigger an error via moveNext.
+	const doneCol = 4
+	for range doneCol {
+		b = sendKey(b, "l")
+	}
+	b = sendKey(b, "N") // moveNext on "done" → error: already at last status
+
+	v := b.View()
+
+	// The error should be visible.
+	if !containsStr(v, "Error:") {
+		t.Fatal("expected an error message in the view")
+	}
+
+	// Column headers must still be visible.
+	for _, status := range []string{"backlog", "todo", "in-progress", "review", "done"} {
+		if !containsStr(v, status) {
+			t.Errorf("column header %q is not visible when error is displayed", status)
+		}
+	}
+
+	// The total output must fit within the terminal height.
+	lines := strings.Split(v, "\n")
+	if len(lines) > termHeight {
+		t.Errorf("view has %d lines, exceeds terminal height %d — header row is pushed off-screen",
+			len(lines), termHeight)
+	}
+}

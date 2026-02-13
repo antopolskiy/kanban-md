@@ -38,6 +38,7 @@ const (
 
 	tagMaxFraction = 2 // tags get at most 1/N of card width
 	boardChrome    = 2 // blank line + status bar below the column area
+	errorChrome    = 1 // extra line when error toast is displayed
 	maxScrollOff   = 1<<31 - 1
 	tickInterval   = 30 * time.Second // how often durations refresh
 )
@@ -443,11 +444,21 @@ func (b *Board) clampRow() {
 	b.ensureVisible()
 }
 
+// chromeHeight returns the number of lines consumed by non-card elements below
+// the column area: blank line + status bar (+ error line when an error is shown).
+func (b *Board) chromeHeight() int {
+	h := boardChrome
+	if b.err != nil {
+		h += errorChrome
+	}
+	return h
+}
+
 // visibleCardsForColumn returns the number of cards that fit in the column,
 // accounting for scroll indicator lines ("↑ N more" / "↓ N more") that
 // consume vertical space.
 func (b *Board) visibleCardsForColumn(col *column, width int) int {
-	budget := b.height - boardChrome
+	budget := b.height - b.chromeHeight()
 	if budget < 1 {
 		return 1
 	}
@@ -819,7 +830,7 @@ func (b *Board) viewBoard() string {
 
 	// Pad board view to fill available height so the status bar stays at the
 	// bottom regardless of how many card lines the visible tasks consume.
-	targetHeight := b.height - boardChrome
+	targetHeight := b.height - b.chromeHeight()
 	if targetHeight > 0 {
 		actual := strings.Count(boardView, "\n") + 1
 		if actual < targetHeight {
