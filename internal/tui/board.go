@@ -477,20 +477,32 @@ func (b *Board) visibleCardsForColumn(col *column, width int) int {
 
 // ensureVisible adjusts the active column's scroll offset so the
 // selected row is within the visible window.
+//
+// Because visibleCardsForColumn depends on scrollOff (different cards at
+// different offsets have different heights, and the up-indicator presence
+// changes available space), a single adjustment may not be enough: the
+// new scrollOff may yield a different maxVis that still excludes the
+// selected row. We iterate until the position stabilizes.
 func (b *Board) ensureVisible() {
 	col := b.currentColumn()
 	if col == nil {
 		return
 	}
-	maxVis := b.visibleCardsForColumn(col, b.columnWidth())
+	w := b.columnWidth()
 
-	// Scroll down if active row is below visible window.
-	if b.activeRow >= col.scrollOff+maxVis {
-		col.scrollOff = b.activeRow - maxVis + 1
-	}
-	// Scroll up if active row is above visible window.
-	if b.activeRow < col.scrollOff {
-		col.scrollOff = b.activeRow
+	for range len(col.tasks) + 1 {
+		maxVis := b.visibleCardsForColumn(col, w)
+
+		switch {
+		case b.activeRow >= col.scrollOff+maxVis:
+			// Scroll down: selected row is below visible window.
+			col.scrollOff = b.activeRow - maxVis + 1
+		case b.activeRow < col.scrollOff:
+			// Scroll up: selected row is above visible window.
+			col.scrollOff = b.activeRow
+		default:
+			return // selected row is visible
+		}
 	}
 }
 

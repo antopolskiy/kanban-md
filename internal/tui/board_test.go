@@ -1730,3 +1730,96 @@ func TestBoard_BottomLineStableWhenScrolling(t *testing.T) {
 		}
 	}
 }
+
+func TestBoard_ScrollFollowsSelectedTask(t *testing.T) {
+	// Bug #164: When scrolling down with variable-height cards, the selected
+	// task can end up off-screen because ensureVisible() computes maxVis at
+	// the old scrollOff and then adjusts scrollOff, but at the new offset
+	// the visible card count may be smaller (taller cards + up indicator).
+	//
+	// Setup: 4 tasks in "todo" with distinct priorities (controlling sort
+	// order). Task #4 (low priority, last in sort order) has a long title
+	// that wraps to 3 lines at columnWidth=20 with title_lines=3.
+	// Card heights: [4, 4, 4, 6].
+	// Terminal 100x16 → budget=14, header=1, avail=13.
+	//
+	// At scrollOff=0: 3 short cards fit. When scrolling to the 4th task,
+	// ensureVisible sets scrollOff=1, but at scrollOff=1 the up indicator
+	// steals a line and the tall 4th card reduces maxVis to 2, leaving the
+	// selected task off-screen.
+	dir := t.TempDir()
+	kanbanDir := filepath.Join(dir, "kanban")
+	tasksDir := filepath.Join(kanbanDir, "tasks")
+
+	if err := os.MkdirAll(tasksDir, 0o750); err != nil {
+		t.Fatalf("creating dirs: %v", err)
+	}
+
+	cfg := config.NewDefault("Scroll Follow Test")
+	const testTitleLines = 3
+	cfg.TUI.TitleLines = testTitleLines
+	cfg.SetDir(kanbanDir)
+	if err := cfg.Save(); err != nil {
+		t.Fatalf("saving config: %v", err)
+	}
+
+	// Distinct priorities → deterministic sort: critical, high, medium, low.
+	// Task 4 (low, sorted last) has a long title → taller card.
+	tasks := []struct {
+		id       int
+		title    string
+		priority string
+	}{
+		{1, "Short A", priorityCritical},
+		{2, "Short B", "high"},
+		{3, "Short C", "medium"},
+		{4, "A very long title that will wrap to multiple lines in a narrow column", "low"},
+	}
+	// Expected TUI order: #1 (critical), #2 (high), #3 (medium), #4 (low).
+
+	for _, tt := range tasks {
+		tk := &task.Task{
+			ID:       tt.id,
+			Title:    tt.title,
+			Status:   statusTodo,
+			Priority: tt.priority,
+			Updated:  testRefTime,
+		}
+		path := filepath.Join(tasksDir, task.GenerateFilename(tt.id, tt.title))
+		if err := task.Write(path, tk); err != nil {
+			t.Fatalf("writing task: %v", err)
+		}
+	}
+
+	const termHeight = 16
+	b := tui.NewBoard(cfg)
+	b.SetNow(testNow)
+	b.Update(tea.WindowSizeMsg{Width: 100, Height: termHeight})
+
+	// Navigate to "todo" column (col 1).
+	b = sendKey(b, "l")
+
+	// Expected sort order by ID (priority descending): 1, 2, 3, 4.
+	expectedOrder := [4]int{1, 2, 3, 4}
+
+	// Scroll down through all tasks, checking the selected task is visible.
+	for i := 1; i < len(expectedOrder); i++ {
+		b = sendKey(b, "j")
+		v := b.View()
+		selectedID := fmt.Sprintf("#%d", expectedOrder[i])
+		if !containsStr(v, selectedID) {
+			t.Errorf("after %d down-scrolls: selected task %s is not visible in the view",
+				i, selectedID)
+		}
+	}
+
+	// Also verify scrolling back up keeps the selected task visible.
+	for i := len(expectedOrder) - 2; i >= 0; i-- {
+		b = sendKey(b, "k")
+		v := b.View()
+		selectedID := fmt.Sprintf("#%d", expectedOrder[i])
+		if !containsStr(v, selectedID) {
+			t.Errorf("scrolling up to task %s: not visible in the view", selectedID)
+		}
+	}
+}
