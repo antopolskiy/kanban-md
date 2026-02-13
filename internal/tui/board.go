@@ -829,12 +829,16 @@ func (b *Board) viewBoard() string {
 
 	boardView := lipgloss.JoinHorizontal(lipgloss.Top, renderedCols...)
 
-	// Pad board view to fill available height so the status bar stays at the
-	// bottom regardless of how many card lines the visible tasks consume.
+	// Ensure the board view fits within the available height. At very small
+	// terminal sizes, a single card can exceed the budget. Clamp from the
+	// bottom (keeping headers at the top) and pad if needed.
 	targetHeight := b.height - b.chromeHeight()
 	if targetHeight > 0 {
 		actual := strings.Count(boardView, "\n") + 1
-		if actual < targetHeight {
+		if actual > targetHeight {
+			viewLines := strings.SplitN(boardView, "\n", targetHeight+1)
+			boardView = strings.Join(viewLines[:targetHeight], "\n")
+		} else if actual < targetHeight {
 			boardView += strings.Repeat("\n", targetHeight-actual)
 		}
 	}

@@ -1978,3 +1978,96 @@ func TestBoard_ErrorDoesNotHideColumnHeaders(t *testing.T) {
 			len(lines), termHeight)
 	}
 }
+
+func TestBoard_ColumnHeadersAlwaysVisible(t *testing.T) {
+	// Bug #174: Column headers can disappear at certain terminal sizes.
+	// Test various heights with a board that has enough tasks to scroll.
+	b, _ := setupTestBoard(t)
+
+	statuses := []string{"backlog", "todo", "in-progress", "review", "done"}
+	// Include small heights (5-7) where card+indicators can exceed budget.
+	for _, height := range []int{5, 6, 7, 8, 10, 15, 20, 30, 40} {
+		b.Update(tea.WindowSizeMsg{Width: 100, Height: height})
+		v := b.View()
+
+		// The first non-empty line should contain column headers.
+		firstLine := strings.TrimSpace(stripANSI(strings.Split(v, "\n")[0]))
+		if firstLine == "" {
+			t.Errorf("height %d: first line is blank — headers are missing", height)
+			continue
+		}
+
+		// Each status column header should be present.
+		for _, status := range statuses {
+			if !containsStr(v, status) {
+				t.Errorf("height %d: column header %q is not visible", height, status)
+			}
+		}
+
+		// View should never exceed terminal height.
+		lines := strings.Split(v, "\n")
+		if len(lines) > height {
+			t.Errorf("height %d: view has %d lines, exceeds terminal height",
+				height, len(lines))
+		}
+	}
+}
+
+func TestBoard_ColumnHeadersVisibleWithManyTasks(t *testing.T) {
+	// Bug #174: With many tasks and constrained terminal height, column
+	// headers can be pushed off-screen by card rendering that exceeds budget.
+	dir := t.TempDir()
+	kanbanDir := filepath.Join(dir, "kanban")
+	tasksDir := filepath.Join(kanbanDir, "tasks")
+
+	if err := os.MkdirAll(tasksDir, 0o750); err != nil {
+		t.Fatalf("creating dirs: %v", err)
+	}
+
+	cfg := config.NewDefault("Header Test")
+	const testTitleLines = 3
+	cfg.TUI.TitleLines = testTitleLines
+	cfg.SetDir(kanbanDir)
+	if err := cfg.Save(); err != nil {
+		t.Fatalf("saving config: %v", err)
+	}
+
+	// Create 35 tasks across columns with long titles that wrap to 3 lines.
+	const taskCount = 35
+	statuses := [5]string{"backlog", statusTodo, "in-progress", "review", "done"}
+	for i := 1; i <= taskCount; i++ {
+		status := statuses[i%len(statuses)] //nolint:gosec // index is bounded by array length
+		tk := &task.Task{
+			ID:       i,
+			Title:    fmt.Sprintf("Task %d with a longer title that might wrap across multiple lines", i),
+			Status:   status,
+			Priority: "medium",
+			Updated:  testRefTime,
+		}
+		path := filepath.Join(tasksDir, task.GenerateFilename(i, tk.Title))
+		if err := task.Write(path, tk); err != nil {
+			t.Fatalf("writing task: %v", err)
+		}
+	}
+
+	b := tui.NewBoard(cfg)
+	b.SetNow(testNow)
+
+	for _, height := range []int{10, 15, 20, 25, 30} {
+		b.Update(tea.WindowSizeMsg{Width: 100, Height: height})
+		v := b.View()
+		lines := strings.Split(v, "\n")
+
+		if len(lines) > height {
+			t.Errorf("height %d: view has %d lines, exceeds terminal height — headers pushed off-screen",
+				height, len(lines))
+		}
+
+		// Verify column headers are present in the first line.
+		for _, status := range statuses {
+			if !containsStr(lines[0], status) {
+				t.Errorf("height %d: column header %q not in first line", height, status)
+			}
+		}
+	}
+}
