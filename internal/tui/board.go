@@ -29,6 +29,7 @@ const (
 	viewConfirmDelete
 	viewHelp
 	viewCreate
+	viewDebug
 )
 
 // Key and layout constants.
@@ -151,6 +152,8 @@ func (b *Board) View() string {
 		return b.viewHelp()
 	case viewCreate:
 		return b.viewCreateDialog()
+	case viewDebug:
+		return b.viewDebugScreen()
 	default:
 		return b.viewBoard()
 	}
@@ -175,6 +178,8 @@ func (b *Board) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return b.handleHelpKey(msg)
 	case viewCreate:
 		return b.handleCreateKey(msg)
+	case viewDebug:
+		return b.handleDebugKey(msg)
 	}
 
 	return b, nil
@@ -206,6 +211,8 @@ func (b *Board) handleBoardKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		b.handleDeleteStart()
 	case "r":
 		b.loadTasks()
+	case "ctrl+d":
+		b.view = viewDebug
 	}
 	return b, nil
 }
@@ -530,6 +537,14 @@ func (b *Board) handleDeleteKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 func (b *Board) handleHelpKey(_ tea.KeyMsg) (tea.Model, tea.Cmd) {
 	b.view = viewBoard
+	return b, nil
+}
+
+func (b *Board) handleDebugKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.String() {
+	case keyEsc, "q", "ctrl+d":
+		b.view = viewBoard
+	}
 	return b, nil
 }
 
@@ -1620,6 +1635,43 @@ func (b *Board) viewHelp() string {
 
 	lines = append(lines, "")
 	lines = append(lines, dimStyle.Render("Press any key to close"))
+
+	return dialogStyle.Render(strings.Join(lines, "\n"))
+}
+
+func (b *Board) viewDebugScreen() string {
+	labelStyle := lipgloss.NewStyle().Bold(true).Width(16) //nolint:mnd // debug label width
+	var lines []string
+
+	lines = append(lines, lipgloss.NewStyle().Bold(true).Render("Debug Info"))
+	lines = append(lines, "")
+	lines = append(lines, labelStyle.Render("Terminal:")+"  "+
+		strconv.Itoa(b.width)+"x"+strconv.Itoa(b.height))
+	lines = append(lines, labelStyle.Render("Active col:")+"  "+
+		strconv.Itoa(b.activeCol))
+	lines = append(lines, labelStyle.Render("Active row:")+"  "+
+		strconv.Itoa(b.activeRow))
+	lines = append(lines, labelStyle.Render("Columns:")+"  "+
+		strconv.Itoa(len(b.columns)))
+	lines = append(lines, labelStyle.Render("Total tasks:")+"  "+
+		strconv.Itoa(len(b.tasks)))
+
+	col := b.currentColumn()
+	if col != nil {
+		lines = append(lines, labelStyle.Render("Column:")+"  "+col.status)
+		lines = append(lines, labelStyle.Render("Col tasks:")+"  "+
+			strconv.Itoa(len(col.tasks)))
+		lines = append(lines, labelStyle.Render("Scroll off:")+"  "+
+			strconv.Itoa(col.scrollOff))
+	}
+
+	if t := b.selectedTask(); t != nil {
+		lines = append(lines, labelStyle.Render("Selected:")+"  #"+
+			strconv.Itoa(t.ID)+" "+t.Title)
+	}
+
+	lines = append(lines, "")
+	lines = append(lines, dimStyle.Render("ctrl+d/esc/q: close"))
 
 	return dialogStyle.Render(strings.Join(lines, "\n"))
 }

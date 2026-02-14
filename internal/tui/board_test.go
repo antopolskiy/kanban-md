@@ -2145,3 +2145,60 @@ func TestBoard_ColumnHeadersVisibleWithManyTasks(t *testing.T) {
 		}
 	}
 }
+
+func TestBoard_DebugScreenOpensAndCloses(t *testing.T) {
+	b, _ := setupTestBoard(t)
+
+	// Ctrl+D opens debug screen.
+	b = sendSpecialKey(b, tea.KeyCtrlD)
+	v := b.View()
+	if !containsStr(v, "Debug Info") {
+		t.Fatal("expected debug screen after Ctrl+D")
+	}
+	if !containsStr(v, "Terminal:") {
+		t.Error("expected terminal size in debug screen")
+	}
+
+	// Esc closes debug screen.
+	b = sendSpecialKey(b, tea.KeyEsc)
+	v = b.View()
+	if containsStr(v, "Debug Info") {
+		t.Error("expected board view after closing debug screen")
+	}
+}
+
+func TestBoard_DebugScreenShowsInfo(t *testing.T) {
+	b, _ := setupTestBoard(t)
+
+	b = sendSpecialKey(b, tea.KeyCtrlD)
+	v := b.View()
+
+	// Should show terminal dimensions.
+	if !containsStr(v, "120x40") {
+		t.Error("expected terminal size 120x40 in debug screen")
+	}
+	// Should show active column and row.
+	if !containsStr(v, "Active col:") {
+		t.Error("expected Active col in debug screen")
+	}
+	// Should show selected task info.
+	if !containsStr(v, "Task A") {
+		t.Error("expected selected task info in debug screen")
+	}
+}
+
+func TestBoard_DebugScreenCtrlDCloses(t *testing.T) {
+	b, _ := setupTestBoard(t)
+
+	b = sendSpecialKey(b, tea.KeyCtrlD)
+	if !containsStr(b.View(), "Debug Info") {
+		t.Fatal("expected debug screen")
+	}
+
+	// Ctrl+D again should close it.
+	b = sendSpecialKey(b, tea.KeyCtrlD)
+	v := b.View()
+	if containsStr(v, "Debug Info") {
+		t.Error("expected board view after second Ctrl+D")
+	}
+}
