@@ -201,7 +201,7 @@ Every task follows this lifecycle. The board is shared — multiple agents may w
 
 ```bash
 # 1. Generate a unique agent name at session start
-awk 'length >= 4 && length <= 8 && /^[a-z]+$/' /usr/share/dict/words | sort -R | head -2 | tr '\n' '-' | sed 's/-$//'
+go run ./cmd/kanban-md agent-name
 
 # 2. Pick and claim atomically (tries todo first, then backlog)
 go run ./cmd/kanban-md pick --claim <agent> --status todo --move in-progress

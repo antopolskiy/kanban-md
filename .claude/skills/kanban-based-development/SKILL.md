@@ -77,16 +77,10 @@ Defer to the user (leave the task in `review` with a handoff) only when you need
 Each agent session must generate a unique name to identify itself for claims. At the very start of a session, run:
 
 ```bash
-awk 'length >= 4 && length <= 8 && /^[a-z]+$/' /usr/share/dict/words | sort -R | head -2 | tr '\n' '-' | sed 's/-$//'
+kanban-md agent-name
 ```
 
-This produces a name like `rapidly-almoign` or `fiber-kindly`. **Remember this name in your context** and use it as a literal string in all claim/release commands for the rest of the session. Do not store it in a file or environment variable — those are not persistent or isolated between agents.
-
-Fallback if `/usr/share/dict/words` is missing:
-
-```bash
-echo "agent-$(date +%s)-$RANDOM"
-```
+This produces a name like `quiet-storm` or `frost-maple`. **Remember this name in your context** and use it as a literal string in all claim/release commands for the rest of the session. Do not store it in a file or environment variable — those are not persistent or isolated between agents.
 
 Example: if the generated name is `frost-maple`, use `--claim frost-maple` in every claim command.
 

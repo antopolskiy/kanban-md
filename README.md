@@ -401,6 +401,17 @@ kanban-md pick --claim agent-1 --tag backend
 
 The pick algorithm selects from unclaimed, unblocked tasks with satisfied dependencies, prioritizing by class of service (expedite > fixed-date > standard > intangible), then by priority within each class. Fixed-date tasks are further sorted by earliest due date.
 
+### `agent-name`
+
+Generate a random two-word name for use with `--claim`. Uses the system dictionary when available, with a built-in word list as fallback.
+
+```bash
+kanban-md agent-name
+# → quiet-storm
+
+kanban-md pick --claim $(kanban-md agent-name) --status todo --move in-progress
+```
+
 ### `metrics`
 
 Show flow metrics: throughput, average lead/cycle time, flow efficiency, and aging work items.
