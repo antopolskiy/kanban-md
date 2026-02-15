@@ -60,12 +60,6 @@ func TestCreate_BackspaceDeletesCharacter(t *testing.T) {
 	}
 }
 
-// sendAltEnter sends Alt+Enter to finish the create wizard immediately.
-func sendAltEnter(b *tui.Board) *tui.Board {
-	m, _ := b.Update(tea.KeyMsg{Type: tea.KeyEnter, Alt: true})
-	return m.(*tui.Board)
-}
-
 // typeText sends each character as a rune key to the board.
 func typeText(b *tui.Board, text string) *tui.Board {
 	for _, ch := range text {
@@ -75,7 +69,7 @@ func typeText(b *tui.Board, text string) *tui.Board {
 	return b
 }
 
-func TestCreate_AltEnterCreatesTask(t *testing.T) {
+func TestCreate_EnterCreatesFromTitleStep(t *testing.T) {
 	b, cfg := setupTestBoard(t)
 
 	// Navigate to todo column (l once from backlog).
@@ -84,9 +78,9 @@ func TestCreate_AltEnterCreatesTask(t *testing.T) {
 	// Open create dialog.
 	b = sendKey(b, "c")
 
-	// Type task title and Alt+Enter to create immediately.
+	// Type task title and Enter to create immediately.
 	b = typeText(b, "My new task")
-	b = sendAltEnter(b)
+	b = sendSpecialKey(b, tea.KeyEnter)
 
 	// Board should be back to normal view with the new task visible.
 	v := b.View()
@@ -126,7 +120,7 @@ func TestCreate_FullWizardCreatesTask(t *testing.T) {
 		t.Fatal("expected step 1 (Title)")
 	}
 	b = typeText(b, "Wizard task")
-	b = sendSpecialKey(b, tea.KeyEnter) // advance to body
+	b = sendSpecialKey(b, tea.KeyTab) // advance to body
 
 	// Step 2: Body.
 	v = b.View()
@@ -142,8 +136,8 @@ func TestCreate_FullWizardCreatesTask(t *testing.T) {
 		t.Fatal("expected step 3 (Priority)")
 	}
 
-	b = sendKey(b, "j")                 // move to next priority
-	b = sendSpecialKey(b, tea.KeyEnter) // advance to tags
+	b = sendKey(b, "j")               // move to next priority
+	b = sendSpecialKey(b, tea.KeyTab) // advance to tags
 
 	// Step 4: Tags.
 	v = b.View()
@@ -176,16 +170,16 @@ func TestCreate_FullWizardCreatesTask(t *testing.T) {
 	}
 }
 
-func TestCreate_EnterAdvancesToBodyStep(t *testing.T) {
+func TestCreate_TabAdvancesToBodyStep(t *testing.T) {
 	b, _ := setupTestBoard(t)
 
 	b = sendKey(b, "c")
 	b = typeText(b, "Some title")
-	b = sendSpecialKey(b, tea.KeyEnter)
+	b = sendSpecialKey(b, tea.KeyTab)
 
 	v := b.View()
 	if !containsStr(v, "Step 2/4: Body") {
-		t.Error("expected body step after Enter on title")
+		t.Error("expected body step after Tab on title")
 	}
 }
 
@@ -229,10 +223,10 @@ func TestCreate_NextIDIncrements(t *testing.T) {
 
 	initialNextID := cfg.NextID
 
-	// Create a task using Alt+Enter to finish immediately.
+	// Create a task using Enter to finish immediately from title.
 	b = sendKey(b, "c")
 	b = typeText(b, "Increment test")
-	_ = sendAltEnter(b)
+	_ = sendSpecialKey(b, tea.KeyEnter)
 
 	// Reload config and check NextID incremented.
 	reloaded, err := config.Load(cfg.Dir())
@@ -280,7 +274,7 @@ func TestCreate_ShiftTabNavigatesBack(t *testing.T) {
 
 	b = sendKey(b, "c")
 	b = typeText(b, "Title")
-	b = sendSpecialKey(b, tea.KeyEnter) // → body
+	b = sendSpecialKey(b, tea.KeyTab) // → body
 
 	v := b.View()
 	if !containsStr(v, "Step 2/4: Body") {
@@ -301,53 +295,13 @@ func TestCreate_ShiftTabNavigatesBack(t *testing.T) {
 	}
 }
 
-func TestCreate_BodyMultiline(t *testing.T) {
-	b, _ := setupTestBoard(t)
-
-	b = sendKey(b, "c")
-	b = typeText(b, "Title")
-	b = sendSpecialKey(b, tea.KeyEnter) // → body
-
-	// Type first line.
-	b = typeText(b, "Line 1")
-	// Enter adds a new line in body.
-	b = sendSpecialKey(b, tea.KeyEnter)
-	b = typeText(b, "Line 2")
-
-	v := b.View()
-	if !containsStr(v, "Line 1") {
-		t.Error("expected Line 1 in body")
-	}
-	if !containsStr(v, "Line 2") {
-		t.Error("expected Line 2 in body")
-	}
-}
-
-func TestCreate_BodyBackspaceMergesLines(t *testing.T) {
-	b, _ := setupTestBoard(t)
-
-	b = sendKey(b, "c")
-	b = typeText(b, "Title")
-	b = sendSpecialKey(b, tea.KeyEnter) // → body
-
-	b = typeText(b, "First")
-	b = sendSpecialKey(b, tea.KeyEnter) // new line
-	// Backspace on empty second line should merge back.
-	b = sendSpecialKey(b, tea.KeyBackspace)
-
-	v := b.View()
-	if !containsStr(v, "First") {
-		t.Error("expected First in body after merge")
-	}
-}
-
 func TestCreate_PrioritySelection(t *testing.T) {
 	b, _ := setupTestBoard(t)
 
 	b = sendKey(b, "c")
 	b = typeText(b, "Priority test")
-	b = sendSpecialKey(b, tea.KeyEnter) // → body
-	b = sendSpecialKey(b, tea.KeyTab)   // → priority
+	b = sendSpecialKey(b, tea.KeyTab) // → body
+	b = sendSpecialKey(b, tea.KeyTab) // → priority
 
 	v := b.View()
 	if !containsStr(v, "Step 3/4: Priority") {
@@ -369,7 +323,7 @@ func TestCreate_EscCancelsFromAnyStep(t *testing.T) {
 	// Open wizard, advance to body step, then cancel.
 	b = sendKey(b, "c")
 	b = typeText(b, "Cancel test")
-	b = sendSpecialKey(b, tea.KeyEnter) // → body
+	b = sendSpecialKey(b, tea.KeyTab) // → body
 	b = sendSpecialKey(b, tea.KeyEscape)
 
 	v := b.View()
@@ -389,7 +343,7 @@ func TestCreate_FullWizardTaskHasCorrectFields(t *testing.T) {
 
 	// Title.
 	b = typeText(b, "Field test")
-	b = sendSpecialKey(b, tea.KeyEnter) // → body
+	b = sendSpecialKey(b, tea.KeyTab) // → body
 
 	// Body.
 	b = typeText(b, "Description here")
@@ -397,7 +351,7 @@ func TestCreate_FullWizardTaskHasCorrectFields(t *testing.T) {
 
 	// Priority: default is medium (index 1). Move down to high (index 2).
 	b = sendKey(b, "j")
-	b = sendSpecialKey(b, tea.KeyEnter) // → tags
+	b = sendSpecialKey(b, tea.KeyTab) // → tags
 
 	// Tags.
 	b = typeText(b, "backend, api")
@@ -420,7 +374,7 @@ func TestCreate_FullWizardTaskHasCorrectFields(t *testing.T) {
 			if tk.Body != "Description here\n" {
 				t.Errorf("body = %q, want %q", tk.Body, "Description here\n")
 			}
-			if tk.Priority != "high" {
+			if tk.Priority != "high" { //nolint:goconst // test value
 				t.Errorf("priority = %q, want %q", tk.Priority, "high")
 			}
 			if len(tk.Tags) != 2 || tk.Tags[0] != "backend" || tk.Tags[1] != "api" {
@@ -432,18 +386,18 @@ func TestCreate_FullWizardTaskHasCorrectFields(t *testing.T) {
 	t.Error("task file not found")
 }
 
-func TestCreate_AltEnterFromBodyStep(t *testing.T) {
+func TestCreate_EnterCreatesFromBodyStep(t *testing.T) {
 	b, cfg := setupTestBoard(t)
 
 	b = sendKey(b, "c")
 	b = typeText(b, "Quick create")
-	b = sendSpecialKey(b, tea.KeyEnter) // → body
+	b = sendSpecialKey(b, tea.KeyTab) // → body
 	b = typeText(b, "Some body")
-	b = sendAltEnter(b) // finish immediately from body step
+	b = sendSpecialKey(b, tea.KeyEnter) // create from body step
 
 	v := b.View()
 	if !containsStr(v, "Quick create") {
-		t.Error("expected task in board after alt+enter from body step")
+		t.Error("expected task in board after enter from body step")
 	}
 
 	// Verify body was saved.
@@ -464,6 +418,123 @@ func TestCreate_AltEnterFromBodyStep(t *testing.T) {
 		}
 	}
 	t.Error("task file not found")
+}
+
+func TestCreate_EnterCreatesFromPriorityStep(t *testing.T) {
+	b, cfg := setupTestBoard(t)
+
+	b = sendKey(b, "c")
+	b = typeText(b, "Priority create")
+	b = sendSpecialKey(b, tea.KeyTab)   // → body
+	b = sendSpecialKey(b, tea.KeyTab)   // → priority
+	b = sendKey(b, "j")                 // select next priority
+	b = sendSpecialKey(b, tea.KeyEnter) // create from priority step
+
+	v := b.View()
+	if !containsStr(v, "Priority create") {
+		t.Error("expected task in board after enter from priority step")
+	}
+
+	// Verify task was created.
+	entries, err := os.ReadDir(cfg.TasksPath())
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, e := range entries {
+		if containsStr(e.Name(), "priority-create") {
+			tk, err := task.Read(filepath.Join(cfg.TasksPath(), e.Name()))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if tk.Priority != "high" {
+				t.Errorf("priority = %q, want %q", tk.Priority, "high")
+			}
+			return
+		}
+	}
+	t.Error("task file not found")
+}
+
+func TestCreate_TabDoesNotAdvancePastLastStep(t *testing.T) {
+	b, _ := setupTestBoard(t)
+
+	b = sendKey(b, "c")
+	b = typeText(b, "Tab test")
+	b = sendSpecialKey(b, tea.KeyTab) // → body
+	b = sendSpecialKey(b, tea.KeyTab) // → priority
+	b = sendSpecialKey(b, tea.KeyTab) // → tags
+	b = sendSpecialKey(b, tea.KeyTab) // should stay on tags
+
+	v := b.View()
+	if !containsStr(v, "Step 4/4: Tags") {
+		t.Error("expected to stay on tags step after extra tab")
+	}
+}
+
+func TestCreate_ShiftTabDoesNotGoPastFirstStep(t *testing.T) {
+	b, _ := setupTestBoard(t)
+
+	b = sendKey(b, "c")
+	b = typeText(b, "Back test")
+
+	// Shift+Tab on first step should stay on title.
+	m, _ := b.Update(tea.KeyMsg{Type: tea.KeyShiftTab})
+	b = m.(*tui.Board)
+
+	v := b.View()
+	if !containsStr(v, "Step 1/4: Title") {
+		t.Error("expected to stay on title step after shift+tab")
+	}
+}
+
+func TestCreate_ConsistentHints(t *testing.T) {
+	b, _ := setupTestBoard(t)
+	b = sendKey(b, "c")
+
+	// Title step: should show tab:next and enter:create (no alt+enter).
+	v := b.View()
+	if !containsStr(v, "tab:next") {
+		t.Error("expected 'tab:next' hint on title step")
+	}
+	if !containsStr(v, "enter:create") {
+		t.Error("expected 'enter:create' hint on title step")
+	}
+	if containsStr(v, "alt+enter") {
+		t.Error("should not show 'alt+enter' hint")
+	}
+
+	// Body step.
+	b = sendSpecialKey(b, tea.KeyTab)
+	v = b.View()
+	if !containsStr(v, "tab:next") {
+		t.Error("expected 'tab:next' hint on body step")
+	}
+	if !containsStr(v, "enter:create") {
+		t.Error("expected 'enter:create' hint on body step")
+	}
+	if !containsStr(v, "shift+tab:back") {
+		t.Error("expected 'shift+tab:back' hint on body step")
+	}
+
+	// Priority step.
+	b = sendSpecialKey(b, tea.KeyTab)
+	v = b.View()
+	if !containsStr(v, "tab:next") {
+		t.Error("expected 'tab:next' hint on priority step")
+	}
+	if !containsStr(v, "enter:create") {
+		t.Error("expected 'enter:create' hint on priority step")
+	}
+
+	// Tags step.
+	b = sendSpecialKey(b, tea.KeyTab)
+	v = b.View()
+	if !containsStr(v, "enter:create") {
+		t.Error("expected 'enter:create' hint on tags step")
+	}
+	if !containsStr(v, "shift+tab:back") {
+		t.Error("expected 'shift+tab:back' hint on tags step")
+	}
 }
 
 func countTaskFiles(t *testing.T, dir string) int {

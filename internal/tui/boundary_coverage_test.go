@@ -262,13 +262,13 @@ func TestBoundary_ExecuteCreate_WriteError(t *testing.T) {
 		_ = os.Chmod(tasksDir, 0o750) //nolint:gosec // restore in cleanup
 	})
 
-	// Open create dialog and type a title, then Alt+Enter to create immediately.
+	// Open create dialog and type a title, then Enter to create immediately.
 	b = sendKey(b, "c")
 	for _, ch := range "Fail task" {
 		m, _ := b.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{ch}})
 		b = m.(*tui.Board)
 	}
-	b = sendAltEnter(b)
+	b = sendSpecialKey(b, tea.KeyEnter)
 
 	v := b.View()
 	if !containsStr(v, "creating task") {
@@ -314,13 +314,13 @@ func TestBoundary_ExecuteCreate_ConfigSaveError(t *testing.T) {
 	cfgPath := filepath.Join(kanbanDir, "config.yml")
 	makeReadOnly(t, cfgPath)
 
-	// Open create dialog and type a title, then Alt+Enter to create immediately.
+	// Open create dialog and type a title, then Enter to create immediately.
 	b = sendKey(b, "c")
 	for _, ch := range "Config fail" {
 		m, _ := b.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{ch}})
 		b = m.(*tui.Board)
 	}
-	b = sendAltEnter(b)
+	b = sendSpecialKey(b, tea.KeyEnter)
 
 	// The error from cfg.Save() is set but cleared by the subsequent
 	// loadTasks() call. The task file was still created on disk (the write

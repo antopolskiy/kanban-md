@@ -301,9 +301,25 @@ func (b *Board) handleCreateKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return b, nil
 	}
 
-	// Alt+Enter finishes immediately from any step (skipping remaining steps).
-	if msg.Type == tea.KeyEnter && msg.Alt {
+	// Enter always creates the task (from any step).
+	if msg.Type == tea.KeyEnter {
 		return b.executeCreate()
+	}
+
+	// Tab advances to next step.
+	if msg.String() == "tab" {
+		if b.createStep < stepCount-1 {
+			b.createStep++
+		}
+		return b, nil
+	}
+
+	// Shift+Tab goes back to previous step.
+	if msg.String() == keyShiftTab {
+		if b.createStep > 0 {
+			b.createStep--
+		}
+		return b, nil
 	}
 
 	switch b.createStep {
@@ -321,12 +337,6 @@ func (b *Board) handleCreateKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 func (b *Board) handleCreateTitle(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.Type {
-	case tea.KeyEnter:
-		if strings.TrimSpace(b.createTitle) == "" {
-			b.view = viewBoard
-			return b, nil
-		}
-		b.createStep = stepBody
 	case tea.KeyBackspace:
 		if len(b.createTitle) > 0 {
 			b.createTitle = b.createTitle[:len(b.createTitle)-1]
@@ -341,48 +351,17 @@ func (b *Board) handleCreateTitle(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 func (b *Board) handleCreateBody(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.Type {
-	case tea.KeyEnter:
-		// Enter in body adds a new line.
-		newLines := make([]string, 0, len(b.createBody)+1)
-		newLines = append(newLines, b.createBody[:b.createBodyRow+1]...)
-		newLines = append(newLines, "")
-		newLines = append(newLines, b.createBody[b.createBodyRow+1:]...)
-		b.createBody = newLines
-		b.createBodyRow++
 	case tea.KeyBackspace:
-		line := b.createBody[b.createBodyRow]
+		line := b.createBody[0]
 		if len(line) > 0 {
-			b.createBody[b.createBodyRow] = line[:len(line)-1]
-		} else if b.createBodyRow > 0 {
-			// Merge with previous line.
-			b.createBody = append(b.createBody[:b.createBodyRow], b.createBody[b.createBodyRow+1:]...)
-			b.createBodyRow--
+			b.createBody[0] = line[:len(line)-1]
 		}
 	case tea.KeyRunes:
-		b.createBody[b.createBodyRow] += string(msg.Runes)
+		b.createBody[0] += string(msg.Runes)
 	case tea.KeySpace:
-		b.createBody[b.createBodyRow] += " "
-	default:
-		b.handleCreateBodyNav(msg)
+		b.createBody[0] += " "
 	}
 	return b, nil
-}
-
-func (b *Board) handleCreateBodyNav(msg tea.KeyMsg) {
-	switch msg.String() {
-	case keyUp:
-		if b.createBodyRow > 0 {
-			b.createBodyRow--
-		}
-	case keyDown:
-		if b.createBodyRow < len(b.createBody)-1 {
-			b.createBodyRow++
-		}
-	case "tab":
-		b.createStep = stepPriority
-	case keyShiftTab:
-		b.createStep = stepTitle
-	}
 }
 
 func (b *Board) handleCreatePriority(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
@@ -395,20 +374,12 @@ func (b *Board) handleCreatePriority(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if b.createPriority > 0 {
 			b.createPriority--
 		}
-	case keyEnter:
-		b.createStep = stepTags
-	case "tab":
-		b.createStep = stepTags
-	case keyShiftTab:
-		b.createStep = stepBody
 	}
 	return b, nil
 }
 
 func (b *Board) handleCreateTags(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.Type {
-	case tea.KeyEnter:
-		return b.executeCreate()
 	case tea.KeyBackspace:
 		if len(b.createTags) > 0 {
 			b.createTags = b.createTags[:len(b.createTags)-1]
@@ -417,10 +388,6 @@ func (b *Board) handleCreateTags(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		b.createTags += string(msg.Runes)
 	case tea.KeySpace:
 		b.createTags += " "
-	default:
-		if msg.String() == keyShiftTab {
-			b.createStep = stepPriority
-		}
 	}
 	return b, nil
 }
@@ -1550,13 +1517,13 @@ func (b *Board) stepName() string {
 func (b *Board) createHint() string {
 	switch b.createStep {
 	case stepTitle:
-		return "enter:next  alt+enter:create  esc:cancel"
+		return "tab:next  enter:create  esc:cancel"
 	case stepBody:
-		return "tab:next  shift+tab:back  alt+enter:create  esc:cancel"
+		return "tab:next  shift+tab:back  enter:create  esc:cancel"
 	case stepPriority:
-		return "j/k:select  enter/tab:next  shift+tab:back  alt+enter:create  esc:cancel"
+		return "↑/↓:select  tab:next  shift+tab:back  enter:create  esc:cancel"
 	case stepTags:
-		return "enter:create  shift+tab:back  esc:cancel"
+		return "shift+tab:back  enter:create  esc:cancel"
 	default:
 		return "esc:cancel"
 	}
@@ -1568,17 +1535,8 @@ func (b *Board) viewCreateTitle() string {
 }
 
 func (b *Board) viewCreateBody() string {
-	label := lipgloss.NewStyle().Bold(true).Render("Body:")
-	var lines []string
-	for i, line := range b.createBody {
-		prefix := "  "
-		if i == b.createBodyRow {
-			line += "▏"
-			prefix = "> "
-		}
-		lines = append(lines, prefix+line)
-	}
-	return label + "\n" + strings.Join(lines, "\n")
+	label := lipgloss.NewStyle().Bold(true).Render("Body: ")
+	return label + b.createBody[0] + "▏"
 }
 
 func (b *Board) viewCreatePriority() string {
