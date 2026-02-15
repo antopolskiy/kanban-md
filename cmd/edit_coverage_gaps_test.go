@@ -399,7 +399,7 @@ func TestExecuteEdit_WriteAndRenameError(t *testing.T) {
 	}
 	createTaskFile(t, cfg.TasksPath(), 1, "test-task")
 
-	if runtime.GOOS == "windows" { //nolint:goconst // idiomatic platform check
+	if runtime.GOOS == "windows" {
 		t.Skip("chmod does not restrict directory writes on Windows")
 	}
 

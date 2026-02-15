@@ -39,6 +39,15 @@ linters:
     funlen:
       lines: 100
       statements: 50
+    goconst:
+      ignore-string-values:
+        - "windows"
+        - "darwin"
+        - "linux"
+        - "high"
+        - "medium"
+        - "low"
+        - "critical"
     gocyclo:
       min-complexity: 15
     govet:

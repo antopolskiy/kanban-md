@@ -374,7 +374,7 @@ func TestCreate_FullWizardTaskHasCorrectFields(t *testing.T) {
 			if tk.Body != "Description here\n" {
 				t.Errorf("body = %q, want %q", tk.Body, "Description here\n")
 			}
-			if tk.Priority != "high" { //nolint:goconst // test value
+			if tk.Priority != "high" {
 				t.Errorf("priority = %q, want %q", tk.Priority, "high")
 			}
 			if len(tk.Tags) != 2 || tk.Tags[0] != "backend" || tk.Tags[1] != "api" {
