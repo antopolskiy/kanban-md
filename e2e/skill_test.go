@@ -17,7 +17,7 @@ import (
 // runKanbanNoDir runs the binary without the --dir flag (for skill commands).
 func runKanbanNoDir(t *testing.T, dir string, args ...string) result {
 	t.Helper()
-	cmd := exec.Command(binPath, args...) //nolint:noctx // e2e test binary
+	cmd := exec.Command(binPath, args...) //nolint:noctx,gosec // e2e test binary, args are test-controlled
 	cmd.Dir = dir
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout

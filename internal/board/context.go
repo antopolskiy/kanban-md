@@ -233,9 +233,9 @@ func RenderContextMarkdown(data ContextData) string {
 	b.WriteString("\n\n")
 
 	// Summary.
-	b.WriteString(fmt.Sprintf("**%d tasks** | %d active | %d blocked | %d overdue\n",
+	fmt.Fprintf(&b, "**%d tasks** | %d active | %d blocked | %d overdue\n",
 		data.Summary.TotalTasks, data.Summary.Active,
-		data.Summary.Blocked, data.Summary.Overdue))
+		data.Summary.Blocked, data.Summary.Overdue)
 	if data.Summary.WIPWarning != "" {
 		b.WriteString("\n> ")
 		b.WriteString(data.Summary.WIPWarning)
@@ -248,7 +248,7 @@ func RenderContextMarkdown(data ContextData) string {
 		b.WriteString(sectionTitle(sec.Name))
 		b.WriteString("\n\n")
 		for _, item := range sec.Items {
-			b.WriteString(fmt.Sprintf("- **#%d** %s", item.ID, item.Title))
+			fmt.Fprintf(&b, "- **#%d** %s", item.ID, item.Title)
 			parts := []string{item.Priority}
 			if item.Assignee != "" {
 				parts = append(parts, "@"+item.Assignee)

@@ -141,7 +141,7 @@ func setupManyTasksBoard(t *testing.T) (*tui.Board, *config.Config) { //nolint:u
 			ID:       i,
 			Title:    fmt.Sprintf("Done task %d", i),
 			Status:   "done",
-			Priority: priorities[i%len(priorities)], //nolint:gosec // test data, no overflow
+			Priority: priorities[i%len(priorities)],
 			Updated:  testRefTime,
 		}
 		path := filepath.Join(tasksDir, task.GenerateFilename(i, tk.Title))

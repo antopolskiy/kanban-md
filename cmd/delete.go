@@ -84,7 +84,7 @@ func deleteSingleTask(cfg *config.Config, id int, yes bool) error {
 
 	// Require confirmation in TTY mode unless --yes.
 	if !yes {
-		if !term.IsTerminal(int(os.Stdin.Fd())) {
+		if !term.IsTerminal(int(os.Stdin.Fd())) { //nolint:gosec // Fd returns uintptr, int cast is safe for terminal check
 			return clierr.New(clierr.ConfirmationReq,
 				"cannot prompt for confirmation (not a terminal); use --yes")
 		}

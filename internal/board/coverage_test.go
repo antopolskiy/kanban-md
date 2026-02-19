@@ -221,7 +221,7 @@ func TestFilterPickDeps_NoStatuses(t *testing.T) {
 func TestRenderContextMarkdown_WIPWarning(t *testing.T) {
 	data := ContextData{
 		BoardName: "Test",
-		Summary: ContextSummary{
+		Summary: ContextSummary{ //nolint:gosec // G101 false positive: WIPWarning is not a credential
 			TotalTasks: 1,
 			WIPWarning: "WIP limit reached: in-progress (3/3)",
 		},

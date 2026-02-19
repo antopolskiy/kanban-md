@@ -436,7 +436,7 @@ func isInteractive() bool {
 }
 
 func defaultIsInteractive() bool {
-	return term.IsTerminal(int(os.Stdin.Fd()))
+	return term.IsTerminal(int(os.Stdin.Fd())) //nolint:gosec // Fd returns uintptr, int cast is safe for terminal check
 }
 
 // menuItem represents an item in a multi-select menu.
@@ -568,7 +568,7 @@ func (m selectModel) View() string {
 			label = selectActiveStyle.Render(label)
 		}
 
-		b.WriteString(fmt.Sprintf("  %s [%s] %s — %s\n", cursor, checkRendered, label, desc))
+		fmt.Fprintf(&b, "  %s [%s] %s — %s\n", cursor, checkRendered, label, desc)
 	}
 
 	b.WriteString(selectDimStyle.Render("\n  ↑/↓ navigate • space toggle • enter confirm • esc cancel\n"))

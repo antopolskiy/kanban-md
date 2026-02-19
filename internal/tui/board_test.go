@@ -2110,7 +2110,7 @@ func TestBoard_ColumnHeadersVisibleWithManyTasks(t *testing.T) {
 	const taskCount = 35
 	statuses := [5]string{"backlog", statusTodo, "in-progress", "review", "done"}
 	for i := 1; i <= taskCount; i++ {
-		status := statuses[i%len(statuses)] //nolint:gosec // index is bounded by array length
+		status := statuses[i%len(statuses)]
 		tk := &task.Task{
 			ID:       i,
 			Title:    fmt.Sprintf("Task %d with a longer title that might wrap across multiple lines", i),

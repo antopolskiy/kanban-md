@@ -165,7 +165,7 @@ func resolveTargetStatus(cmd *cobra.Command, args []string, t *task.Task, cfg *c
 
 	switch {
 	case len(args) == 2: //nolint:mnd // positional arg
-		status := args[1]
+		status := args[1] //nolint:gosec // args length checked by case guard
 		if err := task.ValidateStatus(status, cfg.StatusNames()); err != nil {
 			return "", err
 		}
