@@ -25,6 +25,7 @@ func newCreateCmd() *cobra.Command {
 	cmd.Flags().IntSlice("depends-on", nil, "")
 	cmd.Flags().String("body", "", "")
 	cmd.Flags().String("class", "", "")
+	cmd.Flags().String("claim", "", "")
 	return cmd
 }
 
@@ -230,6 +231,24 @@ func TestApplyCreateFlags_InvalidClass(t *testing.T) {
 	err := applyCreateFlags(cmd, tk, cfg)
 	if err == nil {
 		t.Fatal("expected error for invalid class")
+	}
+}
+
+func TestApplyCreateFlags_Claim(t *testing.T) {
+	cmd := newCreateCmd()
+	_ = cmd.Flags().Set("claim", "agent-test")
+
+	cfg := config.NewDefault("Test")
+	tk := &task.Task{}
+
+	if err := applyCreateFlags(cmd, tk, cfg); err != nil {
+		t.Fatal(err)
+	}
+	if tk.ClaimedBy != "agent-test" {
+		t.Errorf("claimed_by = %q, want %q", tk.ClaimedBy, "agent-test")
+	}
+	if tk.ClaimedAt == nil {
+		t.Error("claimed_at should be set")
 	}
 }
 

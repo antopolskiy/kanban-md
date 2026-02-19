@@ -100,7 +100,7 @@ func ValidateClass(class string, allowed []string) error {
 // ValidateClaimRequired returns a CLIError when a status requires --claim but none was provided.
 func ValidateClaimRequired(status string) *clierr.Error {
 	return clierr.Newf(clierr.ClaimRequired,
-		"status %q requires --claim <name>", status).
+		"status %q requires --claim <name> (run 'agent-name' to generate one)", status).
 		WithDetails(map[string]any{
 			"status": status,
 		})

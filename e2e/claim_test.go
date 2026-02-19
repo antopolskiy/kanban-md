@@ -850,6 +850,9 @@ func TestRequireClaimErrorMessageQuality(t *testing.T) {
 	if !strings.Contains(combined, "--claim") {
 		t.Error("error should mention --claim flag")
 	}
+	if !strings.Contains(combined, "agent-name") {
+		t.Error("error should mention 'agent-name' command for generating a name")
+	}
 }
 
 func TestRequireClaimJSONErrorOutput(t *testing.T) {

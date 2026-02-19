@@ -188,6 +188,39 @@ func TestCreateTitleFlagWithAllFlags(t *testing.T) {
 	}
 }
 
+func TestCreateWithClaim(t *testing.T) {
+	kanbanDir := initBoard(t)
+
+	var task taskJSON
+	r := runKanbanJSON(t, kanbanDir, &task, "create", "Claimed on create",
+		"--claim", "my-agent")
+
+	if r.exitCode != 0 {
+		t.Fatalf("create --claim failed: %s", r.stderr)
+	}
+	if task.ClaimedBy != "my-agent" {
+		t.Errorf("claimed_by = %q, want %q", task.ClaimedBy, "my-agent")
+	}
+}
+
+func TestCreateWithClaimAndStatus(t *testing.T) {
+	kanbanDir := initBoard(t)
+
+	var task taskJSON
+	r := runKanbanJSON(t, kanbanDir, &task, "create", "Claimed in-progress",
+		"--status", "in-progress", "--claim", "my-agent")
+
+	if r.exitCode != 0 {
+		t.Fatalf("create --claim --status in-progress failed: %s", r.stderr)
+	}
+	if task.Status != statusInProgress {
+		t.Errorf("status = %q, want %q", task.Status, statusInProgress)
+	}
+	if task.ClaimedBy != "my-agent" {
+		t.Errorf("claimed_by = %q, want %q", task.ClaimedBy, "my-agent")
+	}
+}
+
 // ---------------------------------------------------------------------------
 // List tests
 // ---------------------------------------------------------------------------

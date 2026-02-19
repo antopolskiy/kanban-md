@@ -52,6 +52,7 @@ func init() {
 	createCmd.Flags().IntSlice("depends-on", nil, "dependency task IDs (comma-separated)")
 	createCmd.Flags().String("body", "", "task body/description (markdown)")
 	createCmd.Flags().String("class", "", "class of service (expedite, fixed-date, standard, intangible)")
+	createCmd.Flags().String("claim", "", "claim task for an agent (use 'agent-name' to generate)")
 	rootCmd.AddCommand(createCmd)
 }
 
@@ -167,17 +168,8 @@ func resolveCreateTitle(cmd *cobra.Command, args []string) (string, error) {
 }
 
 func applyCreateFlags(cmd *cobra.Command, t *task.Task, cfg *config.Config) error {
-	if v, _ := cmd.Flags().GetString("status"); v != "" {
-		if err := task.ValidateStatus(v, cfg.StatusNames()); err != nil {
-			return err
-		}
-		t.Status = v
-	}
-	if v, _ := cmd.Flags().GetString("priority"); v != "" {
-		if err := task.ValidatePriority(v, cfg.Priorities); err != nil {
-			return err
-		}
-		t.Priority = v
+	if err := applyCreateValidatedFlags(cmd, t, cfg); err != nil {
+		return err
 	}
 	if v, _ := cmd.Flags().GetString("assignee"); v != "" {
 		t.Assignee = v
@@ -204,6 +196,28 @@ func applyCreateFlags(cmd *cobra.Command, t *task.Task, cfg *config.Config) erro
 	}
 	if v, _ := cmd.Flags().GetString("body"); v != "" {
 		t.Body = v
+	}
+	if v, _ := cmd.Flags().GetString("claim"); v != "" {
+		now := time.Now()
+		t.ClaimedBy = v
+		t.ClaimedAt = &now
+	}
+	return nil
+}
+
+// applyCreateValidatedFlags handles flags that require validation against config.
+func applyCreateValidatedFlags(cmd *cobra.Command, t *task.Task, cfg *config.Config) error {
+	if v, _ := cmd.Flags().GetString("status"); v != "" {
+		if err := task.ValidateStatus(v, cfg.StatusNames()); err != nil {
+			return err
+		}
+		t.Status = v
+	}
+	if v, _ := cmd.Flags().GetString("priority"); v != "" {
+		if err := task.ValidatePriority(v, cfg.Priorities); err != nil {
+			return err
+		}
+		t.Priority = v
 	}
 	if v, _ := cmd.Flags().GetString("class"); v != "" {
 		if err := task.ValidateClass(v, cfg.ClassNames()); err != nil {
