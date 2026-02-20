@@ -109,8 +109,8 @@ func ValidateClaimRequired(status string) *clierr.Error {
 // ValidateTaskClaimed returns a CLIError when a task is claimed by another agent.
 func ValidateTaskClaimed(id int, claimedBy, remaining string) *clierr.Error {
 	return clierr.Newf(clierr.TaskClaimed,
-		"task #%d is claimed by %q (expires in %s). Use 'edit --release' to release",
-		id, claimedBy, remaining).
+		"task #%d is claimed by %q (expires in %s). If this is you, add: --claim %s",
+		id, claimedBy, remaining, claimedBy).
 		WithDetails(map[string]any{
 			"id":         id,
 			"claimed_by": claimedBy,

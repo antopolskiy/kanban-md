@@ -125,8 +125,8 @@ func TestValidateTaskClaimed_MessageFormat(t *testing.T) {
 	if !containsStr(msg, "bot-1") {
 		t.Errorf("message %q should contain claimant", msg)
 	}
-	if !containsStr(msg, "--release") {
-		t.Errorf("message %q should mention --release flag", msg)
+	if !containsStr(msg, "--claim bot-1") {
+		t.Errorf("message %q should suggest '--claim bot-1' to re-claim", msg)
 	}
 }
 

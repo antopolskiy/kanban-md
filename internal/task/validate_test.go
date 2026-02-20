@@ -2,6 +2,7 @@ package task
 
 import (
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -307,5 +308,25 @@ func TestCheckClaimRemainingUnknown(t *testing.T) {
 
 	if cliErr.Details["remaining"] != remainingUnknown {
 		t.Errorf("details[remaining] = %v, want %q", cliErr.Details["remaining"], remainingUnknown)
+	}
+}
+
+func TestValidateTaskClaimedMessageSuggestsReclaimFlag(t *testing.T) {
+	recentTime := time.Now().Add(-5 * time.Minute)
+	tk := &Task{ID: 7, ClaimedBy: "frost-maple", ClaimedAt: &recentTime}
+
+	err := CheckClaim(tk, "other-agent", time.Hour)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+
+	msg := err.Error()
+	// The message must suggest re-passing --claim with the actual claimant name.
+	if !strings.Contains(msg, "--claim frost-maple") {
+		t.Errorf("error message should suggest '--claim frost-maple', got: %q", msg)
+	}
+	// The message must NOT suggest 'edit --release' as the primary action.
+	if strings.Contains(msg, "Use 'edit --release'") {
+		t.Errorf("error message should not suggest 'edit --release' as primary action, got: %q", msg)
 	}
 }
