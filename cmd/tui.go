@@ -29,6 +29,8 @@ Navigate with arrow keys or vim-style h/j/k/l, press ? for help.`,
 }
 
 func init() {
+	tuiCmd.Flags().Bool("hide-empty-columns", false, "hide empty columns in TUI (overrides config)")
+	tuiCmd.Flags().Bool("show-empty-columns", false, "show empty columns in TUI (overrides config)")
 	rootCmd.AddCommand(tuiCmd)
 }
 
@@ -40,7 +42,13 @@ func RunTUI(dir string) error {
 	return runTUI(tuiCmd, nil)
 }
 
-func runTUI(_ *cobra.Command, _ []string) error {
+func runTUI(cmd *cobra.Command, _ []string) error {
+	if cmd == nil {
+		cmd = &cobra.Command{Use: "tui"}
+		cmd.Flags().Bool("hide-empty-columns", false, "")
+		cmd.Flags().Bool("show-empty-columns", false, "")
+	}
+
 	cfg, err := loadConfig()
 	if err != nil {
 		if isBoardNotFound(err) {
@@ -53,7 +61,13 @@ func runTUI(_ *cobra.Command, _ []string) error {
 		}
 	}
 
+	hideEmptyColumns, err := resolveHideEmptyColumns(cmd, cfg)
+	if err != nil {
+		return err
+	}
+
 	model := tui.NewBoard(cfg)
+	model.SetHideEmptyColumns(hideEmptyColumns)
 	p := tea.NewProgram(model, tea.WithAltScreen())
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -63,6 +77,31 @@ func runTUI(_ *cobra.Command, _ []string) error {
 
 	_, err = p.Run()
 	return err
+}
+
+func resolveHideEmptyColumns(cmd *cobra.Command, cfg *config.Config) (bool, error) {
+	hideEmptyColumns := cfg.TUI.HideEmptyColumns
+	if cmd == nil {
+		return hideEmptyColumns, nil
+	}
+
+	hideChanged := cmd.Flags().Changed("hide-empty-columns")
+	showChanged := cmd.Flags().Changed("show-empty-columns")
+	if hideChanged && showChanged {
+		return false, clierr.New(clierr.StatusConflict, "cannot use --hide-empty-columns and --show-empty-columns together")
+	}
+
+	if hideChanged {
+		v, err := cmd.Flags().GetBool("hide-empty-columns")
+		if err != nil {
+			return false, err
+		}
+		return v, nil
+	}
+	if showChanged {
+		return false, nil
+	}
+	return hideEmptyColumns, nil
 }
 
 func isBoardNotFound(err error) bool {

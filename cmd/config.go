@@ -161,6 +161,19 @@ func addExtendedConfigAccessors(accessors map[string]configAccessor) {
 		},
 		writable: true,
 	}
+	accessors["tui.hide_empty_columns"] = configAccessor{
+		get: func(c *config.Config) any { return c.TUI.HideEmptyColumns },
+		set: func(c *config.Config, v string) error {
+			b, err := strconv.ParseBool(v)
+			if err != nil {
+				return clierr.Newf(clierr.InvalidInput,
+					"invalid tui.hide_empty_columns %q: must be true or false", v)
+			}
+			c.TUI.HideEmptyColumns = b
+			return nil
+		},
+		writable: true,
+	}
 	accessors["tui.age_thresholds"] = configAccessor{
 		get: func(c *config.Config) any { return c.TUI.AgeThresholds },
 	}
@@ -182,6 +195,7 @@ func allConfigKeys() []string {
 		"claim_timeout",
 		"classes",
 		"tui.title_lines",
+		"tui.hide_empty_columns",
 		"tui.age_thresholds",
 		"next_id",
 	}

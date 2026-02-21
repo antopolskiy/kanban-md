@@ -431,6 +431,54 @@ func TestBoard_EmptyBoard(t *testing.T) {
 	}
 }
 
+func TestBoard_HideEmptyColumns_ConfigEnabled(t *testing.T) {
+	_, cfg := setupTestBoard(t)
+	cfg.TUI.HideEmptyColumns = true
+
+	b := tui.NewBoard(cfg)
+	b.SetNow(testNow)
+	b.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
+
+	v := b.View()
+	if containsStr(v, "todo (0)") {
+		t.Error("expected todo empty column to be hidden")
+	}
+	if containsStr(v, "review (0)") {
+		t.Error("expected review empty column to be hidden")
+	}
+	if !containsStr(v, "backlog (2)") {
+		t.Error("expected non-empty backlog column to remain visible")
+	}
+}
+
+func TestBoard_HideEmptyColumns_AllEmptyFallback(t *testing.T) {
+	dir := t.TempDir()
+	kanbanDir := filepath.Join(dir, "kanban")
+	tasksDir := filepath.Join(kanbanDir, "tasks")
+
+	if err := os.MkdirAll(tasksDir, 0o750); err != nil {
+		t.Fatalf("creating dirs: %v", err)
+	}
+
+	cfg := config.NewDefault("Empty Board")
+	cfg.TUI.HideEmptyColumns = true
+	cfg.SetDir(kanbanDir)
+	if err := cfg.Save(); err != nil {
+		t.Fatalf("saving config: %v", err)
+	}
+
+	b := tui.NewBoard(cfg)
+	b.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
+
+	v := b.View()
+	if containsStr(v, "No statuses configured.") {
+		t.Error("expected fallback columns on empty board, got no-statuses message")
+	}
+	if !containsStr(v, "(empty)") {
+		t.Error("expected empty column indicator even with hide_empty_columns enabled")
+	}
+}
+
 func TestBoard_ClaimedByDisplayed(t *testing.T) {
 	dir := t.TempDir()
 	kanbanDir := filepath.Join(dir, "kanban")

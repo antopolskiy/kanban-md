@@ -1,0 +1,51 @@
+version: 9
+board:
+    name: Test Project v9
+    description: A project for testing v9 compatibility
+tasks_dir: tasks
+statuses:
+    - name: backlog
+      show_duration: false
+    - name: todo
+    - name: in-progress
+      require_claim: true
+    - name: review
+      require_claim: true
+    - name: done
+      show_duration: false
+    - name: archived
+      show_duration: false
+priorities:
+    - low
+    - medium
+    - high
+    - critical
+defaults:
+    status: backlog
+    priority: medium
+    class: standard
+wip_limits:
+    in-progress: 3
+    review: 2
+claim_timeout: 1h
+classes:
+    - name: expedite
+      wip_limit: 1
+      bypass_column_wip: true
+    - name: fixed-date
+    - name: standard
+    - name: intangible
+tui:
+    title_lines: 2
+    age_thresholds:
+        - after: "0s"
+          color: "242"
+        - after: "1h"
+          color: "34"
+        - after: "24h"
+          color: "226"
+        - after: "72h"
+          color: "208"
+        - after: "168h"
+          color: "196"
+next_id: 2

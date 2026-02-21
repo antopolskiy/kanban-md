@@ -204,3 +204,19 @@ func TestMigrateV6ToV7(t *testing.T) {
 		t.Errorf("Statuses len = %d, want %d", len(names), len(DefaultStatuses))
 	}
 }
+
+func TestMigrateV9ToV10(t *testing.T) {
+	cfg := NewDefault("Test")
+	cfg.Version = 9
+	cfg.TUI.HideEmptyColumns = false
+
+	if err := migrate(cfg); err != nil {
+		t.Fatalf("migrate() v9→v10: %v", err)
+	}
+	if cfg.Version != CurrentVersion {
+		t.Errorf("Version = %d, want %d", cfg.Version, CurrentVersion)
+	}
+	if cfg.TUI.HideEmptyColumns {
+		t.Error("HideEmptyColumns should remain false by default after migration")
+	}
+}

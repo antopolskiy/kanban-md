@@ -68,7 +68,10 @@ type Board struct {
 	width     int
 	height    int
 	err       error
-	now       func() time.Time // clock for duration display; defaults to time.Now
+	// hideEmptyColumns controls whether status columns with zero visible tasks
+	// are removed from the board view.
+	hideEmptyColumns bool
+	now              func() time.Time // clock for duration display; defaults to time.Now
 
 	// Detail view.
 	detailTask      *task.Task
@@ -103,7 +106,11 @@ type column struct {
 
 // NewBoard creates a new Board model from a config.
 func NewBoard(cfg *config.Config) *Board {
-	b := &Board{cfg: cfg, now: time.Now}
+	b := &Board{
+		cfg:              cfg,
+		now:              time.Now,
+		hideEmptyColumns: cfg.TUI.HideEmptyColumns,
+	}
 	b.loadTasks()
 	return b
 }
@@ -111,6 +118,12 @@ func NewBoard(cfg *config.Config) *Board {
 // SetNow overrides the clock function used for duration display (for testing).
 func (b *Board) SetNow(fn func() time.Time) {
 	b.now = fn
+}
+
+// SetHideEmptyColumns controls whether empty status columns are shown.
+func (b *Board) SetHideEmptyColumns(v bool) {
+	b.hideEmptyColumns = v
+	b.loadTasks()
 }
 
 // Init implements tea.Model.
@@ -668,6 +681,26 @@ func (b *Board) loadTasks() {
 
 	// Build columns from board statuses (excludes archived).
 	displayStatuses := b.cfg.BoardStatuses()
+	if b.hideEmptyColumns {
+		counts := make(map[string]int, len(displayStatuses))
+		for _, t := range visibleTasks {
+			counts[t.Status]++
+		}
+
+		filtered := make([]string, 0, len(displayStatuses))
+		for _, status := range displayStatuses {
+			if counts[status] > 0 {
+				filtered = append(filtered, status)
+			}
+		}
+
+		// Keep all columns when the board has no visible tasks so empty boards
+		// still render and allow creating new tasks.
+		if len(filtered) > 0 {
+			displayStatuses = filtered
+		}
+	}
+
 	b.columns = make([]column, len(displayStatuses))
 	for i, status := range displayStatuses {
 		b.columns[i] = column{status: status}
@@ -723,6 +756,18 @@ func (b *Board) selectedTask() *task.Task {
 }
 
 func (b *Board) clampRow() {
+	if len(b.columns) == 0 {
+		b.activeCol = 0
+		b.activeRow = 0
+		return
+	}
+	if b.activeCol < 0 {
+		b.activeCol = 0
+	}
+	if b.activeCol >= len(b.columns) {
+		b.activeCol = len(b.columns) - 1
+	}
+
 	col := b.currentColumn()
 	if col == nil || len(col.tasks) == 0 {
 		b.activeRow = 0

@@ -37,6 +37,7 @@ func TestAllConfigKeys_ExpectedCoverage(t *testing.T) {
 		"claim_timeout",
 		"classes",
 		"tui.title_lines",
+		"tui.hide_empty_columns",
 		"tui.age_thresholds",
 		"next_id",
 	}
@@ -183,6 +184,28 @@ func TestConfigAccessors_SetTUITitleLines_Invalid(t *testing.T) {
 	}
 }
 
+func TestConfigAccessors_SetTUIHideEmptyColumns(t *testing.T) {
+	accessors := configAccessors()
+	cfg := config.NewDefault("Test")
+
+	if err := accessors["tui.hide_empty_columns"].set(cfg, "true"); err != nil {
+		t.Fatal(err)
+	}
+	if !cfg.TUI.HideEmptyColumns {
+		t.Error("tui.hide_empty_columns = false, want true")
+	}
+}
+
+func TestConfigAccessors_SetTUIHideEmptyColumns_Invalid(t *testing.T) {
+	accessors := configAccessors()
+	cfg := config.NewDefault("Test")
+
+	err := accessors["tui.hide_empty_columns"].set(cfg, "nope")
+	if err == nil {
+		t.Fatal("expected error for non-boolean hide_empty_columns")
+	}
+}
+
 func TestConfigAccessors_ReadOnlyKeys(t *testing.T) {
 	accessors := configAccessors()
 	readOnlyKeys := []string{
@@ -206,7 +229,7 @@ func TestConfigAccessors_WritableKeys(t *testing.T) {
 	accessors := configAccessors()
 	writableKeys := []string{
 		"board.name", "board.description", "defaults.status", "defaults.priority",
-		"defaults.class", "claim_timeout", "tui.title_lines",
+		"defaults.class", "claim_timeout", "tui.title_lines", "tui.hide_empty_columns",
 	}
 
 	for _, key := range writableKeys {

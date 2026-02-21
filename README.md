@@ -467,6 +467,7 @@ Available keys:
 | `claim_timeout` | yes | Claim expiration duration (e.g. `1h`, `30m`) |
 | `classes` | no | Class of service definitions |
 | `tui.title_lines` | yes | Number of title lines shown in TUI cards |
+| `tui.hide_empty_columns` | yes | Hide columns with zero tasks in TUI |
 | `tui.age_thresholds` | no | TUI age color thresholds |
 | `next_id` | no | Next task ID |
 | `version` | no | Config schema version |
@@ -499,7 +500,11 @@ When using `--write-to`, the context block is wrapped in HTML comment markers (`
 ```bash
 kanban-md tui             # launch from any directory with a kanban/ board
 kanban-md tui --dir PATH  # point to a specific kanban directory
+kanban-md tui --hide-empty-columns  # override config and hide empty columns
+kanban-md tui --show-empty-columns  # override config and show empty columns
 ```
+
+Set `tui.hide_empty_columns` in `config.yml` to control the default behavior.
 
 > **Note:** Older releases shipped a standalone `kanban-md-tui` binary. It has been retired — use `kanban-md tui` instead.
 

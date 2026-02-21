@@ -588,6 +588,52 @@ func TestCompatV8ConfigMigratesToV9(t *testing.T) {
 	}
 }
 
+func TestCompatV9Config(t *testing.T) {
+	tmp := t.TempDir()
+	fixture := filepath.Join("testdata", "compat", "v9")
+	copyDir(t, fixture, tmp)
+
+	cfg, err := Load(tmp)
+	if err != nil {
+		t.Fatalf("Load() v9 fixture: %v", err)
+	}
+
+	if cfg.Version != CurrentVersion {
+		t.Errorf("Version = %d, want %d", cfg.Version, CurrentVersion)
+	}
+	if cfg.Board.Name != "Test Project v9" {
+		t.Errorf("Board.Name = %q, want %q", cfg.Board.Name, "Test Project v9")
+	}
+}
+
+func TestCompatV9ConfigMigratesToV10(t *testing.T) {
+	tmp := t.TempDir()
+	fixture := filepath.Join("testdata", "compat", "v9")
+	copyDir(t, fixture, tmp)
+
+	cfg, err := Load(tmp)
+	if err != nil {
+		t.Fatalf("Load() v9 fixture: %v", err)
+	}
+
+	if cfg.Version != CurrentVersion {
+		t.Errorf("Version = %d, want %d (after migration)", cfg.Version, CurrentVersion)
+	}
+
+	// v9→v10 introduces tui.hide_empty_columns; default should be false.
+	if cfg.TUI.HideEmptyColumns {
+		t.Error("TUI.HideEmptyColumns = true, want false by default after migration")
+	}
+
+	// Existing fields should be preserved.
+	if cfg.TUI.TitleLines != DefaultTitleLines {
+		t.Errorf("TUI.TitleLines = %d, want %d", cfg.TUI.TitleLines, DefaultTitleLines)
+	}
+	if cfg.ClaimTimeout != "1h" {
+		t.Errorf("ClaimTimeout = %q, want %q", cfg.ClaimTimeout, "1h")
+	}
+}
+
 func TestCompatV1TasksReadable(t *testing.T) {
 	// This test verifies that the current task reader can parse v1 task files.
 	// We only check that files exist and are well-formed here; detailed task

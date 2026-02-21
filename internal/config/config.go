@@ -60,8 +60,9 @@ type AgeThreshold struct {
 
 // TUIConfig holds TUI-specific display settings.
 type TUIConfig struct {
-	TitleLines    int            `yaml:"title_lines,omitempty"`
-	AgeThresholds []AgeThreshold `yaml:"age_thresholds,omitempty"`
+	TitleLines       int            `yaml:"title_lines,omitempty"`
+	AgeThresholds    []AgeThreshold `yaml:"age_thresholds,omitempty"`
+	HideEmptyColumns bool           `yaml:"hide_empty_columns,omitempty"`
 }
 
 // StatusConfig defines a status column and its enforcement rules.
@@ -115,7 +116,11 @@ func NewDefault(name string) *Config {
 		Priorities:   append([]string{}, DefaultPriorities...),
 		Classes:      append([]ClassConfig{}, DefaultClasses...),
 		ClaimTimeout: DefaultClaimTimeout,
-		TUI:          TUIConfig{TitleLines: DefaultTitleLines, AgeThresholds: append([]AgeThreshold{}, DefaultAgeThresholds...)},
+		TUI: TUIConfig{
+			TitleLines:       DefaultTitleLines,
+			AgeThresholds:    append([]AgeThreshold{}, DefaultAgeThresholds...),
+			HideEmptyColumns: DefaultHideEmptyColumns,
+		},
 		Defaults: DefaultsConfig{
 			Status:   DefaultStatus,
 			Priority: DefaultPriority,

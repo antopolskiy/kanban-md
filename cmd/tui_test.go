@@ -8,6 +8,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/spf13/cobra"
+
 	"github.com/antopolskiy/kanban-md/internal/clierr"
 	"github.com/antopolskiy/kanban-md/internal/config"
 	"github.com/antopolskiy/kanban-md/internal/tui"
@@ -288,6 +290,70 @@ func TestRunTUI_PublicAPI_EmptyDir(t *testing.T) {
 
 	if flagDir != dir {
 		t.Errorf("flagDir changed to %q, expected it to stay %q", flagDir, dir)
+	}
+}
+
+func newTUIFlagTestCmd(t *testing.T, args ...string) *cobra.Command {
+	t.Helper()
+	cmd := &cobra.Command{Use: "tui"}
+	cmd.Flags().Bool("hide-empty-columns", false, "")
+	cmd.Flags().Bool("show-empty-columns", false, "")
+	if err := cmd.ParseFlags(args); err != nil {
+		t.Fatalf("parse flags: %v", err)
+	}
+	return cmd
+}
+
+func TestResolveHideEmptyColumns_DefaultFromConfig(t *testing.T) {
+	cfg := config.NewDefault("Test")
+	cfg.TUI.HideEmptyColumns = true
+
+	hide, err := resolveHideEmptyColumns(newTUIFlagTestCmd(t), cfg)
+	if err != nil {
+		t.Fatalf("resolveHideEmptyColumns() error: %v", err)
+	}
+	if !hide {
+		t.Fatal("hide_empty_columns should come from config when no override flags are set")
+	}
+}
+
+func TestResolveHideEmptyColumns_HideFlagOverridesConfig(t *testing.T) {
+	cfg := config.NewDefault("Test")
+	cfg.TUI.HideEmptyColumns = false
+
+	hide, err := resolveHideEmptyColumns(newTUIFlagTestCmd(t, "--hide-empty-columns"), cfg)
+	if err != nil {
+		t.Fatalf("resolveHideEmptyColumns() error: %v", err)
+	}
+	if !hide {
+		t.Fatal("--hide-empty-columns should force hiding empty columns")
+	}
+}
+
+func TestResolveHideEmptyColumns_ShowFlagOverridesConfig(t *testing.T) {
+	cfg := config.NewDefault("Test")
+	cfg.TUI.HideEmptyColumns = true
+
+	hide, err := resolveHideEmptyColumns(newTUIFlagTestCmd(t, "--show-empty-columns"), cfg)
+	if err != nil {
+		t.Fatalf("resolveHideEmptyColumns() error: %v", err)
+	}
+	if hide {
+		t.Fatal("--show-empty-columns should force showing empty columns")
+	}
+}
+
+func TestResolveHideEmptyColumns_ConflictingFlags(t *testing.T) {
+	cfg := config.NewDefault("Test")
+
+	_, err := resolveHideEmptyColumns(newTUIFlagTestCmd(t, "--hide-empty-columns", "--show-empty-columns"), cfg)
+	if err == nil {
+		t.Fatal("expected error for conflicting empty-column override flags")
+	}
+
+	var cliErr *clierr.Error
+	if !errors.As(err, &cliErr) || cliErr.Code != clierr.StatusConflict {
+		t.Fatalf("expected STATUS_CONFLICT cli error, got: %v", err)
 	}
 }
 

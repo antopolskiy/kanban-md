@@ -29,6 +29,9 @@ func TestNewDefault(t *testing.T) {
 	if cfg.TitleLines() != DefaultTitleLines {
 		t.Errorf("TitleLines() = %d, want %d", cfg.TitleLines(), DefaultTitleLines)
 	}
+	if cfg.TUI.HideEmptyColumns != DefaultHideEmptyColumns {
+		t.Errorf("TUI.HideEmptyColumns = %v, want %v", cfg.TUI.HideEmptyColumns, DefaultHideEmptyColumns)
+	}
 }
 
 func TestValidate(t *testing.T) {

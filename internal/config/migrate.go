@@ -45,6 +45,7 @@ var migrations = map[int]func(*Config) error{
 	6: migrateV6ToV7,
 	7: migrateV7ToV8,
 	8: migrateV8ToV9,
+	9: migrateV9ToV10,
 }
 
 // migrateV1ToV2 adds the wip_limits field (defaults to nil/empty = unlimited).
@@ -132,5 +133,11 @@ func migrateV8ToV9(cfg *Config) error { //nolint:unparam // signature must match
 		cfg.TUI.TitleLines = DefaultTitleLines
 	}
 	cfg.Version = 9
+	return nil
+}
+
+// migrateV9ToV10 adds tui.hide_empty_columns (default false).
+func migrateV9ToV10(cfg *Config) error { //nolint:unparam // signature must match migrations map type
+	cfg.Version = 10
 	return nil
 }

@@ -20,7 +20,7 @@ func TestConfigShowAll(t *testing.T) {
 		"version", "board.name", "board.description", "tasks_dir",
 		"statuses", "priorities", "defaults.status", "defaults.priority", "defaults.class",
 		"wip_limits", "claim_timeout", "classes",
-		"tui.title_lines", "tui.age_thresholds", "next_id",
+		"tui.title_lines", "tui.hide_empty_columns", "tui.age_thresholds", "next_id",
 	}
 	for _, key := range expectedKeys {
 		if _, ok := cfg[key]; !ok {
@@ -105,6 +105,18 @@ func TestConfigSetDefaultsClass(t *testing.T) {
 	runKanbanJSON(t, kanbanDir, &val, "config", "get", "defaults.class")
 	if val != "expedite" {
 		t.Errorf("defaults.class = %q, want %q", val, "expedite")
+	}
+}
+
+func TestConfigSetTUIHideEmptyColumns(t *testing.T) {
+	kanbanDir := initBoard(t)
+
+	runKanban(t, kanbanDir, "--json", "config", "set", "tui.hide_empty_columns", "true")
+
+	var val bool
+	runKanbanJSON(t, kanbanDir, &val, "config", "get", "tui.hide_empty_columns")
+	if !val {
+		t.Error("tui.hide_empty_columns = false, want true")
 	}
 }
 
