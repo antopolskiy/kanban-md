@@ -1412,7 +1412,7 @@ func wrapTitle2(title string, firstWidth, restWidth, maxLines int) []string {
 	}
 
 	words := strings.Fields(title)
-	lines := make([]string, 0, maxLines)
+	lines := make([]string, 0, wrapLinesCap(maxLines))
 	var current strings.Builder
 
 	for i, word := range words {
@@ -1463,7 +1463,7 @@ func wrapTitle(title string, maxWidth, maxLines int) []string {
 	}
 
 	words := strings.Fields(title)
-	lines := make([]string, 0, maxLines)
+	lines := make([]string, 0, wrapLinesCap(maxLines))
 	var current strings.Builder
 
 	for i, word := range words {
@@ -1492,6 +1492,22 @@ func wrapTitle(title string, maxWidth, maxLines int) []string {
 		lines = append(lines, truncate(current.String(), maxWidth))
 	}
 	return lines
+}
+
+func wrapLinesCap(maxLines int) int {
+	const defaultCap = 8
+	const maxCap = 64
+
+	switch {
+	case maxLines < 1:
+		return 1
+	case maxLines < defaultCap:
+		return maxLines
+	case maxLines > maxCap:
+		return defaultCap
+	default:
+		return defaultCap
+	}
 }
 
 func (b *Board) renderStatusBar() string {
