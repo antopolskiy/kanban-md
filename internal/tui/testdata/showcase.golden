@@ -27,4 +27,4 @@
                                                                                                                                             
                                                                                                                                             
                                                                                                                                             
- My Project | 19 tasks | ←↓↑→:nav c:create m:move n/p:status +/-:priority d:del ?:help q:quit                                               
+ My Project | 19 tasks | ←↓↑→:nav c:create e:edit m:move n/p:status +/-:priority d:del ?:help q:quit                                        

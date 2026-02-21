@@ -510,8 +510,10 @@ kanban-md tui --dir PATH  # point to a specific kanban directory
 | `h` / `l` | Move between columns |
 | `j` / `k` | Move between tasks within a column |
 | `Enter` | View task details |
+| `c` | Create task in current column |
+| `e` | Edit selected task (same 4-step flow as create) |
 | `m` | Move task to a different status (picker dialog) |
-| `M` | Move task to next status |
+| `n` / `p` | Move task to next / previous status |
 | `d` | Delete task (with confirmation) |
 | `r` | Refresh board |
 | `?` | Show help |

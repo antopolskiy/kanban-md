@@ -3,6 +3,7 @@ package tui
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 	"regexp"
 	"strconv"
@@ -89,6 +90,8 @@ type Board struct {
 	createBodyRow  int      // cursor row in body textarea
 	createPriority int      // index into cfg.Priorities
 	createTags     string
+	createIsEdit   bool
+	createEditID   int
 }
 
 // column groups tasks belonging to a single status.
@@ -209,6 +212,8 @@ func (b *Board) handleBoardKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return b.lowerPriority()
 	case "c":
 		b.handleCreateStart()
+	case "e":
+		b.handleEditStart()
 	case "d":
 		b.handleDeleteStart()
 	case "r":
@@ -277,6 +282,8 @@ func (b *Board) handleCreateStart() {
 	if col == nil {
 		return
 	}
+	b.createIsEdit = false
+	b.createEditID = 0
 	b.createStatus = col.status
 	b.createStep = stepTitle
 	b.createTitle = ""
@@ -284,6 +291,27 @@ func (b *Board) handleCreateStart() {
 	b.createBodyRow = 0
 	b.createPriority = b.defaultPriorityIndex()
 	b.createTags = ""
+	b.view = viewCreate
+}
+
+func (b *Board) handleEditStart() {
+	t := b.selectedTask()
+	if t == nil {
+		return
+	}
+
+	b.createIsEdit = true
+	b.createEditID = t.ID
+	b.createStatus = t.Status
+	b.createStep = stepTitle
+	b.createTitle = t.Title
+	b.createBody = []string{strings.TrimSuffix(t.Body, "\n")}
+	b.createBodyRow = 0
+	b.createPriority = b.cfg.PriorityIndex(t.Priority)
+	if b.createPriority < 0 {
+		b.createPriority = b.defaultPriorityIndex()
+	}
+	b.createTags = strings.Join(t.Tags, ",")
 	b.view = viewCreate
 }
 
@@ -296,15 +324,24 @@ func (b *Board) defaultPriorityIndex() int {
 	return 0
 }
 
+func (b *Board) resetCreateState() {
+	b.createIsEdit = false
+	b.createEditID = 0
+}
+
 func (b *Board) handleCreateKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	// Esc always cancels the entire wizard.
 	if msg.Type == tea.KeyEscape {
+		b.resetCreateState()
 		b.view = viewBoard
 		return b, nil
 	}
 
-	// Enter always creates the task (from any step).
+	// Enter always submits the wizard (from any step).
 	if msg.Type == tea.KeyEnter {
+		if b.createIsEdit {
+			return b.executeEdit()
+		}
 		return b.executeCreate()
 	}
 
@@ -397,6 +434,7 @@ func (b *Board) handleCreateTags(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 func (b *Board) executeCreate() (tea.Model, tea.Cmd) {
 	title := strings.TrimSpace(b.createTitle)
 	if title == "" {
+		b.resetCreateState()
 		b.view = viewBoard
 		return b, nil
 	}
@@ -404,20 +442,8 @@ func (b *Board) executeCreate() (tea.Model, tea.Cmd) {
 	// Build body from lines.
 	body := strings.TrimSpace(strings.Join(b.createBody, "\n"))
 
-	// Resolve priority.
-	priority := b.cfg.Defaults.Priority
-	if b.createPriority >= 0 && b.createPriority < len(b.cfg.Priorities) {
-		priority = b.cfg.Priorities[b.createPriority]
-	}
-
-	// Parse tags.
-	var tags []string
-	for _, tag := range strings.Split(b.createTags, ",") {
-		tag = strings.TrimSpace(tag)
-		if tag != "" {
-			tags = append(tags, tag)
-		}
-	}
+	priority := b.selectedCreatePriority()
+	tags := parseTagsCSV(b.createTags)
 
 	now := b.now()
 	id := b.cfg.NextID
@@ -439,6 +465,7 @@ func (b *Board) executeCreate() (tea.Model, tea.Cmd) {
 
 	if err := task.Write(path, t); err != nil {
 		b.err = fmt.Errorf("creating task: %w", err)
+		b.resetCreateState()
 		b.view = viewBoard
 		return b, nil
 	}
@@ -450,9 +477,110 @@ func (b *Board) executeCreate() (tea.Model, tea.Cmd) {
 		board.LogMutation(b.cfg.Dir(), "create", id, title)
 	}
 
+	b.resetCreateState()
 	b.view = viewBoard
 	b.loadTasks()
+	b.selectTaskByID(id)
 	return b, nil
+}
+
+func (b *Board) executeEdit() (tea.Model, tea.Cmd) {
+	title := strings.TrimSpace(b.createTitle)
+	if title == "" {
+		b.resetCreateState()
+		b.view = viewBoard
+		return b, nil
+	}
+
+	path, err := task.FindByID(b.cfg.TasksPath(), b.createEditID)
+	if err != nil {
+		b.err = fmt.Errorf("finding task #%d: %w", b.createEditID, err)
+		b.resetCreateState()
+		b.view = viewBoard
+		return b, nil
+	}
+
+	tk, err := task.Read(path)
+	if err != nil {
+		b.err = fmt.Errorf("reading task #%d: %w", b.createEditID, err)
+		b.resetCreateState()
+		b.view = viewBoard
+		return b, nil
+	}
+
+	oldTitle := tk.Title
+	tk.Title = title
+	tk.Body = strings.TrimSpace(strings.Join(b.createBody, "\n"))
+	tk.Priority = b.selectedCreatePriority()
+	tk.Tags = parseTagsCSV(b.createTags)
+	tk.Updated = b.now()
+
+	if _, err := writeTaskAndRename(path, tk, oldTitle); err != nil {
+		b.err = fmt.Errorf("editing task #%d: %w", b.createEditID, err)
+	} else {
+		board.LogMutation(b.cfg.Dir(), "edit", tk.ID, tk.Title)
+	}
+
+	taskID := b.createEditID
+	b.resetCreateState()
+	b.view = viewBoard
+	b.loadTasks()
+	b.selectTaskByID(taskID)
+	return b, nil
+}
+
+func (b *Board) selectedCreatePriority() string {
+	priority := b.cfg.Defaults.Priority
+	if b.createPriority >= 0 && b.createPriority < len(b.cfg.Priorities) {
+		priority = b.cfg.Priorities[b.createPriority]
+	}
+	return priority
+}
+
+func parseTagsCSV(raw string) []string {
+	var tags []string
+	for _, tag := range strings.Split(raw, ",") {
+		tag = strings.TrimSpace(tag)
+		if tag != "" {
+			tags = append(tags, tag)
+		}
+	}
+	return tags
+}
+
+func writeTaskAndRename(path string, t *task.Task, oldTitle string) (string, error) {
+	newPath := path
+	if t.Title != oldTitle {
+		slug := task.GenerateSlug(t.Title)
+		filename := task.GenerateFilename(t.ID, slug)
+		newPath = filepath.Join(filepath.Dir(path), filename)
+	}
+
+	if err := task.Write(newPath, t); err != nil {
+		return "", fmt.Errorf("writing task: %w", err)
+	}
+
+	if newPath != path {
+		if err := os.Remove(path); err != nil {
+			return "", fmt.Errorf("removing old file: %w", err)
+		}
+	}
+
+	return newPath, nil
+}
+
+func (b *Board) selectTaskByID(id int) {
+	for colIdx := range b.columns {
+		for rowIdx, t := range b.columns[colIdx].tasks {
+			if t.ID == id {
+				b.activeCol = colIdx
+				b.activeRow = rowIdx
+				b.ensureVisible()
+				return
+			}
+		}
+	}
+	b.clampRow()
 }
 
 func (b *Board) handleDetailKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
@@ -1262,7 +1390,7 @@ func wrapTitle(title string, maxWidth, maxLines int) []string {
 
 func (b *Board) renderStatusBar() string {
 	total := len(b.tasks)
-	status := fmt.Sprintf(" %s | %d tasks | ←↓↑→:nav c:create m:move n/p:status +/-:priority d:del ?:help q:quit",
+	status := fmt.Sprintf(" %s | %d tasks | ←↓↑→:nav c:create e:edit m:move n/p:status +/-:priority d:del ?:help q:quit",
 		b.cfg.Board.Name, total)
 	status = truncate(status, b.width)
 
@@ -1486,8 +1614,11 @@ func (b *Board) viewDeleteConfirm() string {
 }
 
 func (b *Board) viewCreateDialog() string {
-	header := lipgloss.NewStyle().Bold(true).Render(
-		"Create task in " + b.createStatus)
+	headerText := "Create task in " + b.createStatus
+	if b.createIsEdit {
+		headerText = fmt.Sprintf("Edit task #%d in %s", b.createEditID, b.createStatus)
+	}
+	header := lipgloss.NewStyle().Bold(true).Render(headerText)
 	stepLabel := dimStyle.Render(fmt.Sprintf("  Step %d/%d: %s",
 		b.createStep+1, stepCount, b.stepName()))
 
@@ -1525,15 +1656,20 @@ func (b *Board) stepName() string {
 }
 
 func (b *Board) createHint() string {
+	action := "create"
+	if b.createIsEdit {
+		action = "save"
+	}
+
 	switch b.createStep {
 	case stepTitle:
-		return "tab:next  enter:create  esc:cancel"
+		return fmt.Sprintf("tab:next  enter:%s  esc:cancel", action)
 	case stepBody:
-		return "tab:next  shift+tab:back  enter:create  esc:cancel"
+		return fmt.Sprintf("tab:next  shift+tab:back  enter:%s  esc:cancel", action)
 	case stepPriority:
-		return "↑/↓:select  tab:next  shift+tab:back  enter:create  esc:cancel"
+		return fmt.Sprintf("↑/↓:select  tab:next  shift+tab:back  enter:%s  esc:cancel", action)
 	case stepTags:
-		return "shift+tab:back  enter:create  esc:cancel"
+		return fmt.Sprintf("shift+tab:back  enter:%s  esc:cancel", action)
 	default:
 		return "esc:cancel"
 	}
@@ -1580,6 +1716,7 @@ func (b *Board) viewHelp() string {
 		{"↑/k", "Move cursor up"},
 		{"enter", "Show task detail"},
 		{"c", "Create new task in column"},
+		{"e", "Edit selected task (same flow as create)"},
 		{"m", "Move task (status picker)"},
 		{"n", "Move task to next status"},
 		{"p", "Move task to previous status"},
