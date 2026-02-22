@@ -11,6 +11,8 @@ import (
 	"time"
 
 	"github.com/charmbracelet/bubbles/key"
+	"github.com/charmbracelet/bubbles/textarea"
+	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/glamour"
 	"github.com/charmbracelet/lipgloss"
@@ -50,9 +52,10 @@ const (
 	errorChrome    = 1 // extra line when error toast is displayed
 	maxScrollOff   = 1<<31 - 1
 	// noLineLimit is a sentinel passed to wrapTitle to allow unlimited lines.
-	noLineLimit         = 1<<31 - 1
-	tickInterval        = 30 * time.Second // how often durations refresh
-	createInputOverhead = 6                // dialogPadX*2 + border(2)
+	noLineLimit          = 1<<31 - 1
+	tickInterval         = 30 * time.Second // how often durations refresh
+	createInputOverhead  = 6                // dialogPadX*2 + border(2)
+	createBodyInputLines = 6                // fixed visible lines in create textarea
 
 	// Create wizard steps.
 	stepTitle    = 0
@@ -91,18 +94,15 @@ type Board struct {
 	deleteTitle string
 
 	// Create wizard.
-	createStatus   string // column where task will be created
-	createStep     int    // current wizard step (0=title, 1=body, 2=priority, 3=tags)
-	createTitle    string
-	createTitleCol int
-	createBody     []string // lines of body text
-	createBodyRow  int      // cursor row in body textarea
-	createBodyCol  int      // cursor column in body textarea
-	createPriority int      // index into cfg.Priorities
-	createTags     string
-	createTagsCol  int
-	createIsEdit   bool
-	createEditID   int
+	createStatus      string // column where task will be created
+	createStep        int    // current wizard step (0=title, 1=body, 2=priority, 3=tags)
+	createPriority    int    // index into cfg.Priorities
+	createIsEdit      bool
+	createEditID      int
+	createInputsReady bool
+	createTitleInput  textinput.Model
+	createBodyInput   textarea.Model
+	createTagsInput   textinput.Model
 }
 
 // column groups tasks belonging to a single status.
@@ -147,6 +147,7 @@ func (b *Board) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		b.width = msg.Width
 		b.height = msg.Height
+		b.applyCreateInputLayout()
 		return b, nil
 	case ReloadMsg:
 		b.loadTasks()
@@ -303,19 +304,17 @@ func (b *Board) handleCreateStart() {
 	if col == nil {
 		return
 	}
+	b.initCreateInputs()
 	b.createIsEdit = false
 	b.createEditID = 0
 	b.createStatus = col.status
 	b.createStep = stepTitle
-	b.createTitle = ""
-	b.createTitleCol = 0
-	b.createBody = []string{""}
-	b.createBodyRow = 0
-	b.createBodyCol = 0
 	b.createPriority = b.defaultPriorityIndex()
-	b.createTags = ""
-	b.createTagsCol = 0
+	b.createTitleInput.SetValue("")
+	b.createBodyInput.SetValue("")
+	b.createTagsInput.SetValue("")
 	b.view = viewCreate
+	b.focusCreateField()
 }
 
 func (b *Board) handleEditStart() {
@@ -324,21 +323,24 @@ func (b *Board) handleEditStart() {
 		return
 	}
 
+	b.initCreateInputs()
 	b.createIsEdit = true
 	b.createEditID = t.ID
 	b.createStatus = t.Status
 	b.createStep = stepTitle
-	b.createTitle = t.Title
-	b.createTitleCol = len([]rune(b.createTitle))
-	b.createBody = []string{strings.TrimSuffix(t.Body, "\n")}
-	b.createBodyRow = 0
-	b.createBodyCol = len([]rune(b.createBody[0]))
 	b.createPriority = b.cfg.PriorityIndex(t.Priority)
 	if b.createPriority < 0 {
 		b.createPriority = b.defaultPriorityIndex()
 	}
-	b.createTags = strings.Join(t.Tags, ",")
-	b.createTagsCol = len([]rune(b.createTags))
+	bodyText := strings.TrimSuffix(t.Body, "\n")
+	tagText := strings.Join(t.Tags, ",")
+	b.createTitleInput.SetValue(t.Title)
+	b.createBodyInput.SetValue(bodyText)
+	b.createTagsInput.SetValue(tagText)
+	b.createTitleInput.SetCursor(len([]rune(t.Title)))
+	b.createBodyInput.SetCursor(len([]rune(bodyText)))
+	b.createTagsInput.SetCursor(len([]rune(tagText)))
+	b.focusCreateField()
 	b.view = viewCreate
 }
 
@@ -354,9 +356,12 @@ func (b *Board) defaultPriorityIndex() int {
 func (b *Board) resetCreateState() {
 	b.createIsEdit = false
 	b.createEditID = 0
-	b.createTitleCol = 0
-	b.createBodyCol = 0
-	b.createTagsCol = 0
+	b.createTitleInput.SetValue("")
+	b.createBodyInput.SetValue("")
+	b.createTagsInput.SetValue("")
+	b.createTitleInput.Blur()
+	b.createBodyInput.Blur()
+	b.createTagsInput.Blur()
 }
 
 func (b *Board) handleCreateKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
@@ -380,6 +385,7 @@ func (b *Board) handleCreateKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if b.createStep < stepCount-1 {
 			b.createStep++
 		}
+		b.focusCreateField()
 		return b, nil
 	}
 
@@ -388,6 +394,7 @@ func (b *Board) handleCreateKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if b.createStep > 0 {
 			b.createStep--
 		}
+		b.focusCreateField()
 		return b, nil
 	}
 
@@ -405,16 +412,17 @@ func (b *Board) handleCreateKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 func (b *Board) handleCreateTitle(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	b.applyCreateTextInput(msg, &b.createTitle, &b.createTitleCol)
+	cmd := b.applyCreateTextInput(msg, &b.createTitleInput)
+	if cmd != nil {
+		return b, cmd
+	}
 	return b, nil
 }
 
 func (b *Board) handleCreateBody(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	if len(b.createBody) == 0 {
-		b.createBody = []string{""}
-	}
-	b.applyCreateTextInput(msg, &b.createBody[0], &b.createBodyCol)
-	return b, nil
+	m, cmd := b.createBodyInput.Update(msg)
+	b.createBodyInput = m
+	return b, cmd
 }
 
 func (b *Board) handleCreatePriority(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
@@ -432,94 +440,81 @@ func (b *Board) handleCreatePriority(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 func (b *Board) handleCreateTags(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	b.applyCreateTextInput(msg, &b.createTags, &b.createTagsCol)
+	cmd := b.applyCreateTextInput(msg, &b.createTagsInput)
+	if cmd != nil {
+		return b, cmd
+	}
 	return b, nil
 }
 
-func (b *Board) applyCreateTextInput(msg tea.KeyMsg, value *string, cursor *int) {
-	runes := []rune(*value)
-	*cursor = clampTextCursor(*cursor, len(runes))
-	if moveCreateCursor(msg.String(), len(runes), cursor) {
+func (b *Board) initCreateInputs() {
+	b.createTitleInput = textinput.New()
+	b.createTitleInput.Prompt = ""
+	b.createTagsInput = textinput.New()
+	b.createTagsInput.Prompt = ""
+
+	b.createBodyInput = textarea.New()
+	b.createBodyInput.Prompt = ""
+	b.createBodyInput.ShowLineNumbers = false
+	b.createBodyInput.SetHeight(createBodyInputLines)
+	b.createInputsReady = true
+
+	b.applyCreateInputLayout()
+}
+
+func (b *Board) applyCreateTextInput(msg tea.KeyMsg, input *textinput.Model) tea.Cmd {
+	m, cmd := input.Update(msg)
+	*input = m
+	return cmd
+}
+
+func (b *Board) focusCreateField() {
+	if !b.createInputsReady {
 		return
 	}
-	runes = applyCreateTextEdit(msg, runes, cursor)
-	*value = string(runes)
-}
 
-func clampTextCursor(cursor, maxPos int) int {
-	if cursor < 0 {
-		return 0
-	}
-	if cursor > maxPos {
-		return maxPos
-	}
-	return cursor
-}
+	b.createTitleInput.Blur()
+	b.createBodyInput.Blur()
+	b.createTagsInput.Blur()
 
-func moveCreateCursor(k string, textLen int, cursor *int) bool {
-	switch k {
-	case keyLeft:
-		if *cursor > 0 {
-			*cursor--
-		}
-		return true
-	case keyRight:
-		if *cursor < textLen {
-			*cursor++
-		}
-		return true
-	case keyHome, "ctrl+a":
-		*cursor = 0
-		return true
-	case keyEnd, "ctrl+e":
-		*cursor = textLen
-		return true
-	default:
-		return false
+	switch b.createStep {
+	case stepTitle:
+		b.createTitleInput.Focus()
+	case stepBody:
+		b.createBodyInput.Focus()
+	case stepTags:
+		b.createTagsInput.Focus()
 	}
 }
 
-func applyCreateTextEdit(msg tea.KeyMsg, runes []rune, cursor *int) []rune {
-	switch msg.Type {
-	case tea.KeyBackspace, tea.KeyCtrlH:
-		if *cursor > 0 {
-			copy(runes[*cursor-1:], runes[*cursor:])
-			runes = runes[:len(runes)-1]
-			*cursor--
-		}
-	case tea.KeyDelete:
-		if *cursor < len(runes) {
-			runes = append(runes[:*cursor], runes[*cursor+1:]...)
-		}
-	case tea.KeyRunes:
-		if len(msg.Runes) > 0 {
-			left := append([]rune{}, runes[:*cursor]...)
-			left = append(left, msg.Runes...)
-			runes = append(left, runes[*cursor:]...)
-			*cursor += len(msg.Runes)
-		}
-	case tea.KeySpace:
-		left := append([]rune{}, runes[:*cursor]...)
-		left = append(left, ' ')
-		runes = append(left, runes[*cursor:]...)
-		*cursor++
+func (b *Board) applyCreateInputLayout() {
+	if !b.createInputsReady {
+		return
 	}
-	return runes
+
+	inputWidth := b.createInputWidth("Title: ")
+	if inputWidth <= 0 {
+		return
+	}
+
+	b.createTitleInput.Width = inputWidth
+	b.createTagsInput.Width = inputWidth
+	b.createBodyInput.SetWidth(inputWidth)
+	b.createBodyInput.SetHeight(createBodyInputLines)
 }
 
 func (b *Board) executeCreate() (tea.Model, tea.Cmd) {
-	title := strings.TrimSpace(b.createTitle)
+	title := strings.TrimSpace(b.createTitleInput.Value())
 	if title == "" {
 		b.resetCreateState()
 		b.view = viewBoard
 		return b, nil
 	}
 
-	// Build body from lines.
-	body := strings.TrimSpace(strings.Join(b.createBody, "\n"))
+	body := strings.TrimSpace(b.createBodyInput.Value())
 
 	priority := b.selectedCreatePriority()
-	tags := parseTagsCSV(b.createTags)
+	tags := parseTagsCSV(b.createTagsInput.Value())
 
 	now := b.now()
 	id := b.cfg.NextID
@@ -561,7 +556,7 @@ func (b *Board) executeCreate() (tea.Model, tea.Cmd) {
 }
 
 func (b *Board) executeEdit() (tea.Model, tea.Cmd) {
-	title := strings.TrimSpace(b.createTitle)
+	title := strings.TrimSpace(b.createTitleInput.Value())
 	if title == "" {
 		b.resetCreateState()
 		b.view = viewBoard
@@ -586,9 +581,9 @@ func (b *Board) executeEdit() (tea.Model, tea.Cmd) {
 
 	oldTitle := tk.Title
 	tk.Title = title
-	tk.Body = strings.TrimSpace(strings.Join(b.createBody, "\n"))
+	tk.Body = strings.TrimSpace(b.createBodyInput.Value())
 	tk.Priority = b.selectedCreatePriority()
-	tk.Tags = parseTagsCSV(b.createTags)
+	tk.Tags = parseTagsCSV(b.createTagsInput.Value())
 	tk.Updated = b.now()
 
 	if _, err := writeTaskAndRename(path, tk, oldTitle); err != nil {
@@ -1800,15 +1795,13 @@ func (b *Board) createHint() string {
 }
 
 func (b *Board) viewCreateTitle() string {
-	return renderLabeledTextInput("Title: ", b.createTitle, b.createTitleCol, b.createInputWidth("Title: "))
+	b.applyCreateInputLayout()
+	return b.renderLabeledCreateInput("Title: ", b.createTitleInput.View())
 }
 
 func (b *Board) viewCreateBody() string {
-	body := ""
-	if len(b.createBody) > 0 {
-		body = b.createBody[0]
-	}
-	return renderLabeledTextInput("Body: ", body, b.createBodyCol, b.createInputWidth("Body: "))
+	b.applyCreateInputLayout()
+	return b.renderLabeledCreateInput("Body: ", b.createBodyInput.View())
 }
 
 func (b *Board) viewCreatePriority() string {
@@ -1829,20 +1822,9 @@ func (b *Board) viewCreatePriority() string {
 }
 
 func (b *Board) viewCreateTagsStep() string {
-	label := lipgloss.NewStyle().Bold(true).Render("Tags: ")
 	hint := dimStyle.Render("(comma-separated)")
-	return label + renderTextInputCursor(b.createTags, b.createTagsCol) + "  " + hint
-}
-
-func renderTextInputCursor(value string, cursor int) string {
-	runes := []rune(value)
-	if cursor < 0 {
-		cursor = 0
-	}
-	if cursor > len(runes) {
-		cursor = len(runes)
-	}
-	return string(runes[:cursor]) + "▏" + string(runes[cursor:])
+	b.applyCreateInputLayout()
+	return b.renderLabeledCreateInput("Tags: ", b.createTagsInput.View()) + "  " + hint
 }
 
 func (b *Board) createInputWidth(label string) int {
@@ -1859,54 +1841,17 @@ func (b *Board) createInputWidth(label string) int {
 	return inputWidth
 }
 
-func renderLabeledTextInput(label, value string, cursor, maxValueWidth int) string {
-	input := renderTextInputCursorWrapped(value, cursor, maxValueWidth)
+func (b *Board) renderLabeledCreateInput(label, value string) string {
+	value = strings.TrimRight(value, "\n")
 	indent := strings.Repeat(" ", lipgloss.Width(label))
 	labelStyle := lipgloss.NewStyle().Bold(true)
 
-	lines := strings.Split(input, "\n")
+	lines := strings.Split(value, "\n")
 	lines[0] = labelStyle.Render(label) + lines[0]
 	for i := 1; i < len(lines); i++ {
 		lines[i] = indent + lines[i]
 	}
 
-	return strings.Join(lines, "\n")
-}
-
-func renderTextInputCursorWrapped(value string, cursor int, maxWidth int) string {
-	runes := []rune(value)
-	if cursor < 0 {
-		cursor = 0
-	}
-	if cursor > len(runes) {
-		cursor = len(runes)
-	}
-	if maxWidth < 1 {
-		maxWidth = 1
-	}
-
-	display := make([]rune, 0, len(runes)+1)
-	for i := 0; i <= len(runes); i++ {
-		if i == cursor {
-			display = append(display, '▏')
-		}
-		if i < len(runes) {
-			display = append(display, runes[i])
-		}
-	}
-
-	if len(display) == 0 {
-		return "▏"
-	}
-
-	var lines []string
-	for i := 0; i < len(display); i += maxWidth {
-		end := i + maxWidth
-		if end > len(display) {
-			end = len(display)
-		}
-		lines = append(lines, string(display[i:end]))
-	}
 	return strings.Join(lines, "\n")
 }
 
