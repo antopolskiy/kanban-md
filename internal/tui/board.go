@@ -480,9 +480,10 @@ func moveCreateCursor(k string, textLen int, cursor *int) bool {
 
 func applyCreateTextEdit(msg tea.KeyMsg, runes []rune, cursor *int) []rune {
 	switch msg.Type {
-	case tea.KeyBackspace:
+	case tea.KeyBackspace, tea.KeyCtrlH:
 		if *cursor > 0 {
-			runes = append(runes[:*cursor-1], runes[*cursor:]...)
+			copy(runes[*cursor-1:], runes[*cursor:])
+			runes = runes[:len(runes)-1]
 			*cursor--
 		}
 	case tea.KeyDelete:

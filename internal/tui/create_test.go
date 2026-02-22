@@ -60,6 +60,24 @@ func TestCreate_BackspaceDeletesCharacter(t *testing.T) {
 	}
 }
 
+func TestCreate_BackspaceAliasDeletesCharacter(t *testing.T) {
+	b, _ := setupTestBoard(t)
+
+	b = sendKey(b, "c")
+	// Type "AB" then simulate a terminal backspace key as ctrl+h.
+	for _, ch := range "AB" {
+		m, _ := b.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{ch}})
+		b = m.(*tui.Board)
+	}
+	b = sendSpecialKey(b, tea.KeyCtrlH)
+
+	v := b.View()
+	// Should show "A" not "AB".
+	if containsStr(v, "AB") {
+		t.Error("backspace alias should have deleted the last character")
+	}
+}
+
 // typeText sends each character as a rune key to the board.
 func typeText(b *tui.Board, text string) *tui.Board {
 	for _, ch := range text {
