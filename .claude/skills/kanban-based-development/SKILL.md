@@ -114,11 +114,7 @@ kanban-md pick --claim <agent> --status backlog --move in-progress
 
 This is atomic — if another agent claims the task between your list and claim, `pick` handles it safely. No need to list/choose/claim manually.
 
-After picking, read the full task:
-
-```bash
-kanban-md show <ID>
-```
+By default, `pick` prints the picked task details (including body), so a separate `show` is not required. Use `--no-body` only when you want the one-line confirmation.
 
 ### 2) Create a worktree (default)
 

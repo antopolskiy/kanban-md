@@ -43,6 +43,10 @@ func runShow(_ *cobra.Command, args []string) error {
 		return err
 	}
 
+	return outputTaskDetail(t)
+}
+
+func outputTaskDetail(t *task.Task) error {
 	format := outputFormat()
 	if format == output.FormatJSON {
 		return output.JSON(os.Stdout, t)

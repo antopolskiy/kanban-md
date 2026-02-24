@@ -722,7 +722,7 @@ func TestOutputPickResult_JSON(t *testing.T) {
 	r, w := captureStdout(t)
 
 	picked := &task.Task{ID: 1, Title: "test-pick", Status: "backlog"}
-	err := outputPickResult(picked, "", "agent")
+	err := outputPickResult(picked, "", "agent", false)
 
 	got := drainPipe(t, r, w)
 
@@ -738,8 +738,8 @@ func TestOutputPickResult_TableNoMove(t *testing.T) {
 	setFlags(t, false, true, false)
 	r, w := captureStdout(t)
 
-	picked := &task.Task{ID: 1, Title: "test-pick", Status: "backlog"}
-	err := outputPickResult(picked, "", "agent")
+	picked := &task.Task{ID: 1, Title: "test-pick", Status: "backlog", Body: "task body"}
+	err := outputPickResult(picked, "", "agent", false)
 
 	got := drainPipe(t, r, w)
 
@@ -752,6 +752,12 @@ func TestOutputPickResult_TableNoMove(t *testing.T) {
 	if containsSubstring(got, "->") {
 		t.Errorf("expected no move arrow in output, got: %s", got)
 	}
+	if !containsSubstring(got, "Task #1: test-pick") {
+		t.Errorf("expected task details after confirmation, got: %s", got)
+	}
+	if !containsSubstring(got, "task body") {
+		t.Errorf("expected task body in detail output, got: %s", got)
+	}
 }
 
 func TestOutputPickResult_TableWithMove(t *testing.T) {
@@ -759,7 +765,7 @@ func TestOutputPickResult_TableWithMove(t *testing.T) {
 	r, w := captureStdout(t)
 
 	picked := &task.Task{ID: 1, Title: "test-pick", Status: "todo"}
-	err := outputPickResult(picked, "backlog", "agent")
+	err := outputPickResult(picked, "backlog", "agent", false)
 
 	got := drainPipe(t, r, w)
 
@@ -771,6 +777,32 @@ func TestOutputPickResult_TableWithMove(t *testing.T) {
 	}
 	if !containsSubstring(got, "backlog -> todo") {
 		t.Errorf("expected 'backlog -> todo' in output, got: %s", got)
+	}
+	if !containsSubstring(got, "Task #1: test-pick") {
+		t.Errorf("expected task details after confirmation, got: %s", got)
+	}
+}
+
+func TestOutputPickResult_TableNoBody(t *testing.T) {
+	setFlags(t, false, true, false)
+	r, w := captureStdout(t)
+
+	picked := &task.Task{ID: 1, Title: "test-pick", Status: "backlog", Body: "task body"}
+	err := outputPickResult(picked, "", "agent", true)
+
+	got := drainPipe(t, r, w)
+
+	if err != nil {
+		t.Fatalf("outputPickResult error: %v", err)
+	}
+	if !containsSubstring(got, "Picked task #1") {
+		t.Errorf("expected 'Picked task #1' message, got: %s", got)
+	}
+	if containsSubstring(got, "Task #1: test-pick") {
+		t.Errorf("expected no task details when no-body is true, got: %s", got)
+	}
+	if containsSubstring(got, "task body") {
+		t.Errorf("expected no task body when no-body is true, got: %s", got)
 	}
 }
 
@@ -809,6 +841,7 @@ func newPickCmd() *cobra.Command {
 	cmd.Flags().String("status", "", "")
 	cmd.Flags().String("move", "", "")
 	cmd.Flags().StringSlice("tags", nil, "")
+	cmd.Flags().Bool("no-body", false, "")
 	return cmd
 }
 

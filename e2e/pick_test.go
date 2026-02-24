@@ -83,7 +83,7 @@ func TestPickNothingAvailable(t *testing.T) {
 
 func TestPickTableOutput(t *testing.T) {
 	kanbanDir := initBoard(t)
-	mustCreateTask(t, kanbanDir, "Table pick task")
+	mustCreateTask(t, kanbanDir, "Table pick task", "--body", "task body")
 
 	r := runKanban(t, kanbanDir, "pick", "--claim", claimAgent1)
 	if r.exitCode != 0 {
@@ -94,6 +94,12 @@ func TestPickTableOutput(t *testing.T) {
 	}
 	if !strings.Contains(r.stdout, claimAgent1) {
 		t.Error("table output should contain claimant name")
+	}
+	if !strings.Contains(r.stdout, "Task #1: Table pick task") {
+		t.Errorf("table output should include task details, got:\n%s", r.stdout)
+	}
+	if !strings.Contains(r.stdout, "task body") {
+		t.Errorf("table output should include task body, got:\n%s", r.stdout)
 	}
 }
 
@@ -107,6 +113,47 @@ func TestPickTableOutputWithMove(t *testing.T) {
 	}
 	if !strings.Contains(r.stdout, "Picked and moved") {
 		t.Error("table output should contain 'Picked and moved'")
+	}
+	if !strings.Contains(r.stdout, "Task #1: Table move task") {
+		t.Errorf("table output should include task details, got:\n%s", r.stdout)
+	}
+}
+
+func TestPickTableOutputNoBody(t *testing.T) {
+	kanbanDir := initBoard(t)
+	mustCreateTask(t, kanbanDir, "No body pick task", "--body", "do not show")
+
+	r := runKanban(t, kanbanDir, "pick", "--claim", claimAgent1, "--no-body")
+	if r.exitCode != 0 {
+		t.Fatalf("pick --no-body failed (exit %d): %s", r.exitCode, r.stderr)
+	}
+	if !strings.Contains(r.stdout, "Picked task") {
+		t.Error("table output should contain 'Picked task'")
+	}
+	if strings.Contains(r.stdout, "Task #1: No body pick task") {
+		t.Errorf("table output should not include task details with --no-body, got:\n%s", r.stdout)
+	}
+	if strings.Contains(r.stdout, "do not show") {
+		t.Errorf("table output should not include task body with --no-body, got:\n%s", r.stdout)
+	}
+}
+
+func TestPickCompactOutputIncludesDetails(t *testing.T) {
+	kanbanDir := initBoard(t)
+	mustCreateTask(t, kanbanDir, "Compact pick task", "--body", "compact body")
+
+	r := runKanban(t, kanbanDir, "--compact", "pick", "--claim", claimAgent1)
+	if r.exitCode != 0 {
+		t.Fatalf("compact pick failed (exit %d): %s", r.exitCode, r.stderr)
+	}
+	if !strings.Contains(r.stdout, "Picked task #1: Compact pick task") {
+		t.Errorf("compact output missing pick confirmation, got:\n%s", r.stdout)
+	}
+	if !strings.Contains(r.stdout, "#1 [backlog/medium] Compact pick task") {
+		t.Errorf("compact output missing task details, got:\n%s", r.stdout)
+	}
+	if !strings.Contains(r.stdout, "compact body") {
+		t.Errorf("compact output missing task body, got:\n%s", r.stdout)
 	}
 }
 

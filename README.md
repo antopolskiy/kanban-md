@@ -396,7 +396,8 @@ Atomically find and claim the next available task. Designed for multi-agent work
 ```bash
 kanban-md pick --claim agent-1
 kanban-md pick --claim agent-1 --status todo --move in-progress
-kanban-md pick --claim agent-1 --tag backend
+kanban-md pick --claim agent-1 --tags backend
+kanban-md pick --claim agent-1 --no-body
 ```
 
 | Flag | Default | Description |
@@ -404,7 +405,10 @@ kanban-md pick --claim agent-1 --tag backend
 | `--claim` | (required) | Agent name to claim the task for |
 | `--status` | all non-terminal | Source status(es) to pick from (comma-separated) |
 | `--move` | | Also move picked task to this status |
-| `--tag` | | Only pick tasks with this tag |
+| `--tags` | | Only pick tasks matching at least one tag |
+| `--no-body` | false | Show only the pick confirmation line (skip full task details) |
+
+By default, `pick` prints the one-line confirmation and then the full task details (same as `show`, including body) so agents do not need a follow-up `show` command.
 
 The pick algorithm selects from unclaimed, unblocked tasks with satisfied dependencies, prioritizing by class of service (expedite > fixed-date > standard > intangible), then by priority within each class. Fixed-date tasks are further sorted by earliest due date.
 
@@ -664,7 +668,7 @@ kanban-md edit 5 --release
 kanban-md move 5 done
 
 # Another agent picks from a specific queue
-kanban-md pick --claim agent-2 --status todo --tag backend
+kanban-md pick --claim agent-2 --status todo --tags backend
 ```
 
 ### Classes of service

@@ -27,6 +27,7 @@ func init() {
 	pickCmd.Flags().String("status", "", "status column to pick from (default: all non-terminal)")
 	pickCmd.Flags().String("move", "", "also move the picked task to this status")
 	pickCmd.Flags().StringSlice("tags", nil, "filter by tags (comma-separated, OR logic)")
+	pickCmd.Flags().Bool("no-body", false, "suppress full task details after pick")
 	_ = pickCmd.MarkFlagRequired("claim")
 	rootCmd.AddCommand(pickCmd)
 }
@@ -41,6 +42,7 @@ func runPick(cmd *cobra.Command, _ []string) error {
 	statusFilter, _ := cmd.Flags().GetString("status")
 	moveTarget, _ := cmd.Flags().GetString("move")
 	tags, _ := cmd.Flags().GetStringSlice("tags")
+	noBody, _ := cmd.Flags().GetBool("no-body")
 
 	if err = validatePickFlags(cfg, statusFilter, moveTarget); err != nil {
 		return err
@@ -51,7 +53,7 @@ func runPick(cmd *cobra.Command, _ []string) error {
 		return err
 	}
 
-	return outputPickResult(picked, oldStatus, claimant)
+	return outputPickResult(picked, oldStatus, claimant, noBody)
 }
 
 func validatePickFlags(cfg *config.Config, statusFilter, moveTarget string) error {
@@ -123,7 +125,7 @@ func executePick(cfg *config.Config, claimant, statusFilter, moveTarget string, 
 	return picked, oldStatus, nil
 }
 
-func outputPickResult(picked *task.Task, oldStatus, claimant string) error {
+func outputPickResult(picked *task.Task, oldStatus, claimant string, noBody bool) error {
 	if outputFormat() == output.FormatJSON {
 		return output.JSON(os.Stdout, picked)
 	}
@@ -134,5 +136,11 @@ func outputPickResult(picked *task.Task, oldStatus, claimant string) error {
 		output.Messagef(os.Stdout, "Picked task #%d: %s (%s, claimed by %s)",
 			picked.ID, picked.Title, picked.Status, claimant)
 	}
-	return nil
+	if noBody {
+		return nil
+	}
+	if _, err := fmt.Fprintln(os.Stdout); err != nil {
+		return err
+	}
+	return outputTaskDetail(picked)
 }
