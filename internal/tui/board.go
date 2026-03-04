@@ -19,6 +19,7 @@ import (
 
 	"github.com/antopolskiy/kanban-md/internal/board"
 	"github.com/antopolskiy/kanban-md/internal/config"
+	"github.com/antopolskiy/kanban-md/internal/filelock"
 	"github.com/antopolskiy/kanban-md/internal/task"
 )
 
@@ -515,6 +516,28 @@ func (b *Board) executeCreate() (tea.Model, tea.Cmd) {
 
 	priority := b.selectedCreatePriority()
 	tags := parseTagsCSV(b.createTagsInput.Value())
+
+	// Acquire exclusive lock to prevent concurrent creates from
+	// reading the same next_id and generating duplicate task IDs.
+	unlock, err := filelock.Lock(filepath.Join(b.cfg.Dir(), ".lock"))
+	if err != nil {
+		b.err = fmt.Errorf("acquiring lock: %w", err)
+		b.resetCreateState()
+		b.view = viewBoard
+		return b, nil
+	}
+	defer unlock() //nolint:errcheck // best-effort unlock
+
+	// Reload config from disk to get the current NextID, since another
+	// process may have created tasks while the TUI was running.
+	freshCfg, err := config.Load(b.cfg.Dir())
+	if err != nil {
+		b.err = fmt.Errorf("reloading config: %w", err)
+		b.resetCreateState()
+		b.view = viewBoard
+		return b, nil
+	}
+	b.cfg.NextID = freshCfg.NextID
 
 	now := b.now()
 	id := b.cfg.NextID

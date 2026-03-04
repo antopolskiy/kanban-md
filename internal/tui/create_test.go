@@ -610,6 +610,80 @@ func TestCreate_TitleCursorMovementInsertsAtCursor(t *testing.T) {
 	}
 }
 
+func TestCreate_ReloadsNextIDFromDisk(t *testing.T) {
+	b, cfg := setupTestBoard(t)
+
+	// setupTestBoard creates tasks 1-4 but leaves NextID=1.
+	// First, sync NextID to 5 on disk AND in memory (realistic starting state).
+	cfg.NextID = 5
+	if err := cfg.Save(); err != nil {
+		t.Fatal(err)
+	}
+
+	// Simulate an external process (CLI) creating task-5 while TUI is running.
+	// Write the task file and bump NextID on disk, but WITHOUT updating the
+	// Board's in-memory config (to simulate a stale TUI).
+	externalTask := &task.Task{
+		ID:       5,
+		Title:    "External task",
+		Status:   "todo",
+		Priority: "medium",
+		Created:  testRefTime,
+		Updated:  testRefTime,
+	}
+	slug := task.GenerateSlug("External task")
+	filename := task.GenerateFilename(5, slug)
+	path := filepath.Join(cfg.TasksPath(), filename)
+	if err := task.Write(path, externalTask); err != nil {
+		t.Fatal(err)
+	}
+	// Write NextID=6 to disk directly (bypassing in-memory cfg pointer).
+	diskCfg, err := config.Load(cfg.Dir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	diskCfg.NextID = 6
+	if saveErr := diskCfg.Save(); saveErr != nil {
+		t.Fatal(saveErr)
+	}
+	// Verify the Board's in-memory NextID is still stale (5).
+	if cfg.NextID != 5 {
+		t.Fatalf("expected stale in-memory NextID=5, got %d", cfg.NextID)
+	}
+
+	// Now create a task via TUI — it must NOT use the stale NextID (5).
+	b = sendKey(b, "c")
+	b = typeText(b, "TUI task after external")
+	_ = sendSpecialKey(b, tea.KeyEnter)
+
+	// Read all tasks and verify no duplicate IDs.
+	tasks, err := task.ReadAll(cfg.TasksPath())
+	if err != nil {
+		t.Fatal(err)
+	}
+	ids := make(map[int]int, len(tasks))
+	for _, tk := range tasks {
+		ids[tk.ID]++
+	}
+	for id, count := range ids {
+		if count > 1 {
+			t.Errorf("duplicate task ID %d (found %d times)", id, count)
+		}
+	}
+
+	// The TUI-created task should have ID 6, not the stale 5.
+	for _, tk := range tasks {
+		if tk.Title == "TUI task after external" {
+			if tk.ID == 5 {
+				t.Errorf("TUI task got stale ID 5, same as external task")
+			}
+			if tk.ID != 6 {
+				t.Errorf("TUI task ID = %d, want 6", tk.ID)
+			}
+		}
+	}
+}
+
 func countTaskFiles(t *testing.T, dir string) int {
 	t.Helper()
 	entries, err := os.ReadDir(dir)
