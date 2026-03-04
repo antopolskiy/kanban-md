@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/antopolskiy/kanban-md/internal/clierr"
 	"github.com/antopolskiy/kanban-md/internal/config"
 	"github.com/antopolskiy/kanban-md/internal/date"
 	"github.com/antopolskiy/kanban-md/internal/task"
@@ -354,4 +355,114 @@ func validateDeps(cfg *config.Config, t *task.Task) error {
 		}
 	}
 	return nil
+}
+
+// EditResult is returned after a successful edit.
+type EditResult struct {
+	Task    *task.Task
+	NewPath string
+}
+
+// Edit modifies an existing task. It handles find, read, claim validation,
+// applying changes via the caller-provided applyFn, post-validation (deps,
+// require_claim, WIP limits on status change), write, and logging.
+//
+// applyFn receives the task to mutate in-place and returns whether any
+// changes were made. If no changes were made, Edit returns a NoChanges error.
+//
+// If release is true, claim checks are bypassed (intent is to release a claim).
+func Edit(cfg *config.Config, id int, claimant string, release bool,
+	applyFn func(t *task.Task) (changed bool, err error), now time.Time,
+) (*EditResult, error) {
+	path, err := task.FindByID(cfg.TasksPath(), id)
+	if err != nil {
+		return nil, err
+	}
+
+	t, err := task.Read(path)
+	if err != nil {
+		return nil, err
+	}
+
+	// Claim validation (release bypasses this).
+	if !release {
+		if err = task.CheckClaim(t, claimant, cfg.ClaimTimeoutDuration()); err != nil {
+			return nil, err
+		}
+		// Enforce require_claim for the task's current status.
+		if cfg.StatusRequiresClaim(t.Status) && claimant == "" {
+			return nil, task.ValidateClaimRequired(t.Status)
+		}
+	}
+
+	oldTitle := t.Title
+	oldStatus := t.Status
+	wasBlocked := t.Blocked
+	wasClaimedBy := t.ClaimedBy
+
+	// Apply caller-provided changes.
+	changed, err := applyFn(t)
+	if err != nil {
+		return nil, err
+	}
+	if !changed {
+		return nil, clierr.New(clierr.NoChanges, "no changes specified")
+	}
+
+	// Post-validation.
+	if err = validateEditPost(cfg, t, oldStatus, claimant); err != nil {
+		return nil, err
+	}
+
+	t.Updated = now
+
+	newPath, err := task.WriteAndRename(path, t, oldTitle)
+	if err != nil {
+		return nil, err
+	}
+
+	// Log transitions.
+	LogMutation(cfg.Dir(), "edit", t.ID, t.Title)
+	logEditTransitions(cfg, t, wasBlocked, wasClaimedBy)
+
+	return &EditResult{Task: t, NewPath: newPath}, nil
+}
+
+// validateEditPost runs post-edit validations: deps, require_claim for new
+// status, and WIP limits on status change.
+func validateEditPost(cfg *config.Config, t *task.Task, oldStatus, claimant string) error {
+	if err := validateDeps(cfg, t); err != nil {
+		return err
+	}
+	// Enforce require_claim if status changed.
+	if t.Status != oldStatus && cfg.StatusRequiresClaim(t.Status) && claimant == "" {
+		return task.ValidateClaimRequired(t.Status)
+	}
+	// Check WIP limit if status changed (class-aware).
+	if t.Status != oldStatus {
+		// Temporarily set old status back for the WIP check, which uses
+		// t.Status as the "current" status for the deduction calculation.
+		newStatus := t.Status
+		t.Status = oldStatus
+		err := enforceMoveWIP(cfg, t, newStatus)
+		t.Status = newStatus
+		return err
+	}
+	return nil
+}
+
+// logEditTransitions logs block/unblock and claim/release transitions.
+func logEditTransitions(cfg *config.Config, t *task.Task, wasBlocked bool, wasClaimedBy string) {
+	if !wasBlocked && t.Blocked {
+		LogMutation(cfg.Dir(), "block", t.ID, t.BlockReason)
+	}
+	if wasBlocked && !t.Blocked {
+		LogMutation(cfg.Dir(), "unblock", t.ID, t.Title)
+	}
+	if wasClaimedBy == "" && t.ClaimedBy != "" {
+		LogMutation(cfg.Dir(), "claim", t.ID, t.ClaimedBy)
+	}
+	if wasClaimedBy != "" && t.ClaimedBy == "" {
+		LogMutation(cfg.Dir(), "release", t.ID, wasClaimedBy)
+	}
 }

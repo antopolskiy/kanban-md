@@ -7,6 +7,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/antopolskiy/kanban-md/internal/board"
 	"github.com/antopolskiy/kanban-md/internal/clierr"
 	"github.com/antopolskiy/kanban-md/internal/config"
 	"github.com/antopolskiy/kanban-md/internal/date"
@@ -91,94 +92,47 @@ func editSingleTask(cfg *config.Config, id int, cmd *cobra.Command) error {
 	return nil
 }
 
-// executeEdit performs the core edit: find, read, apply, validate, write, log.
+// executeEdit performs the core edit via board.Edit.
 // Returns the modified task and its new file path.
 func executeEdit(cfg *config.Config, id int, cmd *cobra.Command) (*task.Task, string, error) {
-	path, err := task.FindByID(cfg.TasksPath(), id)
+	claimant, _ := cmd.Flags().GetString("claim")
+	release, _ := cmd.Flags().GetBool("release")
+
+	result, err := board.Edit(cfg, id, claimant, release,
+		func(t *task.Task) (bool, error) {
+			return applyEditChanges(cmd, t, cfg, claimant, release)
+		}, time.Now())
 	if err != nil {
 		return nil, "", err
 	}
 
-	t, err := task.Read(path)
-	if err != nil {
-		return nil, "", err
-	}
-
-	claimant, release, err := validateEditClaim(cfg, t, cmd)
-	if err != nil {
-		return nil, "", err
-	}
-
-	oldTitle := t.Title
-	oldStatus := t.Status
-	wasBlocked := t.Blocked
-	wasClaimedBy := t.ClaimedBy
-	changed, err := applyEditChanges(cmd, t, cfg, claimant, release)
-	if err != nil {
-		return nil, "", err
-	}
-
-	if !changed {
-		return nil, "", clierr.New(clierr.NoChanges, "no changes specified")
-	}
-
-	if err = validateEditPost(cfg, t, oldStatus, claimant); err != nil {
-		return nil, "", err
-	}
-
-	t.Updated = time.Now()
-
-	newPath, err := task.WriteAndRename(path, t, oldTitle)
-	if err != nil {
-		return nil, "", err
-	}
-
-	logEditActivity(cfg, t, wasBlocked, wasClaimedBy)
-	return t, newPath, nil
+	return result.Task, result.NewPath, nil
 }
 
 // validateEditClaim checks claim ownership and require_claim before allowing edits.
 // The --release flag bypasses claim checks since its intent is to release a claim.
-func validateEditClaim(cfg *config.Config, t *task.Task, cmd *cobra.Command) (string, bool, error) {
+func validateEditClaim(cfg *config.Config, t *task.Task, cmd *cobra.Command) (string, bool, error) { //nolint:unparam // claimant used by tests
 	claimant, _ := cmd.Flags().GetString("claim")
 	release, _ := cmd.Flags().GetBool("release")
-	// --release bypasses claim check — its purpose is to release a (possibly foreign) claim.
 	if !release {
 		if err := checkClaim(t, claimant, cfg.ClaimTimeoutDuration()); err != nil {
 			return "", false, err
 		}
 	}
-	// Enforce require_claim for the task's current status.
 	if cfg.StatusRequiresClaim(t.Status) && claimant == "" && !release {
 		return "", false, task.ValidateClaimRequired(t.Status)
 	}
 	return claimant, release, nil
 }
 
-// applyEditChanges applies field edits and claim/release flags.
-func applyEditChanges(cmd *cobra.Command, t *task.Task, cfg *config.Config, claimant string, release bool) (bool, error) {
-	changed, err := applyEditFlags(cmd, t, cfg)
-	if err != nil {
-		return false, err
-	}
-	if c, claimErr := applyClaimFlags(cmd, t, claimant, release); claimErr != nil {
-		return false, claimErr
-	} else if c {
-		changed = true
-	}
-	return changed, nil
-}
-
 // validateEditPost runs post-edit validations: deps, require_claim for new status, WIP limits.
-func validateEditPost(cfg *config.Config, t *task.Task, oldStatus, claimant string) error {
+func validateEditPost(cfg *config.Config, t *task.Task, oldStatus, claimant string) error { //nolint:unparam // oldStatus varies in tests
 	if err := validateDeps(cfg, t); err != nil {
 		return err
 	}
-	// Enforce require_claim if status changed via --status.
 	if t.Status != oldStatus && cfg.StatusRequiresClaim(t.Status) && claimant == "" {
 		return task.ValidateClaimRequired(t.Status)
 	}
-	// Check WIP limit if status changed (class-aware).
 	if t.Status != oldStatus {
 		if t.Class != "" && len(cfg.Classes) > 0 {
 			return enforceWIPLimitForClass(cfg, t, oldStatus, t.Status)
@@ -203,6 +157,20 @@ func logEditActivity(cfg *config.Config, t *task.Task, wasBlocked bool, wasClaim
 	if wasClaimedBy != "" && t.ClaimedBy == "" {
 		logActivity(cfg, "release", t.ID, wasClaimedBy)
 	}
+}
+
+// applyEditChanges applies field edits and claim/release flags.
+func applyEditChanges(cmd *cobra.Command, t *task.Task, cfg *config.Config, claimant string, release bool) (bool, error) {
+	changed, err := applyEditFlags(cmd, t, cfg)
+	if err != nil {
+		return false, err
+	}
+	if c, claimErr := applyClaimFlags(cmd, t, claimant, release); claimErr != nil {
+		return false, claimErr
+	} else if c {
+		changed = true
+	}
+	return changed, nil
 }
 
 // applyClaimFlags handles --claim and --release flags.

@@ -567,40 +567,29 @@ func (b *Board) executeEdit() (tea.Model, tea.Cmd) {
 		return b, nil
 	}
 
-	path, err := task.FindByID(b.cfg.TasksPath(), b.createEditID)
-	if err != nil {
-		b.err = fmt.Errorf("finding task #%d: %w", b.createEditID, err)
-		b.resetCreateState()
-		b.view = viewBoard
-		return b, nil
-	}
+	body := strings.TrimSpace(b.createBodyInput.Value())
+	priority := b.selectedCreatePriority()
+	tags := parseTagsCSV(b.createTagsInput.Value())
+	editID := b.createEditID
 
-	tk, err := task.Read(path)
-	if err != nil {
-		b.err = fmt.Errorf("reading task #%d: %w", b.createEditID, err)
-		b.resetCreateState()
-		b.view = viewBoard
-		return b, nil
-	}
+	_, editErr := board.Edit(b.cfg, editID, "", false,
+		func(t *task.Task) (bool, error) {
+			t.Title = title
+			t.Body = body
+			t.Priority = priority
+			t.Tags = tags
+			return true, nil // TUI edit always has changes (user confirmed)
+		}, b.now())
 
-	oldTitle := tk.Title
-	tk.Title = title
-	tk.Body = strings.TrimSpace(b.createBodyInput.Value())
-	tk.Priority = b.selectedCreatePriority()
-	tk.Tags = parseTagsCSV(b.createTagsInput.Value())
-	tk.Updated = b.now()
-
-	if _, err := task.WriteAndRename(path, tk, oldTitle); err != nil {
-		b.err = fmt.Errorf("editing task #%d: %w", b.createEditID, err)
-	} else {
-		board.LogMutation(b.cfg.Dir(), "edit", tk.ID, tk.Title)
-	}
-
-	taskID := b.createEditID
 	b.resetCreateState()
 	b.view = viewBoard
 	b.loadTasks()
-	b.selectTaskByID(taskID)
+
+	if editErr != nil {
+		b.err = fmt.Errorf("editing task #%d: %w", editID, editErr)
+	} else {
+		b.selectTaskByID(editID)
+	}
 	return b, nil
 }
 
