@@ -80,83 +80,55 @@ func moveSingleTask(cfg *config.Config, id int, cmd *cobra.Command, args []strin
 	return nil
 }
 
-// executeMove performs the core move: find, read, resolve, wip check, write, log.
+// executeMove performs the core move via board.Move.
 // Returns (task, oldStatus, error). If the task was already at the target status
 // (idempotent), oldStatus is empty and the task is returned unchanged.
 func executeMove(cfg *config.Config, id int, cmd *cobra.Command, args []string) (*task.Task, string, error) {
+	claimant, _ := cmd.Flags().GetString("claim")
+
+	// Resolve the target status from CLI flags/args. This requires reading
+	// the task for --next/--prev, so we do a pre-read for those cases.
+	newStatus, err := resolveTargetStatusByID(cfg, cmd, args, id)
+	if err != nil {
+		return nil, "", err
+	}
+
+	result, err := board.Move(cfg, board.MoveParams{
+		ID:        id,
+		NewStatus: newStatus,
+		Claimant:  claimant,
+		SetClaim:  cmd.Flags().Changed("claim") && claimant != "",
+	}, time.Now())
+	if err != nil {
+		return nil, "", err
+	}
+
+	for _, w := range result.Warnings {
+		fmt.Fprintf(os.Stderr, "Warning: %s\n", w)
+	}
+
+	return result.Task, result.OldStatus, nil
+}
+
+// resolveTargetStatusByID resolves the target status from CLI flags/args.
+// For --next/--prev it reads the task from disk to determine current status.
+func resolveTargetStatusByID(cfg *config.Config, cmd *cobra.Command, args []string, id int) (string, error) {
+	if next, _ := cmd.Flags().GetBool("next"); !next {
+		if prev, _ := cmd.Flags().GetBool("prev"); !prev {
+			// No --next/--prev: delegate to resolveTargetStatus with nil task.
+			return resolveTargetStatus(cmd, args, nil, cfg)
+		}
+	}
+	// --next or --prev: need to read the task for current status.
 	path, err := task.FindByID(cfg.TasksPath(), id)
 	if err != nil {
-		return nil, "", err
+		return "", err
 	}
-
 	t, err := task.Read(path)
 	if err != nil {
-		return nil, "", err
+		return "", err
 	}
-
-	claimant, _ := cmd.Flags().GetString("claim")
-	if err = validateMoveClaim(cfg, t, claimant); err != nil {
-		return nil, "", err
-	}
-
-	newStatus, err := resolveTargetStatus(cmd, args, t, cfg)
-	if err != nil {
-		return nil, "", err
-	}
-
-	// Idempotent: if already at target status, succeed without writing.
-	if t.Status == newStatus {
-		return t, "", nil
-	}
-
-	// Enforce require_claim for target status.
-	if cfg.StatusRequiresClaim(newStatus) && claimant == "" {
-		return nil, "", task.ValidateClaimRequired(newStatus)
-	}
-
-	if err = enforceMoveWIP(cfg, t, newStatus); err != nil {
-		return nil, "", err
-	}
-
-	// Warn when moving a blocked task.
-	if t.Blocked {
-		fmt.Fprintf(os.Stderr, "Warning: task #%d is blocked (%s)\n", t.ID, t.BlockReason)
-	}
-
-	oldStatus := t.Status
-	t.Status = newStatus
-	task.UpdateTimestamps(t, oldStatus, newStatus, cfg)
-	applyMoveClaim(cmd, t, claimant)
-	t.Updated = time.Now()
-
-	if err := task.Write(path, t); err != nil {
-		return nil, "", fmt.Errorf("writing task: %w", err)
-	}
-
-	logActivity(cfg, "move", id, oldStatus+" -> "+newStatus)
-	return t, oldStatus, nil
-}
-
-// validateMoveClaim checks claim ownership before allowing a move.
-func validateMoveClaim(cfg *config.Config, t *task.Task, claimant string) error {
-	return checkClaim(t, claimant, cfg.ClaimTimeoutDuration())
-}
-
-// enforceMoveWIP checks WIP limits, considering class of service.
-func enforceMoveWIP(cfg *config.Config, t *task.Task, newStatus string) error {
-	if t.Class != "" && len(cfg.Classes) > 0 {
-		return enforceWIPLimitForClass(cfg, t, t.Status, newStatus)
-	}
-	return enforceWIPLimit(cfg, t.Status, newStatus)
-}
-
-// applyMoveClaim sets the claim on the task if --claim flag was provided.
-func applyMoveClaim(cmd *cobra.Command, t *task.Task, claimant string) {
-	if cmd.Flags().Changed("claim") && claimant != "" {
-		now := time.Now()
-		t.ClaimedBy = claimant
-		t.ClaimedAt = &now
-	}
+	return resolveTargetStatus(cmd, args, t, cfg)
 }
 
 func resolveTargetStatus(cmd *cobra.Command, args []string, t *task.Task, cfg *config.Config) (string, error) {
@@ -187,6 +159,15 @@ func resolveTargetStatus(cmd *cobra.Command, args []string, t *task.Task, cfg *c
 	default:
 		return "", clierr.New(clierr.InvalidInput, "provide a target status or use --next/--prev")
 	}
+}
+
+// enforceMoveWIP checks WIP limits for a move, considering class of service.
+// Used by handoff.go and other commands until they are refactored to use board.Move.
+func enforceMoveWIP(cfg *config.Config, t *task.Task, newStatus string) error {
+	if t.Class != "" && len(cfg.Classes) > 0 {
+		return enforceWIPLimitForClass(cfg, t, t.Status, newStatus)
+	}
+	return enforceWIPLimit(cfg, t.Status, newStatus)
 }
 
 // enforceWIPLimit checks if the target status has room.

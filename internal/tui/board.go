@@ -1051,24 +1051,18 @@ func (b *Board) executeMove(targetStatus string) (tea.Model, tea.Cmd) {
 		return b, nil
 	}
 
-	if t.Status == targetStatus {
-		b.view = viewBoard
-		return b, nil
-	}
-
-	oldStatus := t.Status
-	t.Status = targetStatus
-	task.UpdateTimestamps(t, oldStatus, targetStatus, b.cfg)
-
-	if err := task.Write(t.File, t); err != nil {
-		b.err = fmt.Errorf("moving task #%d: %w", t.ID, err)
-		t.Status = oldStatus // revert
-	} else {
-		board.LogMutation(b.cfg.Dir(), "move", t.ID, oldStatus+" -> "+targetStatus)
-	}
+	_, moveErr := board.Move(b.cfg, board.MoveParams{
+		ID:        t.ID,
+		NewStatus: targetStatus,
+	}, b.now())
 
 	b.view = viewBoard
 	b.loadTasks()
+
+	// Set error after loadTasks so it isn't cleared by a successful reload.
+	if moveErr != nil {
+		b.err = fmt.Errorf("moving task #%d: %w", t.ID, moveErr)
+	}
 	return b, nil
 }
 
