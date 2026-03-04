@@ -183,7 +183,7 @@ func TestWriteAndRename_WriteError(t *testing.T) {
 	badPath := filepath.Join(t.TempDir(), "nonexistent", "dir", "task.md")
 	tk := &task.Task{ID: 1, Title: "test", Status: "backlog", Priority: "medium"}
 
-	_, err := writeAndRename(badPath, tk, "test")
+	_, err := task.WriteAndRename(badPath, tk, "test")
 	if err == nil {
 		t.Fatal("expected error when write fails")
 	}
@@ -207,7 +207,7 @@ func TestWriteAndRename_RemoveError(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_, err := writeAndRename(oldPath, tk, "old title")
+	_, err := task.WriteAndRename(oldPath, tk, "old title")
 	if err == nil {
 		t.Fatal("expected error when remove fails")
 	}

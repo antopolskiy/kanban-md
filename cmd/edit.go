@@ -1,9 +1,7 @@
 package cmd
 
 import (
-	"fmt"
 	"os"
-	"path/filepath"
 	"strings"
 	"time"
 
@@ -130,7 +128,7 @@ func executeEdit(cfg *config.Config, id int, cmd *cobra.Command) (*task.Task, st
 
 	t.Updated = time.Now()
 
-	newPath, err := writeAndRename(path, t, oldTitle)
+	newPath, err := task.WriteAndRename(path, t, oldTitle)
 	if err != nil {
 		return nil, "", err
 	}
@@ -188,27 +186,6 @@ func validateEditPost(cfg *config.Config, t *task.Task, oldStatus, claimant stri
 		return enforceWIPLimit(cfg, oldStatus, t.Status)
 	}
 	return nil
-}
-
-// writeAndRename writes the task and renames the file if the title changed.
-func writeAndRename(path string, t *task.Task, oldTitle string) (string, error) {
-	newPath := path
-	if t.Title != oldTitle {
-		slug := task.GenerateSlug(t.Title)
-		filename := task.GenerateFilename(t.ID, slug)
-		newPath = filepath.Join(filepath.Dir(path), filename)
-	}
-
-	if err := task.Write(newPath, t); err != nil {
-		return "", fmt.Errorf("writing task: %w", err)
-	}
-
-	if newPath != path {
-		if err := os.Remove(path); err != nil {
-			return "", fmt.Errorf("removing old file: %w", err)
-		}
-	}
-	return newPath, nil
 }
 
 // logEditActivity logs the edit and any block/unblock/claim/release transitions.

@@ -3,7 +3,6 @@ package tui
 
 import (
 	"fmt"
-	"os"
 	"path/filepath"
 	"regexp"
 	"strconv"
@@ -609,7 +608,7 @@ func (b *Board) executeEdit() (tea.Model, tea.Cmd) {
 	tk.Tags = parseTagsCSV(b.createTagsInput.Value())
 	tk.Updated = b.now()
 
-	if _, err := writeTaskAndRename(path, tk, oldTitle); err != nil {
+	if _, err := task.WriteAndRename(path, tk, oldTitle); err != nil {
 		b.err = fmt.Errorf("editing task #%d: %w", b.createEditID, err)
 	} else {
 		board.LogMutation(b.cfg.Dir(), "edit", tk.ID, tk.Title)
@@ -640,27 +639,6 @@ func parseTagsCSV(raw string) []string {
 		}
 	}
 	return tags
-}
-
-func writeTaskAndRename(path string, t *task.Task, oldTitle string) (string, error) {
-	newPath := path
-	if t.Title != oldTitle {
-		slug := task.GenerateSlug(t.Title)
-		filename := task.GenerateFilename(t.ID, slug)
-		newPath = filepath.Join(filepath.Dir(path), filename)
-	}
-
-	if err := task.Write(newPath, t); err != nil {
-		return "", fmt.Errorf("writing task: %w", err)
-	}
-
-	if newPath != path {
-		if err := os.Remove(path); err != nil {
-			return "", fmt.Errorf("removing old file: %w", err)
-		}
-	}
-
-	return newPath, nil
 }
 
 func (b *Board) selectTaskByID(id int) {

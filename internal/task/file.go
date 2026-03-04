@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"go.yaml.in/yaml/v3"
@@ -90,6 +91,28 @@ func splitFrontmatter(data []byte) ([]byte, string, error) {
 	}
 
 	return []byte(fm), body, nil
+}
+
+// WriteAndRename writes the task to disk and renames the file if the title
+// changed (so the filename slug stays in sync). Returns the new file path.
+func WriteAndRename(path string, t *Task, oldTitle string) (string, error) {
+	newPath := path
+	if t.Title != oldTitle {
+		slug := GenerateSlug(t.Title)
+		filename := GenerateFilename(t.ID, slug)
+		newPath = filepath.Join(filepath.Dir(path), filename)
+	}
+
+	if err := Write(newPath, t); err != nil {
+		return "", fmt.Errorf("writing task: %w", err)
+	}
+
+	if newPath != path {
+		if err := os.Remove(path); err != nil {
+			return "", fmt.Errorf("removing old file: %w", err)
+		}
+	}
+	return newPath, nil
 }
 
 func validateRequiredFields(t *Task) error {

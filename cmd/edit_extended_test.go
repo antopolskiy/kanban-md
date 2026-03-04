@@ -730,7 +730,7 @@ func TestWriteAndRename_SameTitle(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	newPath, err := writeAndRename(path, tk, "test task")
+	newPath, err := task.WriteAndRename(path, tk, "test task")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -749,7 +749,7 @@ func TestWriteAndRename_TitleChanged(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	newPath, err := writeAndRename(path, tk, "old title")
+	newPath, err := task.WriteAndRename(path, tk, "old title")
 	if err != nil {
 		t.Fatal(err)
 	}
