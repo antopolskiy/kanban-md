@@ -304,6 +304,40 @@ func TestBoard_MovePrev(t *testing.T) {
 	_ = b.View()
 }
 
+func TestBoard_MoveToRequireClaimStatus(t *testing.T) {
+	b, cfg := setupTestBoard(t)
+
+	// Default config has require_claim: true for in-progress.
+	// Move task 1 from backlog → todo using N.
+	b = sendKey(b, "n") // backlog → todo
+
+	// After moveNext + loadTasks, cursor stays at backlog column.
+	// Navigate to the todo column where task 1 now lives.
+	b = sendKey(b, "l") // → todo column
+
+	// Now move task 1 from todo → in-progress.
+	b = sendKey(b, "n") // todo → in-progress
+
+	// Verify the task reached in-progress (not blocked by require_claim).
+	path, err := task.FindByID(cfg.TasksPath(), 1)
+	if err != nil {
+		t.Fatalf("finding task: %v", err)
+	}
+	tk, err := task.Read(path)
+	if err != nil {
+		t.Fatalf("reading task: %v", err)
+	}
+	if tk.Status != "in-progress" {
+		t.Errorf("expected status 'in-progress', got %q", tk.Status)
+	}
+
+	// Check view has no error.
+	v := b.View()
+	if containsStr(v, "require") || containsStr(v, "claim") {
+		t.Errorf("expected no claim error in view, got:\n%s", v)
+	}
+}
+
 func TestBoard_MovePrevAtFirst(t *testing.T) {
 	b, _ := setupTestBoard(t)
 

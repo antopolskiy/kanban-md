@@ -3,6 +3,7 @@ package tui
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 	"regexp"
 	"strconv"
@@ -572,7 +573,7 @@ func (b *Board) executeEdit() (tea.Model, tea.Cmd) {
 	tags := parseTagsCSV(b.createTagsInput.Value())
 	editID := b.createEditID
 
-	_, editErr := board.Edit(b.cfg, editID, "", false,
+	_, editErr := board.Edit(b.cfg, editID, tuiClaimant(), false,
 		func(t *task.Task) (bool, error) {
 			t.Title = title
 			t.Body = body
@@ -599,6 +600,17 @@ func (b *Board) selectedCreatePriority() string {
 		priority = b.cfg.Priorities[b.createPriority]
 	}
 	return priority
+}
+
+// tuiClaimant returns a claimant identifier for TUI operations.
+// Uses the hostname to auto-claim tasks when require_claim is set,
+// since the TUI is for interactive human use (not multi-agent coordination).
+func tuiClaimant() string {
+	host, err := os.Hostname()
+	if err != nil || host == "" {
+		return "tui"
+	}
+	return "tui@" + host
 }
 
 func parseTagsCSV(raw string) []string {
@@ -1022,10 +1034,18 @@ func (b *Board) executeMove(targetStatus string) (tea.Model, tea.Cmd) {
 		return b, nil
 	}
 
-	_, moveErr := board.Move(b.cfg, board.MoveParams{
+	params := board.MoveParams{
 		ID:        t.ID,
 		NewStatus: targetStatus,
-	}, b.now())
+	}
+
+	// Auto-claim with hostname when moving to a require_claim status.
+	if b.cfg.StatusRequiresClaim(targetStatus) {
+		params.Claimant = tuiClaimant()
+		params.SetClaim = true
+	}
+
+	_, moveErr := board.Move(b.cfg, params, b.now())
 
 	b.view = viewBoard
 	b.loadTasks()
@@ -1038,7 +1058,7 @@ func (b *Board) executeMove(targetStatus string) (tea.Model, tea.Cmd) {
 }
 
 func (b *Board) executeDelete() (tea.Model, tea.Cmd) {
-	_, deleteErr := board.Delete(b.cfg, b.deleteID, "", b.now())
+	_, deleteErr := board.Delete(b.cfg, b.deleteID, tuiClaimant(), b.now())
 
 	b.view = viewBoard
 	b.loadTasks()
