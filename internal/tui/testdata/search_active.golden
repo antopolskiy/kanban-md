@@ -1,9 +1,5 @@
- backlog (2)             todo (0)                in-progress (1)         review (0)              done (1)               
-╭──────────────────────╮  (empty)               ╭──────────────────────╮  (empty)               ╭──────────────────────╮
-│ #1 Task A            │                        │ #3 Task C            │                        │ #4 Task D            │
-│ high                 │                        │ high 2h              │                        │ low                  │
-╰──────────────────────╯                        ╰──────────────────────╯                        ╰──────────────────────╯
-╭──────────────────────╮                                                                                                
+ backlog (1)             todo (0)                in-progress (0)         review (0)              done (0)               
+╭──────────────────────╮  (empty)                 (empty)                 (empty)                 (empty)               
 │ #2 Task B            │                                                                                                
 │ medium               │                                                                                                
 ╰──────────────────────╯                                                                                                
@@ -37,4 +33,8 @@
                                                                                                                         
                                                                                                                         
                                                                                                                         
- Test Board | 4 tasks | c:create e:edit m:move n/p:status +/-:priority d:del s:sort[priority↓] /:search ?:help q:quit   
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+/b   enter:keep  esc:clear                                                                                              

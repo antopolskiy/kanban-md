@@ -34,7 +34,11 @@ const (
 	viewHelp
 	viewCreate
 	viewDebug
+	viewSearch
 )
+
+// sortFields is the ordered set of fields the board sort key cycles through.
+var sortFields = []string{"priority", "created", "updated", "title"}
 
 // Key and layout constants.
 const (
@@ -82,6 +86,15 @@ type Board struct {
 	hideEmptyColumns bool
 	now              func() time.Time // clock for duration display; defaults to time.Now
 
+	// Sort state.
+	sortField   string // one of sortFields
+	sortReverse bool   // true = descending order
+
+	// Search/filter.
+	filterQuery string          // active case-insensitive title filter; empty = no filter
+	searchInput textinput.Model // input shown while typing the query
+	searchReady bool
+
 	// Detail view.
 	detailTask      *task.Task
 	detailScrollOff int
@@ -119,6 +132,8 @@ func NewBoard(cfg *config.Config) *Board {
 		cfg:              cfg,
 		now:              time.Now,
 		hideEmptyColumns: cfg.TUI.HideEmptyColumns,
+		sortField:        "priority",
+		sortReverse:      true,
 	}
 	b.loadTasks()
 	return b
@@ -182,6 +197,8 @@ func (b *Board) View() string {
 		return b.viewCreateDialog()
 	case viewDebug:
 		return b.viewDebugScreen()
+	case viewSearch:
+		return b.viewBoard()
 	default:
 		return b.viewBoard()
 	}
@@ -208,6 +225,8 @@ func (b *Board) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return b.handleCreateKey(msg)
 	case viewDebug:
 		return b.handleDebugKey(msg)
+	case viewSearch:
+		return b.handleSearchKey(msg)
 	}
 
 	return b, nil
@@ -223,8 +242,6 @@ func (b *Board) handleBoardKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		b.handleNavigation(msg.String())
 	case keyEnter:
 		b.handleEnter()
-	case "m":
-		b.handleMoveStart()
 	case "n":
 		return b.moveNext()
 	case "p":
@@ -233,6 +250,19 @@ func (b *Board) handleBoardKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return b.raisePriority()
 	case "-", "_":
 		return b.lowerPriority()
+	default:
+		return b.handleBoardActionKey(msg)
+	}
+	return b, nil
+}
+
+// handleBoardActionKey handles the less-frequent board action keys (create,
+// edit, move, delete, refresh, sort, search, debug). Split out from
+// handleBoardKey to keep each dispatch's cyclomatic complexity manageable.
+func (b *Board) handleBoardActionKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.String() {
+	case "m":
+		b.handleMoveStart()
 	case "c":
 		b.handleCreateStart()
 	case "e":
@@ -241,10 +271,122 @@ func (b *Board) handleBoardKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		b.handleDeleteStart()
 	case "r":
 		b.loadTasks()
+	case "s":
+		b.cycleSortField()
+	case "S":
+		b.sortReverse = !b.sortReverse
+		b.reloadKeepingSelection()
+	case "/":
+		b.handleSearchStart()
 	case "ctrl+d":
 		b.view = viewDebug
 	}
 	return b, nil
+}
+
+// cycleSortField advances the sort field to the next entry in sortFields
+// (wrapping around) and reloads, keeping the cursor on the same task.
+func (b *Board) cycleSortField() {
+	idx := 0
+	for i, f := range sortFields {
+		if f == b.sortField {
+			idx = i
+			break
+		}
+	}
+	b.sortField = sortFields[(idx+1)%len(sortFields)]
+	b.reloadKeepingSelection()
+}
+
+// reloadKeepingSelection reloads tasks (re-applying sort/filter) and keeps the
+// cursor on the previously selected task when it is still visible.
+func (b *Board) reloadKeepingSelection() {
+	var selectedID int
+	if t := b.selectedTask(); t != nil {
+		selectedID = t.ID
+	}
+	b.loadTasks()
+	if selectedID == 0 {
+		return
+	}
+	col := b.currentColumn()
+	if col != nil {
+		for i, ct := range col.tasks {
+			if ct.ID == selectedID {
+				b.activeRow = i
+				break
+			}
+		}
+	}
+	b.ensureVisible()
+}
+
+// handleSearchStart enters the live title-filter input mode, seeding the input
+// with any currently active filter.
+func (b *Board) handleSearchStart() {
+	if !b.searchReady {
+		b.searchInput = textinput.New()
+		b.searchInput.Prompt = "/"
+		b.searchReady = true
+	}
+	b.searchInput.SetValue(b.filterQuery)
+	b.searchInput.SetCursor(len([]rune(b.filterQuery)))
+	b.searchInput.Focus()
+	b.view = viewSearch
+}
+
+// handleSearchKey handles keypresses while the search input is focused. Esc
+// clears the filter, Enter keeps it, any other key updates the live filter.
+func (b *Board) handleSearchKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.String() {
+	case keyEsc:
+		b.searchInput.Blur()
+		b.filterQuery = ""
+		b.view = viewBoard
+		b.loadTasks()
+		return b, nil
+	case keyEnter:
+		b.searchInput.Blur()
+		b.view = viewBoard
+		return b, nil
+	}
+
+	m, cmd := b.searchInput.Update(msg)
+	b.searchInput = m
+	// Store the raw value (not trimmed) so a trailing space in ID search mode
+	// remains significant; matchesFilter handles trimming/case per mode.
+	b.filterQuery = b.searchInput.Value()
+	b.loadTasks()
+	return b, cmd
+}
+
+// matchesFilter reports whether task t matches the active search query.
+//
+// A query starting with "#" searches ticket IDs: while typing, the digits
+// prefix-match the ID ("#12" matches #12, #121, ...), and a trailing space
+// ("#12 ") requires an exact ID match (only #12). A bare "#" (no digits yet)
+// matches everything. Any other query is a case-insensitive substring match
+// on the title.
+func matchesFilter(t *task.Task, query string) bool {
+	if strings.HasPrefix(query, "#") {
+		rest := query[1:]
+		exact := strings.HasSuffix(rest, " ")
+		digits := strings.TrimSpace(rest)
+		if digits == "" {
+			return true
+		}
+		id := strconv.Itoa(t.ID)
+		if exact {
+			return id == digits
+		}
+		return strings.HasPrefix(id, digits)
+	}
+
+	needle := strings.TrimSpace(strings.ToLower(query))
+	if needle == "" {
+		return true
+	}
+	return strings.Contains(strings.ToLower(t.Title), needle)
 }
 
 func (b *Board) handleNavigation(k string) {
@@ -709,17 +851,22 @@ func (b *Board) loadTasks() {
 	}
 	b.err = nil
 
-	// Filter out archived tasks from TUI display.
+	// Filter out archived tasks and (when active) tasks not matching the
+	// search query from the TUI display.
 	var visibleTasks []*task.Task
 	for _, t := range tasks {
-		if !b.cfg.IsArchivedStatus(t.Status) {
-			visibleTasks = append(visibleTasks, t)
+		if b.cfg.IsArchivedStatus(t.Status) {
+			continue
 		}
+		if !matchesFilter(t, b.filterQuery) {
+			continue
+		}
+		visibleTasks = append(visibleTasks, t)
 	}
 	b.tasks = visibleTasks
 
-	// Sort tasks by priority (higher priority first).
-	board.Sort(visibleTasks, "priority", true, b.cfg)
+	// Sort tasks by the active sort key.
+	board.Sort(visibleTasks, b.sortField, b.sortReverse, b.cfg)
 
 	// Build columns from board statuses (excludes archived).
 	displayStatuses := b.cfg.BoardStatuses()
@@ -1201,9 +1348,19 @@ func (b *Board) viewBoard() string {
 		}
 	}
 
-	statusBar := b.renderStatusBar()
+	bottom := b.renderStatusBar()
+	if b.view == viewSearch {
+		bottom = b.renderSearchBar()
+	}
 
-	return lipgloss.JoinVertical(lipgloss.Left, boardView, "", statusBar)
+	return lipgloss.JoinVertical(lipgloss.Left, boardView, "", bottom)
+}
+
+// renderSearchBar renders the live title-filter input line shown while the
+// search input is focused.
+func (b *Board) renderSearchBar() string {
+	line := truncate(b.searchInput.View()+"  "+dimStyle.Render("enter:keep  esc:clear"), b.width)
+	return statusBarStyle.Render(line)
 }
 
 func (b *Board) columnWidth() int {
@@ -1488,8 +1645,16 @@ func wrapLinesCap(maxLines int) int {
 
 func (b *Board) renderStatusBar() string {
 	total := len(b.tasks)
-	status := fmt.Sprintf(" %s | %d tasks | ←↓↑→:nav c:create e:edit m:move n/p:status +/-:priority d:del ?:help q:quit",
-		b.cfg.Board.Name, total)
+	arrow := "↑"
+	if b.sortReverse {
+		arrow = "↓"
+	}
+	filter := ""
+	if b.filterQuery != "" {
+		filter = fmt.Sprintf(" | filter:%q", b.filterQuery)
+	}
+	status := fmt.Sprintf(" %s | %d tasks%s | c:create e:edit m:move n/p:status +/-:priority d:del s:sort[%s%s] /:search ?:help q:quit",
+		b.cfg.Board.Name, total, filter, b.sortField, arrow)
 	status = truncate(status, b.width)
 
 	if b.err != nil {
@@ -1849,6 +2014,9 @@ func (b *Board) viewHelp() string {
 		{"+/=", "Raise task priority"},
 		{"-/_", "Lower task priority"},
 		{"d", "Delete task"},
+		{"s", "Cycle sort field (priority/created/updated/title)"},
+		{"S", "Reverse sort direction"},
+		{"/", "Search by title, or by ID with #12 (trailing space = exact)"},
 		{"r", "Refresh board"},
 		{"?", "Show this help"},
 		{"esc/q", "Quit"},

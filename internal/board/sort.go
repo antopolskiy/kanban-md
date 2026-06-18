@@ -2,6 +2,7 @@ package board
 
 import (
 	"sort"
+	"strings"
 
 	"github.com/antopolskiy/kanban-md/internal/config"
 	"github.com/antopolskiy/kanban-md/internal/task"
@@ -27,6 +28,8 @@ func compareTasks(a, b *task.Task, field string, cfg *config.Config) bool {
 		return cfg.StatusIndex(a.Status) < cfg.StatusIndex(b.Status)
 	case fieldPriority:
 		return cfg.PriorityIndex(a.Priority) < cfg.PriorityIndex(b.Priority)
+	case "title":
+		return strings.ToLower(a.Title) < strings.ToLower(b.Title)
 	case "created":
 		return a.Created.Before(b.Created)
 	case "updated":

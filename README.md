@@ -533,6 +533,9 @@ In create/edit dialogs, text fields support cursor-based editing (`←/→`, `Ho
 | `m` | Move task to a different status (picker dialog) |
 | `n` / `p` | Move task to next / previous status |
 | `d` | Delete task (with confirmation) |
+| `s` | Cycle the sort field (priority → created → updated → title) |
+| `S` | Reverse the sort direction |
+| `/` | Search/filter tasks live. By default matches a case-insensitive substring of the title. Start the query with `#` to search ticket IDs instead: `#12` matches every ID beginning with `12` (e.g. #12, #121), and a trailing space (`#12 `) requires an exact match (only #12). `Enter` keeps the filter, `Esc` clears it |
 | `r` | Refresh board |
 | `?` | Show help |
 | `q` / `Ctrl+C` | Quit |

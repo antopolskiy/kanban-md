@@ -106,6 +106,31 @@ func TestSortByUpdated(t *testing.T) {
 	}
 }
 
+func TestSortByTitle(t *testing.T) {
+	tasks := []*task.Task{
+		{ID: 1, Title: "banana"},
+		{ID: 2, Title: "Apple"},
+		{ID: 3, Title: "cherry"},
+	}
+	// Case-insensitive ascending: Apple, banana, cherry.
+	Sort(tasks, "title", false, testConfig())
+	if got := taskIDs(tasks); got != [3]int{2, 1, 3} {
+		t.Errorf("sort by title = %v, want [2, 1, 3]", got)
+	}
+}
+
+func TestSortByTitleReverse(t *testing.T) {
+	tasks := []*task.Task{
+		{ID: 1, Title: "banana"},
+		{ID: 2, Title: "Apple"},
+		{ID: 3, Title: "cherry"},
+	}
+	Sort(tasks, "title", true, testConfig())
+	if got := taskIDs(tasks); got != [3]int{3, 1, 2} {
+		t.Errorf("sort by title reverse = %v, want [3, 1, 2]", got)
+	}
+}
+
 func TestSortByUnknownFieldFallsBackToID(t *testing.T) {
 	tasks := []*task.Task{
 		{ID: 3}, {ID: 1}, {ID: 2},

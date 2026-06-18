@@ -616,6 +616,12 @@ func findSubstring(s, sub string) bool {
 	return strings.Contains(s, sub)
 }
 
+// indexOfStr returns the byte index of sub in s after stripping ANSI codes,
+// or -1 if not present.
+func indexOfStr(s, sub string) int {
+	return strings.Index(stripANSI(s), sub)
+}
+
 // addLongBodyToTask modifies a task file to have a multi-line body.
 func addLongBodyToTask(t *testing.T, cfg *config.Config, taskID, lineCount int) { //nolint:unparam // helper accepts any task ID
 	t.Helper()
@@ -2367,5 +2373,255 @@ func TestBoard_DebugScreenCtrlDCloses(t *testing.T) {
 	v := b.View()
 	if containsStr(v, "Debug Info") {
 		t.Error("expected board view after second Ctrl+D")
+	}
+}
+
+func TestBoard_SortCycleUpdatesStatusBar(t *testing.T) {
+	b, _ := setupTestBoard(t)
+
+	// Default sort is priority, descending.
+	if !containsStr(b.View(), "s:sort[priority↓]") {
+		t.Fatalf("expected default sort priority↓ in status bar")
+	}
+
+	// 's' cycles priority -> created -> updated -> title -> priority.
+	want := []string{"created", "updated", "title", "priority"}
+	for _, field := range want {
+		b = sendKey(b, "s")
+		if !containsStr(b.View(), "s:sort["+field) {
+			t.Errorf("expected sort field %q after pressing s, got:\n%s", field, b.View())
+		}
+	}
+}
+
+func TestBoard_SortReverseTogglesArrow(t *testing.T) {
+	b, _ := setupTestBoard(t)
+
+	// 'S' flips descending (↓) to ascending (↑).
+	b = sendKey(b, "S")
+	if !containsStr(b.View(), "s:sort[priority↑]") {
+		t.Errorf("expected ascending arrow after S, got:\n%s", b.View())
+	}
+
+	b = sendKey(b, "S")
+	if !containsStr(b.View(), "s:sort[priority↓]") {
+		t.Errorf("expected descending arrow after second S, got:\n%s", b.View())
+	}
+}
+
+func TestBoard_SortByTitleOrdersTasks(t *testing.T) {
+	b, _ := setupTestBoard(t)
+
+	// Cycle to title sort (priority -> created -> updated -> title).
+	for i := 0; i < 3; i++ {
+		b = sendKey(b, "s")
+	}
+
+	// backlog holds Task A and Task B. The board defaults to reverse=true, so
+	// title sort is descending: Task B sorts before Task A. This verifies the
+	// title comparator is wired up.
+	v := b.View()
+	posA := indexOfStr(v, "Task A")
+	posB := indexOfStr(v, "Task B")
+	if posA < 0 || posB < 0 {
+		t.Fatalf("expected both Task A and Task B visible")
+	}
+	if posB > posA {
+		t.Errorf("expected Task B before Task A under descending title sort")
+	}
+
+	// Reversing to ascending flips the order to Task A before Task B.
+	b = sendKey(b, "S")
+	v = b.View()
+	if indexOfStr(v, "Task A") > indexOfStr(v, "Task B") {
+		t.Errorf("expected Task A before Task B under ascending title sort")
+	}
+}
+
+func TestBoard_SearchFiltersByTitle(t *testing.T) {
+	b, _ := setupTestBoard(t)
+
+	b = sendKey(b, "/")
+	b = sendKey(b, "b") // matches "Task B" only
+
+	v := b.View()
+	if !containsStr(v, "Task B") {
+		t.Error("expected matching Task B to remain visible")
+	}
+	for _, gone := range []string{"Task A", "Task C", "Task D"} {
+		if containsStr(v, gone) {
+			t.Errorf("expected %q to be filtered out", gone)
+		}
+	}
+	// While typing, the search input line is shown (not the status bar).
+	if !containsStr(v, "esc:clear") {
+		t.Error("expected search input line with esc:clear hint")
+	}
+}
+
+func TestBoard_SearchEnterKeepsFilter(t *testing.T) {
+	b, _ := setupTestBoard(t)
+
+	b = sendKey(b, "/")
+	b = sendKey(b, "b")
+	b = sendSpecialKey(b, tea.KeyEnter)
+
+	v := b.View()
+	if containsStr(v, "Task A") {
+		t.Error("expected filter to persist after Enter")
+	}
+	if !containsStr(v, "Task B") {
+		t.Error("expected Task B to remain after Enter")
+	}
+	if !containsStr(v, `filter:"b"`) {
+		t.Error("expected filter indicator after Enter")
+	}
+}
+
+func TestBoard_SearchEscClearsFilter(t *testing.T) {
+	b, _ := setupTestBoard(t)
+
+	b = sendKey(b, "/")
+	b = sendKey(b, "b")
+	b = sendSpecialKey(b, tea.KeyEsc)
+
+	v := b.View()
+	for _, want := range []string{"Task A", "Task B", "Task C", "Task D"} {
+		if !containsStr(v, want) {
+			t.Errorf("expected %q visible after clearing filter", want)
+		}
+	}
+	if containsStr(v, "filter:") {
+		t.Error("expected no filter indicator after Esc")
+	}
+}
+
+func TestBoard_SearchEmptyResultNoPanic(t *testing.T) {
+	b, _ := setupTestBoard(t)
+
+	b = sendKey(b, "/")
+	for _, r := range "zzzzz" {
+		b = sendKey(b, string(r))
+	}
+
+	v := b.View() // must not panic with all columns empty
+	for _, gone := range []string{"Task A", "Task B", "Task C", "Task D"} {
+		if containsStr(v, gone) {
+			t.Errorf("expected %q filtered out", gone)
+		}
+	}
+
+	// Navigating with an empty board must not panic either.
+	b = sendKey(b, "j")
+	b = sendKey(b, "l")
+	_ = b.View()
+}
+
+// setupIDSearchBoard builds a board with IDs chosen to exercise ID-prefix vs
+// exact ID search: #3 (Gamma), #12 (Alpha), #121 (Beta).
+func setupIDSearchBoard(t *testing.T) *tui.Board {
+	t.Helper()
+
+	dir := t.TempDir()
+	kanbanDir := filepath.Join(dir, "kanban")
+	tasksDir := filepath.Join(kanbanDir, "tasks")
+	if err := os.MkdirAll(tasksDir, 0o750); err != nil {
+		t.Fatalf("creating dirs: %v", err)
+	}
+
+	cfg := config.NewDefault("ID Search Board")
+	cfg.SetDir(kanbanDir)
+	if err := cfg.Save(); err != nil {
+		t.Fatalf("saving config: %v", err)
+	}
+
+	tasks := []struct {
+		id    int
+		title string
+	}{
+		{3, "Gamma"},
+		{12, "Alpha"},
+		{121, "Beta"},
+	}
+	for _, tt := range tasks {
+		tk := &task.Task{ID: tt.id, Title: tt.title, Status: "backlog", Priority: "medium", Updated: testRefTime}
+		path := filepath.Join(tasksDir, task.GenerateFilename(tt.id, tt.title))
+		if err := task.Write(path, tk); err != nil {
+			t.Fatalf("writing task: %v", err)
+		}
+	}
+
+	b := tui.NewBoard(cfg)
+	b.SetNow(testNow)
+	b.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
+	return b
+}
+
+func typeSearch(b *tui.Board, query string) *tui.Board {
+	b = sendKey(b, "/")
+	for _, r := range query {
+		b = sendKey(b, string(r))
+	}
+	return b
+}
+
+func TestBoard_SearchByIDPrefix(t *testing.T) {
+	b := setupIDSearchBoard(t)
+
+	// "#12" prefix-matches both #12 (Alpha) and #121 (Beta), excludes #3 (Gamma).
+	b = typeSearch(b, "#12")
+	v := b.View()
+	if !containsStr(v, "Alpha") {
+		t.Error("expected #12 Alpha to match prefix #12")
+	}
+	if !containsStr(v, "Beta") {
+		t.Error("expected #121 Beta to match prefix #12")
+	}
+	if containsStr(v, "Gamma") {
+		t.Error("expected #3 Gamma to be filtered out by prefix #12")
+	}
+}
+
+func TestBoard_SearchByIDExactWithTrailingSpace(t *testing.T) {
+	b := setupIDSearchBoard(t)
+
+	// "#12 " (trailing space) requires an exact ID match: only #12 (Alpha).
+	b = typeSearch(b, "#12 ")
+	v := b.View()
+	if !containsStr(v, "Alpha") {
+		t.Error("expected #12 Alpha to match exact #12")
+	}
+	if containsStr(v, "Beta") {
+		t.Error("expected #121 Beta to be excluded by exact #12 (trailing space)")
+	}
+	if containsStr(v, "Gamma") {
+		t.Error("expected #3 Gamma to be excluded by exact #12")
+	}
+}
+
+func TestBoard_SearchByIDBareHashShowsAll(t *testing.T) {
+	b := setupIDSearchBoard(t)
+
+	// A bare "#" with no digits yet does not filter anything out.
+	b = typeSearch(b, "#")
+	v := b.View()
+	for _, want := range []string{"Alpha", "Beta", "Gamma"} {
+		if !containsStr(v, want) {
+			t.Errorf("expected %q visible for bare # query", want)
+		}
+	}
+}
+
+func TestBoard_SearchByIDTitleModeUnaffected(t *testing.T) {
+	b := setupIDSearchBoard(t)
+
+	// Without a leading #, the query stays a title substring match.
+	b = typeSearch(b, "alph")
+	v := b.View()
+	if !containsStr(v, "Alpha") {
+		t.Error("expected title search to match Alpha")
+	}
+	if containsStr(v, "Beta") || containsStr(v, "Gamma") {
+		t.Error("expected only Alpha for title query 'alph'")
 	}
 }

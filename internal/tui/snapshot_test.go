@@ -81,6 +81,21 @@ func TestSnapshot_HelpView(t *testing.T) {
 	assertGolden(t, "help_view", b.View())
 }
 
+func TestSnapshot_SearchActive(t *testing.T) {
+	b, _ := setupTestBoard(t)
+	b = sendKey(b, "/") // enter search mode
+	b = sendKey(b, "b") // filter to titles containing "b" (only "Task B")
+	assertGolden(t, "search_active", b.View())
+}
+
+func TestSnapshot_SortByTitle(t *testing.T) {
+	b, _ := setupTestBoard(t)
+	for range 3 { // priority -> created -> updated -> title
+		b = sendKey(b, "s")
+	}
+	assertGolden(t, "sort_by_title", b.View())
+}
+
 func TestSnapshot_BoardView80(t *testing.T) {
 	b, _ := setupTestBoard80(t)
 	assertGolden(t, "board_view_80", b.View())
