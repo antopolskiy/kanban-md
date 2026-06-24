@@ -9,6 +9,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/antopolskiy/kanban-md/internal/board"
 	"github.com/antopolskiy/kanban-md/internal/clierr"
 	"github.com/antopolskiy/kanban-md/internal/config"
 	"github.com/antopolskiy/kanban-md/internal/task"
@@ -877,14 +878,14 @@ func TestLogEditActivity_ReleaseTransition(t *testing.T) {
 // --- appendBody unit tests ---
 
 func TestAppendBody_EmptyExisting(t *testing.T) {
-	got := appendBody("", "hello", false)
+	got := board.AppendBody("", "hello", false)
 	if got != "hello" {
 		t.Errorf("appendBody(\"\", \"hello\", false) = %q, want %q", got, "hello")
 	}
 }
 
 func TestAppendBody_NonEmptyExisting(t *testing.T) {
-	got := appendBody("first", "second", false)
+	got := board.AppendBody("first", "second", false)
 	want := "first\n\nsecond"
 	if got != want {
 		t.Errorf("appendBody(\"first\", \"second\", false) = %q, want %q", got, want)
@@ -892,7 +893,7 @@ func TestAppendBody_NonEmptyExisting(t *testing.T) {
 }
 
 func TestAppendBody_TrimsTrailingNewlines(t *testing.T) {
-	got := appendBody("first\n\n\n", "second", false)
+	got := board.AppendBody("first\n\n\n", "second", false)
 	want := "first\n\nsecond"
 	if got != want {
 		t.Errorf("appendBody = %q, want %q", got, want)
@@ -900,7 +901,7 @@ func TestAppendBody_TrimsTrailingNewlines(t *testing.T) {
 }
 
 func TestAppendBody_WithTimestamp(t *testing.T) {
-	got := appendBody("", "note", true)
+	got := board.AppendBody("", "note", true)
 	// Should start with [[YYYY-MM-DD]] Day HH:MM format.
 	if !containsSubstring(got, "[[") || !containsSubstring(got, "]]") {
 		t.Errorf("expected timestamp markers in %q", got)
@@ -911,7 +912,7 @@ func TestAppendBody_WithTimestamp(t *testing.T) {
 }
 
 func TestAppendBody_WithTimestampAndExisting(t *testing.T) {
-	got := appendBody("existing", "note", true)
+	got := board.AppendBody("existing", "note", true)
 	if !containsSubstring(got, "existing\n\n[[") {
 		t.Errorf("expected existing + separator + timestamp, got %q", got)
 	}

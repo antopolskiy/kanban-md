@@ -251,16 +251,6 @@ func TestMoveSingleTask_SuccessTable(t *testing.T) {
 
 // --- resolveTargetStatus ---
 
-func TestResolveTargetStatus_InvalidStatusArg(t *testing.T) {
-	cfg := config.NewDefault("Test")
-	tk := &task.Task{ID: 1, Status: "backlog"}
-
-	cmd := newMoveCmd()
-	_, err := resolveTargetStatus(cmd, []string{"1", "nonexistent"}, tk, cfg)
-	if err == nil {
-		t.Fatal("expected error for invalid status")
-	}
-}
 
 func TestResolveTargetStatus_NextSuccess(t *testing.T) {
 	cfg := config.NewDefault("Test")

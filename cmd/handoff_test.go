@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"errors"
-	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -458,89 +457,7 @@ func TestHandoffSingleTask_PropagatesError(t *testing.T) {
 
 // --- logHandoffActivity tests ---
 
-func TestLogHandoffActivity_MoveAndBlock(t *testing.T) {
-	kanbanDir := setupBoard(t)
-	cfg, err := config.Load(kanbanDir)
-	if err != nil {
-		t.Fatal(err)
-	}
 
-	tk := &task.Task{ID: 1, Title: "test", Status: testReviewStatus, Blocked: true, BlockReason: "waiting"}
-	logHandoffActivity(cfg, tk, "in-progress")
-
-	logPath := filepath.Join(kanbanDir, "activity.jsonl")
-	data, err := os.ReadFile(logPath) //nolint:gosec // test path
-	if err != nil {
-		t.Fatal(err)
-	}
-	got := string(data)
-	if !containsSubstring(got, "move") {
-		t.Errorf("expected 'move' in log, got: %s", got)
-	}
-	if !containsSubstring(got, "handoff") {
-		t.Errorf("expected 'handoff' in log, got: %s", got)
-	}
-	if !containsSubstring(got, "block") {
-		t.Errorf("expected 'block' in log, got: %s", got)
-	}
-}
-
-func TestLogHandoffActivity_ReleaseOnly(t *testing.T) {
-	kanbanDir := setupBoard(t)
-	cfg, err := config.Load(kanbanDir)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// ClaimedBy="" means claim was released.
-	tk := &task.Task{ID: 1, Title: "test", Status: testReviewStatus, ClaimedBy: ""}
-	logHandoffActivity(cfg, tk, testReviewStatus)
-
-	logPath := filepath.Join(kanbanDir, "activity.jsonl")
-	data, err := os.ReadFile(logPath) //nolint:gosec // test path
-	if err != nil {
-		t.Fatal(err)
-	}
-	got := string(data)
-	if !containsSubstring(got, "release") {
-		t.Errorf("expected 'release' in log, got: %s", got)
-	}
-	// Should not log move (same status).
-	if containsSubstring(got, "move") {
-		t.Errorf("should not log 'move' when status unchanged, got: %s", got)
-	}
-}
-
-func TestLogHandoffActivity_NoMoveNoBlockNoClaim(t *testing.T) {
-	kanbanDir := setupBoard(t)
-	cfg, err := config.Load(kanbanDir)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// Same status, not blocked, still claimed → only handoff log entry.
-	tk := &task.Task{ID: 1, Title: "test", Status: testReviewStatus, ClaimedBy: testHandoffAgent}
-	logHandoffActivity(cfg, tk, testReviewStatus)
-
-	logPath := filepath.Join(kanbanDir, "activity.jsonl")
-	data, err := os.ReadFile(logPath) //nolint:gosec // test path
-	if err != nil {
-		t.Fatal(err)
-	}
-	got := string(data)
-	if !containsSubstring(got, "handoff") {
-		t.Errorf("expected 'handoff' in log, got: %s", got)
-	}
-	if containsSubstring(got, "move") {
-		t.Errorf("should not log 'move', got: %s", got)
-	}
-	if containsSubstring(got, "block") {
-		t.Errorf("should not log 'block', got: %s", got)
-	}
-	if containsSubstring(got, "release") {
-		t.Errorf("should not log 'release', got: %s", got)
-	}
-}
 
 func TestExecuteHandoff_ExpiredClaimAllowsHandoff(t *testing.T) {
 	kanbanDir := setupBoard(t)

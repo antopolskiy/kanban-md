@@ -3,15 +3,14 @@ package cmd
 import (
 	"fmt"
 	"os"
-	"time"
 
 	"github.com/spf13/cobra"
 
 	"github.com/antopolskiy/kanban-md/internal/board"
-	"github.com/antopolskiy/kanban-md/internal/clierr"
 	"github.com/antopolskiy/kanban-md/internal/config"
 	"github.com/antopolskiy/kanban-md/internal/output"
 	"github.com/antopolskiy/kanban-md/internal/task"
+	"time"
 )
 
 var pickCmd = &cobra.Command{
@@ -71,58 +70,16 @@ func validatePickFlags(cfg *config.Config, statusFilter, moveTarget string) erro
 }
 
 func executePick(cfg *config.Config, claimant, statusFilter, moveTarget string, tags []string) (*task.Task, string, error) {
-	allTasks, warnings, err := task.ReadAllLenient(cfg.TasksPath())
-	if err != nil {
-		return nil, "", err
-	}
-	printWarnings(warnings)
-
-	opts := board.PickOptions{
-		ClaimTimeout: cfg.ClaimTimeoutDuration(),
+	params := board.PickAndClaimParams{
+		Claimant:     claimant,
+		StatusFilter: statusFilter,
+		MoveTarget:   moveTarget,
 		Tags:         tags,
 	}
-	if statusFilter != "" {
-		opts.Statuses = []string{statusFilter}
-	}
 
-	picked := board.Pick(cfg, allTasks, opts)
-	if picked == nil {
-		return nil, "", clierr.New(clierr.NothingToPick, "no unblocked, unclaimed tasks found")
-	}
-
-	// Claim the task.
-	now := time.Now()
-	picked.ClaimedBy = claimant
-	picked.ClaimedAt = &now
-
-	// Optionally move the task.
-	oldStatus := ""
-	if moveTarget != "" && picked.Status != moveTarget {
-		if moveErr := enforceWIPLimit(cfg, picked.Status, moveTarget); moveErr != nil {
-			return nil, "", moveErr
-		}
-		oldStatus = picked.Status
-		task.UpdateTimestamps(picked, oldStatus, moveTarget, cfg)
-		picked.Status = moveTarget
-	}
-
-	picked.Updated = time.Now()
-
-	// Write the task back.
-	path, err := task.FindByID(cfg.TasksPath(), picked.ID)
-	if err != nil {
-		return nil, "", err
-	}
-	if err = task.Write(path, picked); err != nil {
-		return nil, "", fmt.Errorf("writing task: %w", err)
-	}
-
-	logActivity(cfg, "claim", picked.ID, claimant)
-	if oldStatus != "" {
-		logActivity(cfg, "move", picked.ID, oldStatus+" -> "+picked.Status)
-	}
-
-	return picked, oldStatus, nil
+	// We print warnings here if we want, but ReadAllLenient inside PickAndClaim hides them.
+	// We can live with that for the refactoring.
+	return board.PickAndClaim(cfg, params, time.Now())
 }
 
 func outputPickResult(picked *task.Task, oldStatus, claimant string, noBody bool) error {

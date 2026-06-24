@@ -8,6 +8,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/antopolskiy/kanban-md/internal/config"
+	"github.com/antopolskiy/kanban-md/internal/board"
 	"github.com/antopolskiy/kanban-md/internal/output"
 	"github.com/antopolskiy/kanban-md/internal/task"
 )
@@ -100,6 +101,6 @@ func executeArchiveCore(cfg *config.Config, id int) (*task.Task, string, error) 
 		return nil, "", fmt.Errorf("writing task: %w", err)
 	}
 
-	logActivity(cfg, "move", id, oldStatus+" -> "+targetStatus)
+	board.LogMutation(cfg.Dir(), "move", id, oldStatus+" -> "+targetStatus)
 	return t, oldStatus, nil
 }

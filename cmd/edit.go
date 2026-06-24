@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"os"
-	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -144,18 +143,18 @@ func validateEditPost(cfg *config.Config, t *task.Task, oldStatus, claimant stri
 
 // logEditActivity logs the edit and any block/unblock/claim/release transitions.
 func logEditActivity(cfg *config.Config, t *task.Task, wasBlocked bool, wasClaimedBy string) {
-	logActivity(cfg, "edit", t.ID, t.Title)
+	board.LogMutation(cfg.Dir(), "edit", t.ID, t.Title)
 	if !wasBlocked && t.Blocked {
-		logActivity(cfg, "block", t.ID, t.BlockReason)
+		board.LogMutation(cfg.Dir(), "block", t.ID, t.BlockReason)
 	}
 	if wasBlocked && !t.Blocked {
-		logActivity(cfg, "unblock", t.ID, t.Title)
+		board.LogMutation(cfg.Dir(), "unblock", t.ID, t.Title)
 	}
 	if wasClaimedBy == "" && t.ClaimedBy != "" {
-		logActivity(cfg, "claim", t.ID, t.ClaimedBy)
+		board.LogMutation(cfg.Dir(), "claim", t.ID, t.ClaimedBy)
 	}
 	if wasClaimedBy != "" && t.ClaimedBy == "" {
-		logActivity(cfg, "release", t.ID, wasClaimedBy)
+		board.LogMutation(cfg.Dir(), "release", t.ID, wasClaimedBy)
 	}
 }
 
@@ -263,7 +262,7 @@ func applySimpleEditFlags(cmd *cobra.Command, t *task.Task, cfg *config.Config) 
 	if appendSet {
 		v, _ := cmd.Flags().GetString("append-body")
 		ts, _ := cmd.Flags().GetBool("timestamp")
-		t.Body = appendBody(t.Body, v, ts)
+		t.Body = board.AppendBody(t.Body, v, ts)
 		changed = true
 	}
 	if v, _ := cmd.Flags().GetString("class"); v != "" {
@@ -462,22 +461,3 @@ func removeAll(slice []string, items ...string) []string {
 	return result
 }
 
-// appendBody appends text to the existing body, optionally prefixed with a timestamp line.
-func appendBody(existing, text string, addTimestamp bool) string {
-	var b strings.Builder
-
-	if existing != "" {
-		b.WriteString(strings.TrimRight(existing, "\n"))
-		b.WriteString("\n\n")
-	}
-
-	if addTimestamp {
-		now := time.Now()
-		b.WriteString(now.Format("[[2006-01-02]] Mon 15:04"))
-		b.WriteByte('\n')
-	}
-
-	b.WriteString(text)
-
-	return b.String()
-}

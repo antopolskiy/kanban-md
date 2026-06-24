@@ -163,12 +163,6 @@ func checkWIPLimit(cfg *config.Config, statusCounts map[string]int, targetStatus
 	return board.CheckWIPLimit(cfg, statusCounts, targetStatus, currentTaskStatus)
 }
 
-// logActivity appends an entry to the activity log. Errors are silently
-// discarded because logging should never fail a command.
-func logActivity(cfg *config.Config, action string, taskID int, detail string) {
-	board.LogMutation(cfg.Dir(), action, taskID, detail)
-}
-
 // checkClaim verifies that a mutating operation is allowed on a claimed task.
 func checkClaim(t *task.Task, claimant string, timeout time.Duration) error {
 	return task.CheckClaim(t, claimant, timeout)

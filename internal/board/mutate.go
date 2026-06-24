@@ -1,6 +1,8 @@
 package board
 
 import (
+	"strings"
+
 	"fmt"
 	"path/filepath"
 	"time"
@@ -78,6 +80,10 @@ type MoveResult struct {
 // for the target status. The operation is idempotent — moving to the current
 // status is a no-op.
 func Move(cfg *config.Config, params MoveParams, now time.Time) (*MoveResult, error) {
+	if err := task.ValidateStatus(params.NewStatus, cfg.StatusNames()); err != nil {
+		return nil, err
+	}
+
 	path, err := task.FindByID(cfg.TasksPath(), params.ID)
 	if err != nil {
 		return nil, err
@@ -465,4 +471,177 @@ func logEditTransitions(cfg *config.Config, t *task.Task, wasBlocked bool, wasCl
 	if wasClaimedBy != "" && t.ClaimedBy == "" {
 		LogMutation(cfg.Dir(), "release", t.ID, wasClaimedBy)
 	}
+}
+
+// HandoffParams contains parameters for the Handoff operation.
+type HandoffParams struct {
+	ID           int
+	Claimant     string
+	Release      bool
+	BlockReason  string
+	Note         string
+	AddTimestamp bool
+}
+
+// Handoff executes the handoff workflow for a task.
+func Handoff(cfg *config.Config, params HandoffParams, now time.Time) (*task.Task, error) {
+	if params.Claimant == "" {
+		return nil, fmt.Errorf("claim name is required")
+	}
+
+	path, err := task.FindByID(cfg.TasksPath(), params.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	t, err := task.Read(path)
+	if err != nil {
+		return nil, err
+	}
+
+	// Validate claim ownership.
+	if err = task.CheckClaim(t, params.Claimant, cfg.ClaimTimeoutDuration()); err != nil {
+		return nil, err
+	}
+
+	// Resolve target status: "review" must exist in config.
+	const reviewStatus = "review"
+	if err = task.ValidateStatus(reviewStatus, cfg.StatusNames()); err != nil {
+		return nil, fmt.Errorf("board has no 'review' status; add one to use handoff")
+	}
+
+	// Move to review (skip if already there).
+	oldStatus := t.Status
+	if t.Status != reviewStatus {
+		// Enforce require_claim for review.
+		if cfg.StatusRequiresClaim(reviewStatus) && params.Claimant == "" {
+			return nil, task.ValidateClaimRequired(reviewStatus)
+		}
+		if err = enforceClassWIP(cfg, t, reviewStatus); err != nil {
+			return nil, err
+		}
+		t.Status = reviewStatus
+		task.UpdateTimestamps(t, oldStatus, reviewStatus, cfg)
+	}
+
+	// Apply claim (refresh).
+	t.ClaimedBy = params.Claimant
+	t.ClaimedAt = &now
+
+	// Optionally block.
+	if params.BlockReason != "" {
+		t.Blocked = true
+		t.BlockReason = params.BlockReason
+	}
+
+	// Append note.
+	if params.Note != "" {
+		t.Body = AppendBody(t.Body, params.Note, params.AddTimestamp)
+	}
+
+	// Release claim if requested.
+	if params.Release {
+		t.ClaimedBy = ""
+		t.ClaimedAt = nil
+	}
+
+	t.Updated = now
+
+	if err = task.Write(path, t); err != nil {
+		return nil, fmt.Errorf("writing task: %w", err)
+	}
+
+	// Log activity.
+	if oldStatus != t.Status {
+		LogMutation(cfg.Dir(), "move", t.ID, oldStatus+" -> "+t.Status)
+	}
+	LogMutation(cfg.Dir(), "handoff", t.ID, t.Title)
+	if t.Blocked {
+		LogMutation(cfg.Dir(), "block", t.ID, t.BlockReason)
+	}
+	if t.ClaimedBy == "" {
+		LogMutation(cfg.Dir(), "release", t.ID, t.Title)
+	}
+
+	return t, nil
+}
+
+// AppendBody appends text to the existing body, optionally prefixed with a timestamp line.
+func AppendBody(existing, text string, addTimestamp bool) string {
+	var b strings.Builder
+	if existing != "" {
+		b.WriteString(strings.TrimRight(existing, "\n"))
+		b.WriteString("\n\n")
+	}
+	if addTimestamp {
+		b.WriteString(time.Now().Format("[[2006-01-02]] Mon 15:04"))
+		b.WriteByte('\n')
+	}
+	b.WriteString(text)
+	return b.String()
+}
+
+// PickAndClaimParams contains parameters for the PickAndClaim operation.
+type PickAndClaimParams struct {
+	Claimant     string
+	StatusFilter string
+	MoveTarget   string
+	Tags         []string
+}
+
+// PickAndClaim finds the highest-priority task and atomically claims it.
+func PickAndClaim(cfg *config.Config, params PickAndClaimParams, now time.Time) (*task.Task, string, error) {
+	allTasks, warnings, err := task.ReadAllLenient(cfg.TasksPath())
+	if err != nil {
+		return nil, "", err
+	}
+	// Warnings are discarded or we should print them. Better to just print or ignore since CLI did printWarnings.
+	// We'll ignore warnings here or log them.
+	_ = warnings
+
+	opts := PickOptions{
+		ClaimTimeout: cfg.ClaimTimeoutDuration(),
+		Tags:         params.Tags,
+	}
+	if params.StatusFilter != "" {
+		opts.Statuses = []string{params.StatusFilter}
+	}
+
+	picked := Pick(cfg, allTasks, opts)
+	if picked == nil {
+		return nil, "", clierr.New(clierr.NothingToPick, "no unblocked, unclaimed tasks found")
+	}
+
+	// Claim the task.
+	picked.ClaimedBy = params.Claimant
+	picked.ClaimedAt = &now
+
+	// Optionally move the task.
+	oldStatus := ""
+	if params.MoveTarget != "" && picked.Status != params.MoveTarget {
+		if err := enforceClassWIP(cfg, picked, params.MoveTarget); err != nil {
+			return nil, "", err
+		}
+		oldStatus = picked.Status
+		task.UpdateTimestamps(picked, oldStatus, params.MoveTarget, cfg)
+		picked.Status = params.MoveTarget
+	}
+
+	picked.Updated = now
+
+	// Write the task back.
+	path, err := task.FindByID(cfg.TasksPath(), picked.ID)
+	if err != nil {
+		return nil, "", err
+	}
+	if err = task.Write(path, picked); err != nil {
+		return nil, "", fmt.Errorf("writing task: %w", err)
+	}
+
+	LogMutation(cfg.Dir(), "claim", picked.ID, params.Claimant)
+	if oldStatus != "" {
+		LogMutation(cfg.Dir(), "move", picked.ID, oldStatus+" -> "+picked.Status)
+	}
+
+	return picked, oldStatus, nil
 }

@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/antopolskiy/kanban-md/internal/board"
 	"github.com/antopolskiy/kanban-md/internal/clierr"
 	"github.com/antopolskiy/kanban-md/internal/config"
 	"github.com/antopolskiy/kanban-md/internal/output"
@@ -391,7 +392,7 @@ func TestLogActivity_WritesLogEntry(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	logActivity(cfg, "create", 1, "test detail")
+	board.LogMutation(cfg.Dir(), "create", 1, "test detail")
 
 	// Verify the log file was created.
 	logPath := filepath.Join(kanbanDir, "activity.jsonl")
