@@ -1,10 +1,10 @@
 package board
 
 import (
-	"strings"
-
+	"errors"
 	"fmt"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/antopolskiy/kanban-md/internal/clierr"
@@ -486,7 +486,7 @@ type HandoffParams struct {
 // Handoff executes the handoff workflow for a task.
 func Handoff(cfg *config.Config, params HandoffParams, now time.Time) (*task.Task, error) {
 	if params.Claimant == "" {
-		return nil, fmt.Errorf("claim name is required")
+		return nil, errors.New("claim name is required")
 	}
 
 	path, err := task.FindByID(cfg.TasksPath(), params.ID)
@@ -507,7 +507,7 @@ func Handoff(cfg *config.Config, params HandoffParams, now time.Time) (*task.Tas
 	// Resolve target status: "review" must exist in config.
 	const reviewStatus = "review"
 	if err = task.ValidateStatus(reviewStatus, cfg.StatusNames()); err != nil {
-		return nil, fmt.Errorf("board has no 'review' status; add one to use handoff")
+		return nil, errors.New("board has no 'review' status; add one to use handoff")
 	}
 
 	// Move to review (skip if already there).
@@ -619,8 +619,8 @@ func PickAndClaim(cfg *config.Config, params PickAndClaimParams, now time.Time) 
 	// Optionally move the task.
 	oldStatus := ""
 	if params.MoveTarget != "" && picked.Status != params.MoveTarget {
-		if err := enforceClassWIP(cfg, picked, params.MoveTarget); err != nil {
-			return nil, "", err
+		if enforceErr := enforceClassWIP(cfg, picked, params.MoveTarget); enforceErr != nil {
+			return nil, "", enforceErr
 		}
 		oldStatus = picked.Status
 		task.UpdateTimestamps(picked, oldStatus, params.MoveTarget, cfg)
