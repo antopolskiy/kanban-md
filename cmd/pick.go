@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/spf13/cobra"
 
@@ -10,7 +11,6 @@ import (
 	"github.com/antopolskiy/kanban-md/internal/config"
 	"github.com/antopolskiy/kanban-md/internal/output"
 	"github.com/antopolskiy/kanban-md/internal/task"
-	"time"
 )
 
 var pickCmd = &cobra.Command{
@@ -77,9 +77,9 @@ func executePick(cfg *config.Config, claimant, statusFilter, moveTarget string, 
 		Tags:         tags,
 	}
 
-	// We print warnings here if we want, but ReadAllLenient inside PickAndClaim hides them.
-	// We can live with that for the refactoring.
-	return board.PickAndClaim(cfg, params, time.Now())
+	picked, oldStatus, warnings, err := board.PickAndClaim(cfg, params, time.Now())
+	printWarnings(warnings)
+	return picked, oldStatus, err
 }
 
 func outputPickResult(picked *task.Task, oldStatus, claimant string, noBody bool) error {

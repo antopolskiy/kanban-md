@@ -1,7 +1,6 @@
 package board
 
 import (
-	"errors"
 	"fmt"
 	"path/filepath"
 	"strings"
@@ -486,7 +485,7 @@ type HandoffParams struct {
 // Handoff executes the handoff workflow for a task.
 func Handoff(cfg *config.Config, params HandoffParams, now time.Time) (*task.Task, error) {
 	if params.Claimant == "" {
-		return nil, errors.New("claim name is required")
+		return nil, clierr.New(clierr.InvalidInput, "claim name is required")
 	}
 
 	path, err := task.FindByID(cfg.TasksPath(), params.ID)
@@ -507,7 +506,7 @@ func Handoff(cfg *config.Config, params HandoffParams, now time.Time) (*task.Tas
 	// Resolve target status: "review" must exist in config.
 	const reviewStatus = "review"
 	if err = task.ValidateStatus(reviewStatus, cfg.StatusNames()); err != nil {
-		return nil, errors.New("board has no 'review' status; add one to use handoff")
+		return nil, clierr.New(clierr.InvalidInput, "board has no 'review' status; add one to use handoff")
 	}
 
 	// Move to review (skip if already there).
@@ -589,15 +588,14 @@ type PickAndClaimParams struct {
 	Tags         []string
 }
 
-// PickAndClaim finds the highest-priority task and atomically claims it.
-func PickAndClaim(cfg *config.Config, params PickAndClaimParams, now time.Time) (*task.Task, string, error) {
+// PickAndClaim finds the highest-priority task and atomically claims it. Any
+// warnings from reading malformed task files are returned so the caller can
+// surface them.
+func PickAndClaim(cfg *config.Config, params PickAndClaimParams, now time.Time) (*task.Task, string, []task.ReadWarning, error) {
 	allTasks, warnings, err := task.ReadAllLenient(cfg.TasksPath())
 	if err != nil {
-		return nil, "", err
+		return nil, "", nil, err
 	}
-	// Warnings are discarded or we should print them. Better to just print or ignore since CLI did printWarnings.
-	// We'll ignore warnings here or log them.
-	_ = warnings
 
 	opts := PickOptions{
 		ClaimTimeout: cfg.ClaimTimeoutDuration(),
@@ -609,7 +607,7 @@ func PickAndClaim(cfg *config.Config, params PickAndClaimParams, now time.Time) 
 
 	picked := Pick(cfg, allTasks, opts)
 	if picked == nil {
-		return nil, "", clierr.New(clierr.NothingToPick, "no unblocked, unclaimed tasks found")
+		return nil, "", warnings, clierr.New(clierr.NothingToPick, "no unblocked, unclaimed tasks found")
 	}
 
 	// Claim the task.
@@ -620,7 +618,7 @@ func PickAndClaim(cfg *config.Config, params PickAndClaimParams, now time.Time) 
 	oldStatus := ""
 	if params.MoveTarget != "" && picked.Status != params.MoveTarget {
 		if enforceErr := enforceClassWIP(cfg, picked, params.MoveTarget); enforceErr != nil {
-			return nil, "", enforceErr
+			return nil, "", warnings, enforceErr
 		}
 		oldStatus = picked.Status
 		task.UpdateTimestamps(picked, oldStatus, params.MoveTarget, cfg)
@@ -632,10 +630,10 @@ func PickAndClaim(cfg *config.Config, params PickAndClaimParams, now time.Time) 
 	// Write the task back.
 	path, err := task.FindByID(cfg.TasksPath(), picked.ID)
 	if err != nil {
-		return nil, "", err
+		return nil, "", warnings, err
 	}
 	if err = task.Write(path, picked); err != nil {
-		return nil, "", fmt.Errorf("writing task: %w", err)
+		return nil, "", warnings, fmt.Errorf("writing task: %w", err)
 	}
 
 	LogMutation(cfg.Dir(), "claim", picked.ID, params.Claimant)
@@ -643,5 +641,5 @@ func PickAndClaim(cfg *config.Config, params PickAndClaimParams, now time.Time) 
 		LogMutation(cfg.Dir(), "move", picked.ID, oldStatus+" -> "+picked.Status)
 	}
 
-	return picked, oldStatus, nil
+	return picked, oldStatus, warnings, nil
 }

@@ -154,8 +154,11 @@ func TestPickAndClaim_NoCandidates(t *testing.T) {
 		Claimant: "agent-a",
 	}
 
-	_, _, err := board.PickAndClaim(cfg, params, time.Now())
+	picked, _, _, err := board.PickAndClaim(cfg, params, time.Now())
 	if err == nil {
 		t.Fatal("expected error, got nil")
+	}
+	if picked != nil {
+		t.Errorf("expected nil task, got %v", picked)
 	}
 }
