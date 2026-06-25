@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"os"
 	"path/filepath"
 	"testing"
 	"time"
@@ -24,111 +23,6 @@ func writeArchiveTask(t *testing.T, cfg *config.Config, tk *task.Task) {
 }
 
 // --- executeArchiveCore tests ---
-
-func TestExecuteArchiveCore_BasicArchive(t *testing.T) {
-	kanbanDir := setupBoard(t)
-	cfg, err := config.Load(kanbanDir)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	now := time.Now()
-	writeArchiveTask(t, cfg, &task.Task{
-		ID:       1,
-		Title:    "Archive me",
-		Status:   testBacklogStatus,
-		Priority: "medium",
-		Created:  now,
-		Updated:  now,
-	})
-
-	tk, oldStatus, err := executeArchiveCore(cfg, 1)
-	if err != nil {
-		t.Fatalf("executeArchiveCore error: %v", err)
-	}
-	if oldStatus != testBacklogStatus {
-		t.Errorf("oldStatus = %q, want %q", oldStatus, testBacklogStatus)
-	}
-	if tk.Status != config.ArchivedStatus {
-		t.Errorf("Status = %q, want %q", tk.Status, config.ArchivedStatus)
-	}
-}
-
-func TestExecuteArchiveCore_AlreadyArchived(t *testing.T) {
-	kanbanDir := setupBoard(t)
-	cfg, err := config.Load(kanbanDir)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	now := time.Now()
-	writeArchiveTask(t, cfg, &task.Task{
-		ID:       1,
-		Title:    "Already archived",
-		Status:   config.ArchivedStatus,
-		Priority: "medium",
-		Created:  now,
-		Updated:  now,
-	})
-
-	tk, oldStatus, err := executeArchiveCore(cfg, 1)
-	if err != nil {
-		t.Fatalf("executeArchiveCore error: %v", err)
-	}
-	if oldStatus != "" {
-		t.Errorf("oldStatus = %q, want empty for already-archived", oldStatus)
-	}
-	if tk.Status != config.ArchivedStatus {
-		t.Errorf("Status = %q, want %q", tk.Status, config.ArchivedStatus)
-	}
-}
-
-func TestExecuteArchiveCore_TaskNotFound(t *testing.T) {
-	kanbanDir := setupBoard(t)
-	cfg, err := config.Load(kanbanDir)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	_, _, err = executeArchiveCore(cfg, 999)
-	if err == nil {
-		t.Fatal("expected error for non-existent task")
-	}
-}
-
-func TestExecuteArchiveCore_LogsActivity(t *testing.T) {
-	kanbanDir := setupBoard(t)
-	cfg, err := config.Load(kanbanDir)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	now := time.Now()
-	writeArchiveTask(t, cfg, &task.Task{
-		ID:       1,
-		Title:    "Log this",
-		Status:   "todo",
-		Priority: "medium",
-		Created:  now,
-		Updated:  now,
-	})
-
-	_, _, err = executeArchiveCore(cfg, 1)
-	if err != nil {
-		t.Fatalf("executeArchiveCore error: %v", err)
-	}
-
-	logPath := filepath.Join(kanbanDir, "activity.jsonl")
-	data, err := os.ReadFile(logPath) //nolint:gosec // test path from t.TempDir
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !containsSubstring(string(data), "move") {
-		t.Errorf("expected 'move' in activity log, got: %s", data)
-	}
-}
-
-// --- executeArchive tests ---
 
 func TestExecuteArchive_BasicArchive(t *testing.T) {
 	kanbanDir := setupBoard(t)

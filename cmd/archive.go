@@ -1,14 +1,13 @@
 package cmd
 
 import (
-	"fmt"
 	"os"
 	"time"
 
 	"github.com/spf13/cobra"
 
-	"github.com/antopolskiy/kanban-md/internal/config"
 	"github.com/antopolskiy/kanban-md/internal/board"
+	"github.com/antopolskiy/kanban-md/internal/config"
 	"github.com/antopolskiy/kanban-md/internal/output"
 	"github.com/antopolskiy/kanban-md/internal/task"
 )
@@ -75,32 +74,9 @@ func executeArchive(cfg *config.Config, id int) error {
 }
 
 func executeArchiveCore(cfg *config.Config, id int) (*task.Task, string, error) {
-	path, err := task.FindByID(cfg.TasksPath(), id)
+	result, err := board.Archive(cfg, id, "", time.Now())
 	if err != nil {
 		return nil, "", err
 	}
-
-	t, err := task.Read(path)
-	if err != nil {
-		return nil, "", err
-	}
-
-	targetStatus := config.ArchivedStatus
-
-	// Idempotent: if already archived, return unchanged.
-	if t.Status == targetStatus {
-		return t, "", nil
-	}
-
-	oldStatus := t.Status
-	t.Status = targetStatus
-	task.UpdateTimestamps(t, oldStatus, targetStatus, cfg)
-	t.Updated = time.Now()
-
-	if err := task.Write(path, t); err != nil {
-		return nil, "", fmt.Errorf("writing task: %w", err)
-	}
-
-	board.LogMutation(cfg.Dir(), "move", id, oldStatus+" -> "+targetStatus)
-	return t, oldStatus, nil
+	return result.Task, result.OldStatus, nil
 }
