@@ -587,55 +587,6 @@ func TestRunEdit_Batch(t *testing.T) {
 	}
 }
 
-// ===== enforceMoveWIP with class =====
-
-func TestEnforceMoveWIP_TaskWithClassAndConfig(t *testing.T) {
-	kanbanDir := setupBoard(t)
-	cfg, err := config.Load(kanbanDir)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// The default config includes classes (expedite, etc.).
-	// Create a task with expedite class; bypasses column WIP.
-	tk := &task.Task{ID: 1, Class: "expedite", Status: "backlog"}
-	err = enforceMoveWIP(cfg, tk, "todo")
-	if err != nil {
-		t.Errorf("expected nil for expedite class, got: %v", err)
-	}
-}
-
-func TestEnforceMoveWIP_TaskWithClassNoClassesConfig(t *testing.T) {
-	kanbanDir := setupBoard(t)
-	cfg, err := config.Load(kanbanDir)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// Task has a class but it doesn't match any configured class.
-	// Should fall through to enforceWIPLimit (column check).
-	tk := &task.Task{ID: 1, Class: "unknown-class", Status: "backlog"}
-	err = enforceMoveWIP(cfg, tk, "todo")
-	if err != nil {
-		t.Errorf("expected nil (no WIP limit on todo), got: %v", err)
-	}
-}
-
-func TestEnforceMoveWIP_NoClass(t *testing.T) {
-	kanbanDir := setupBoard(t)
-	cfg, err := config.Load(kanbanDir)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// Standard task with no class — goes to enforceWIPLimit.
-	tk := &task.Task{ID: 1, Class: "", Status: "backlog"}
-	err = enforceMoveWIP(cfg, tk, "todo")
-	if err != nil {
-		t.Errorf("expected nil (no WIP limit), got: %v", err)
-	}
-}
-
 // ===== Execute (subprocess-style) =====
 
 // TestExecute_RootCmdInit verifies Execute doesn't panic on basic setup.

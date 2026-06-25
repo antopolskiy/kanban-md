@@ -110,73 +110,6 @@ func TestRunEdit_JSONOutput(t *testing.T) {
 	}
 }
 
-// --- validateEditPost error paths ---
-
-func TestValidateEditPost_RequireClaimOnStatusChange(t *testing.T) {
-	cfg := config.NewDefault("Test")
-	// in-progress has require_claim: true in defaults.
-	tk := &task.Task{ID: 1, Status: "in-progress"}
-
-	err := validateEditPost(cfg, tk, "backlog", "") // no claimant
-	if err == nil {
-		t.Fatal("expected error for require_claim violation on status change")
-	}
-}
-
-func TestValidateEditPost_WIPLimitExceeded(t *testing.T) {
-	kanbanDir := setupBoard(t)
-	cfg, err := config.Load(kanbanDir)
-	if err != nil {
-		t.Fatal(err)
-	}
-	cfg.WIPLimits = map[string]int{"todo": 1}
-	if saveErr := cfg.Save(); saveErr != nil {
-		t.Fatal(saveErr)
-	}
-
-	// Create one task in "todo" to fill the WIP limit.
-	createTaskFileWithStatus(t, cfg.TasksPath(), 1, "existing-todo", "todo")
-
-	// Reload config to pick up changes.
-	cfg, err = config.Load(kanbanDir)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	tk := &task.Task{ID: 2, Status: "todo"}
-	vErr := validateEditPost(cfg, tk, "backlog", "")
-	if vErr == nil {
-		t.Fatal("expected WIP limit error")
-	}
-}
-
-func TestValidateEditPost_SelfReferenceDepFails(t *testing.T) {
-	kanbanDir := setupBoard(t)
-	cfg, err := config.Load(kanbanDir)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// Task depends on itself — should fail dep validation.
-	tk := &task.Task{ID: 1, Status: "backlog", DependsOn: []int{1}}
-	vErr := validateEditPost(cfg, tk, "backlog", "")
-	if vErr == nil {
-		t.Fatal("expected error for self-referencing dependency")
-	}
-}
-
-func TestValidateEditPost_StatusUnchangedNoWIPCheck(t *testing.T) {
-	cfg := config.NewDefault("Test")
-	cfg.WIPLimits = map[string]int{"backlog": 1}
-
-	// Same status — WIP check should not trigger.
-	tk := &task.Task{ID: 1, Status: "backlog"}
-	err := validateEditPost(cfg, tk, "backlog", "")
-	if err != nil {
-		t.Errorf("expected no error when status unchanged, got: %v", err)
-	}
-}
-
 // --- writeAndRename error paths ---
 
 func TestWriteAndRename_WriteError(t *testing.T) {
@@ -252,35 +185,5 @@ func TestApplyTimestampFlags_InvalidCompletedDate(t *testing.T) {
 	_, err := applyTimestampFlags(cmd, tk)
 	if err == nil {
 		t.Fatal("expected error for invalid completed date")
-	}
-}
-
-// --- validateEditClaim ---
-
-func TestValidateEditClaim_RequireClaimNoClaim(t *testing.T) {
-	cfg := config.NewDefault("Test")
-	// in-progress requires claim in default config.
-	tk := &task.Task{ID: 1, Status: "in-progress"}
-
-	cmd := newEditCmd()
-	// No --claim or --release flags set.
-	_, _, err := validateEditClaim(cfg, tk, cmd)
-	if err == nil {
-		t.Fatal("expected error when require_claim is true and no claimant")
-	}
-}
-
-func TestValidateEditClaim_ReleaseBypassesCheck(t *testing.T) {
-	cfg := config.NewDefault("Test")
-	tk := &task.Task{ID: 1, Status: "in-progress", ClaimedBy: "other-agent"}
-
-	cmd := newEditCmd()
-	_ = cmd.Flags().Set("release", "true")
-	_, release, err := validateEditClaim(cfg, tk, cmd)
-	if err != nil {
-		t.Fatalf("release should bypass claim check, got: %v", err)
-	}
-	if !release {
-		t.Error("release should be true")
 	}
 }

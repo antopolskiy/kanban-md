@@ -1007,5 +1007,4 @@ func TestResolveDir_NotFound(t *testing.T) {
 	}
 }
 
-// enforceWIPLimit tests are in move_pick_coverage_test.go.
 // findProjectRoot tests are in skill_extended_test.go.

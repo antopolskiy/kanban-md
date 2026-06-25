@@ -108,56 +108,6 @@ func executeEdit(cfg *config.Config, id int, cmd *cobra.Command) (*task.Task, st
 	return result.Task, result.NewPath, nil
 }
 
-// validateEditClaim checks claim ownership and require_claim before allowing edits.
-// The --release flag bypasses claim checks since its intent is to release a claim.
-func validateEditClaim(cfg *config.Config, t *task.Task, cmd *cobra.Command) (string, bool, error) { //nolint:unparam // claimant used by tests
-	claimant, _ := cmd.Flags().GetString("claim")
-	release, _ := cmd.Flags().GetBool("release")
-	if !release {
-		if err := checkClaim(t, claimant, cfg.ClaimTimeoutDuration()); err != nil {
-			return "", false, err
-		}
-	}
-	if cfg.StatusRequiresClaim(t.Status) && claimant == "" && !release {
-		return "", false, task.ValidateClaimRequired(t.Status)
-	}
-	return claimant, release, nil
-}
-
-// validateEditPost runs post-edit validations: deps, require_claim for new status, WIP limits.
-func validateEditPost(cfg *config.Config, t *task.Task, oldStatus, claimant string) error { //nolint:unparam // oldStatus varies in tests
-	if err := validateDeps(cfg, t); err != nil {
-		return err
-	}
-	if t.Status != oldStatus && cfg.StatusRequiresClaim(t.Status) && claimant == "" {
-		return task.ValidateClaimRequired(t.Status)
-	}
-	if t.Status != oldStatus {
-		if t.Class != "" && len(cfg.Classes) > 0 {
-			return enforceWIPLimitForClass(cfg, t, oldStatus, t.Status)
-		}
-		return enforceWIPLimit(cfg, oldStatus, t.Status)
-	}
-	return nil
-}
-
-// logEditActivity logs the edit and any block/unblock/claim/release transitions.
-func logEditActivity(cfg *config.Config, t *task.Task, wasBlocked bool, wasClaimedBy string) {
-	board.LogMutation(cfg.Dir(), "edit", t.ID, t.Title)
-	if !wasBlocked && t.Blocked {
-		board.LogMutation(cfg.Dir(), "block", t.ID, t.BlockReason)
-	}
-	if wasBlocked && !t.Blocked {
-		board.LogMutation(cfg.Dir(), "unblock", t.ID, t.Title)
-	}
-	if wasClaimedBy == "" && t.ClaimedBy != "" {
-		board.LogMutation(cfg.Dir(), "claim", t.ID, t.ClaimedBy)
-	}
-	if wasClaimedBy != "" && t.ClaimedBy == "" {
-		board.LogMutation(cfg.Dir(), "release", t.ID, wasClaimedBy)
-	}
-}
-
 // applyEditChanges applies field edits and claim/release flags.
 func applyEditChanges(cmd *cobra.Command, t *task.Task, cfg *config.Config, claimant string, release bool) (bool, error) {
 	changed, err := applyEditFlags(cmd, t, cfg)
@@ -460,4 +410,3 @@ func removeAll(slice []string, items ...string) []string {
 	}
 	return result
 }
-
