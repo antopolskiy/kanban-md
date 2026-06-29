@@ -1,12 +1,14 @@
 package board_test
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
 	"time"
 
 	"github.com/antopolskiy/kanban-md/internal/board"
+	"github.com/antopolskiy/kanban-md/internal/clierr"
 	"github.com/antopolskiy/kanban-md/internal/task"
 )
 
@@ -132,5 +134,76 @@ func TestPickAndClaim_WIPExceeded(t *testing.T) {
 	}
 	if !containsSubstring(err.Error(), "WIP limit reached") {
 		t.Errorf("expected WIP error message, got: %v", err)
+	}
+}
+
+func TestPickAndClaim_RequiresClaimant(t *testing.T) {
+	cfg, _ := setupMutateBoard(t)
+
+	tk := &task.Task{ID: 1, Title: "test", Status: "todo"}
+	if err := task.Write(filepath.Join(cfg.TasksPath(), "1.md"), tk); err != nil {
+		t.Fatal(err)
+	}
+
+	picked, _, _, err := board.PickAndClaim(cfg, board.PickAndClaimParams{}, time.Now())
+	if err == nil {
+		t.Fatal("expected claim required error, got nil")
+	}
+	if picked != nil {
+		t.Errorf("expected nil task, got %v", picked)
+	}
+	var cliErr *clierr.Error
+	if !errors.As(err, &cliErr) {
+		t.Fatalf("expected clierr.Error, got %T: %v", err, err)
+	}
+	if cliErr.Code != clierr.InvalidInput {
+		t.Errorf("code = %q, want %q", cliErr.Code, clierr.InvalidInput)
+	}
+}
+
+func TestPickAndClaim_ValidatesStatusParams(t *testing.T) {
+	tests := []struct {
+		name   string
+		params board.PickAndClaimParams
+	}{
+		{
+			name: "status filter",
+			params: board.PickAndClaimParams{
+				Claimant:     "agent-status",
+				StatusFilter: "not-a-status",
+			},
+		},
+		{
+			name: "move target",
+			params: board.PickAndClaimParams{
+				Claimant:   "agent-status",
+				MoveTarget: "not-a-status",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg, _ := setupMutateBoard(t)
+			tk := &task.Task{ID: 1, Title: "test", Status: "todo"}
+			if err := task.Write(filepath.Join(cfg.TasksPath(), "1.md"), tk); err != nil {
+				t.Fatal(err)
+			}
+
+			picked, _, _, err := board.PickAndClaim(cfg, tt.params, time.Now())
+			if err == nil {
+				t.Fatal("expected invalid status error, got nil")
+			}
+			if picked != nil {
+				t.Errorf("expected nil task, got %v", picked)
+			}
+			var cliErr *clierr.Error
+			if !errors.As(err, &cliErr) {
+				t.Fatalf("expected clierr.Error, got %T: %v", err, err)
+			}
+			if cliErr.Code != clierr.InvalidStatus {
+				t.Errorf("code = %q, want %q", cliErr.Code, clierr.InvalidStatus)
+			}
+		})
 	}
 }

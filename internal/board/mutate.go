@@ -592,6 +592,20 @@ type PickAndClaimParams struct {
 // warnings from reading malformed task files are returned so the caller can
 // surface them.
 func PickAndClaim(cfg *config.Config, params PickAndClaimParams, now time.Time) (*task.Task, string, []task.ReadWarning, error) {
+	if params.Claimant == "" {
+		return nil, "", nil, clierr.New(clierr.InvalidInput, "claim name is required")
+	}
+	if params.StatusFilter != "" {
+		if err := task.ValidateStatus(params.StatusFilter, cfg.StatusNames()); err != nil {
+			return nil, "", nil, err
+		}
+	}
+	if params.MoveTarget != "" {
+		if err := task.ValidateStatus(params.MoveTarget, cfg.StatusNames()); err != nil {
+			return nil, "", nil, err
+		}
+	}
+
 	allTasks, warnings, err := task.ReadAllLenient(cfg.TasksPath())
 	if err != nil {
 		return nil, "", nil, err
