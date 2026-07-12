@@ -1,12 +1,12 @@
 package cmd
 
 import (
-	"fmt"
 	"os"
 	"time"
 
 	"github.com/spf13/cobra"
 
+	"github.com/antopolskiy/kanban-md/internal/board"
 	"github.com/antopolskiy/kanban-md/internal/config"
 	"github.com/antopolskiy/kanban-md/internal/output"
 	"github.com/antopolskiy/kanban-md/internal/task"
@@ -24,10 +24,11 @@ Multiple IDs can be provided as a comma-separated list.`,
 }
 
 func init() {
+	archiveCmd.Flags().String("claim", "", "claim name for archiving claimed tasks")
 	rootCmd.AddCommand(archiveCmd)
 }
 
-func runArchive(_ *cobra.Command, args []string) error {
+func runArchive(cmd *cobra.Command, args []string) error {
 	ids, err := parseIDs(args[0])
 	if err != nil {
 		return err
@@ -37,18 +38,27 @@ func runArchive(_ *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
+	claimant := archiveClaimant(cmd)
 
 	if len(ids) == 1 {
-		return archiveSingleTask(cfg, ids[0])
+		return archiveSingleTask(cfg, ids[0], claimant)
 	}
 
 	return runBatch(ids, func(id int) error {
-		return executeArchive(cfg, id)
+		return executeArchive(cfg, id, claimant)
 	})
 }
 
-func archiveSingleTask(cfg *config.Config, id int) error {
-	t, oldStatus, err := executeArchiveCore(cfg, id)
+func archiveClaimant(cmd *cobra.Command) string {
+	if cmd == nil {
+		return ""
+	}
+	claimant, _ := cmd.Flags().GetString("claim")
+	return claimant
+}
+
+func archiveSingleTask(cfg *config.Config, id int, claimant string) error {
+	t, oldStatus, err := executeArchiveCore(cfg, id, claimant)
 	if err != nil {
 		return err
 	}
@@ -68,38 +78,15 @@ func archiveSingleTask(cfg *config.Config, id int) error {
 	return nil
 }
 
-func executeArchive(cfg *config.Config, id int) error {
-	_, _, err := executeArchiveCore(cfg, id)
+func executeArchive(cfg *config.Config, id int, claimant string) error {
+	_, _, err := executeArchiveCore(cfg, id, claimant)
 	return err
 }
 
-func executeArchiveCore(cfg *config.Config, id int) (*task.Task, string, error) {
-	path, err := task.FindByID(cfg.TasksPath(), id)
+func executeArchiveCore(cfg *config.Config, id int, claimant string) (*task.Task, string, error) {
+	result, err := board.Archive(cfg, id, claimant, time.Now())
 	if err != nil {
 		return nil, "", err
 	}
-
-	t, err := task.Read(path)
-	if err != nil {
-		return nil, "", err
-	}
-
-	targetStatus := config.ArchivedStatus
-
-	// Idempotent: if already archived, return unchanged.
-	if t.Status == targetStatus {
-		return t, "", nil
-	}
-
-	oldStatus := t.Status
-	t.Status = targetStatus
-	task.UpdateTimestamps(t, oldStatus, targetStatus, cfg)
-	t.Updated = time.Now()
-
-	if err := task.Write(path, t); err != nil {
-		return nil, "", fmt.Errorf("writing task: %w", err)
-	}
-
-	logActivity(cfg, "move", id, oldStatus+" -> "+targetStatus)
-	return t, oldStatus, nil
+	return result.Task, result.OldStatus, nil
 }

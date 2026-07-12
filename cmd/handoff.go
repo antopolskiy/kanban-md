@@ -8,6 +8,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/antopolskiy/kanban-md/internal/board"
 	"github.com/antopolskiy/kanban-md/internal/clierr"
 	"github.com/antopolskiy/kanban-md/internal/config"
 	"github.com/antopolskiy/kanban-md/internal/output"
@@ -87,87 +88,18 @@ func executeHandoff(cfg *config.Config, id int, cmd *cobra.Command) (*task.Task,
 		return nil, clierr.New(clierr.InvalidInput, "claim name is required (use --claim NAME)")
 	}
 
-	path, err := task.FindByID(cfg.TasksPath(), id)
-	if err != nil {
-		return nil, err
+	if cmd.Flags().Changed("block") && blockReason == "" {
+		return nil, clierr.New(clierr.InvalidInput, "block reason is required (use --block REASON)")
 	}
 
-	t, err := task.Read(path)
-	if err != nil {
-		return nil, err
+	params := board.HandoffParams{
+		ID:           id,
+		Claimant:     claimant,
+		Release:      release,
+		BlockReason:  blockReason,
+		Note:         note,
+		AddTimestamp: addTimestamp,
 	}
 
-	// Validate claim ownership.
-	if err = checkClaim(t, claimant, cfg.ClaimTimeoutDuration()); err != nil {
-		return nil, err
-	}
-
-	// Resolve target status: "review" must exist in config.
-	const reviewStatus = "review"
-	if err = task.ValidateStatus(reviewStatus, cfg.StatusNames()); err != nil {
-		return nil, clierr.New(clierr.InvalidInput,
-			"board has no 'review' status; add one to use handoff")
-	}
-
-	// Move to review (skip if already there).
-	oldStatus := t.Status
-	if t.Status != reviewStatus {
-		// Enforce require_claim for review.
-		if cfg.StatusRequiresClaim(reviewStatus) && claimant == "" {
-			return nil, task.ValidateClaimRequired(reviewStatus)
-		}
-		if err = enforceMoveWIP(cfg, t, reviewStatus); err != nil {
-			return nil, err
-		}
-		t.Status = reviewStatus
-		task.UpdateTimestamps(t, oldStatus, reviewStatus, cfg)
-	}
-
-	// Apply claim (refresh).
-	now := time.Now()
-	t.ClaimedBy = claimant
-	t.ClaimedAt = &now
-
-	// Optionally block.
-	if cmd.Flags().Changed("block") {
-		if blockReason == "" {
-			return nil, clierr.New(clierr.InvalidInput, "block reason is required (use --block REASON)")
-		}
-		t.Blocked = true
-		t.BlockReason = blockReason
-	}
-
-	// Append note.
-	if note != "" {
-		t.Body = appendBody(t.Body, note, addTimestamp)
-	}
-
-	// Release claim if requested.
-	if release {
-		t.ClaimedBy = ""
-		t.ClaimedAt = nil
-	}
-
-	t.Updated = time.Now()
-
-	if err = task.Write(path, t); err != nil {
-		return nil, fmt.Errorf("writing task: %w", err)
-	}
-
-	// Log activity.
-	logHandoffActivity(cfg, t, oldStatus)
-	return t, nil
-}
-
-func logHandoffActivity(cfg *config.Config, t *task.Task, oldStatus string) {
-	if oldStatus != t.Status {
-		logActivity(cfg, "move", t.ID, oldStatus+" -> "+t.Status)
-	}
-	logActivity(cfg, "handoff", t.ID, t.Title)
-	if t.Blocked {
-		logActivity(cfg, "block", t.ID, t.BlockReason)
-	}
-	if t.ClaimedBy == "" {
-		logActivity(cfg, "release", t.ID, t.Title)
-	}
+	return board.Handoff(cfg, params, time.Now())
 }

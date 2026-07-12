@@ -9,6 +9,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/antopolskiy/kanban-md/internal/board"
 	"github.com/antopolskiy/kanban-md/internal/clierr"
 	"github.com/antopolskiy/kanban-md/internal/config"
 	"github.com/antopolskiy/kanban-md/internal/task"
@@ -767,124 +768,18 @@ func TestWriteAndRename_TitleChanged(t *testing.T) {
 	}
 }
 
-// --- logEditActivity tests ---
-
-func TestLogEditActivity_BasicEdit(t *testing.T) {
-	kanbanDir := setupBoard(t)
-	cfg, err := config.Load(kanbanDir)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	tk := &task.Task{ID: 1, Title: "test"}
-	logEditActivity(cfg, tk, false, "")
-
-	logPath := filepath.Join(kanbanDir, "activity.jsonl")
-	data, err := os.ReadFile(logPath) //nolint:gosec // test path
-	if err != nil {
-		t.Fatal(err)
-	}
-	got := string(data)
-	if !containsSubstring(got, "edit") {
-		t.Errorf("expected 'edit' action in log, got: %s", got)
-	}
-}
-
-func TestLogEditActivity_BlockTransition(t *testing.T) {
-	kanbanDir := setupBoard(t)
-	cfg, err := config.Load(kanbanDir)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	tk := &task.Task{ID: 1, Title: "test", Blocked: true, BlockReason: "dependency"}
-	logEditActivity(cfg, tk, false, "")
-
-	logPath := filepath.Join(kanbanDir, "activity.jsonl")
-	data, err := os.ReadFile(logPath) //nolint:gosec // test path
-	if err != nil {
-		t.Fatal(err)
-	}
-	got := string(data)
-	if !containsSubstring(got, "block") {
-		t.Errorf("expected 'block' action in log, got: %s", got)
-	}
-}
-
-func TestLogEditActivity_UnblockTransition(t *testing.T) {
-	kanbanDir := setupBoard(t)
-	cfg, err := config.Load(kanbanDir)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	tk := &task.Task{ID: 1, Title: "test", Blocked: false}
-	logEditActivity(cfg, tk, true, "")
-
-	logPath := filepath.Join(kanbanDir, "activity.jsonl")
-	data, err := os.ReadFile(logPath) //nolint:gosec // test path
-	if err != nil {
-		t.Fatal(err)
-	}
-	got := string(data)
-	if !containsSubstring(got, "unblock") {
-		t.Errorf("expected 'unblock' action in log, got: %s", got)
-	}
-}
-
-func TestLogEditActivity_ClaimTransition(t *testing.T) {
-	kanbanDir := setupBoard(t)
-	cfg, err := config.Load(kanbanDir)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	tk := &task.Task{ID: 1, Title: "test", ClaimedBy: "agent-1"}
-	logEditActivity(cfg, tk, false, "")
-
-	logPath := filepath.Join(kanbanDir, "activity.jsonl")
-	data, err := os.ReadFile(logPath) //nolint:gosec // test path
-	if err != nil {
-		t.Fatal(err)
-	}
-	got := string(data)
-	if !containsSubstring(got, "claim") {
-		t.Errorf("expected 'claim' action in log, got: %s", got)
-	}
-}
-
-func TestLogEditActivity_ReleaseTransition(t *testing.T) {
-	kanbanDir := setupBoard(t)
-	cfg, err := config.Load(kanbanDir)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	tk := &task.Task{ID: 1, Title: "test", ClaimedBy: ""}
-	logEditActivity(cfg, tk, false, "agent-1")
-
-	logPath := filepath.Join(kanbanDir, "activity.jsonl")
-	data, err := os.ReadFile(logPath) //nolint:gosec // test path
-	if err != nil {
-		t.Fatal(err)
-	}
-	got := string(data)
-	if !containsSubstring(got, "release") {
-		t.Errorf("expected 'release' action in log, got: %s", got)
-	}
-}
 
 // --- appendBody unit tests ---
 
 func TestAppendBody_EmptyExisting(t *testing.T) {
-	got := appendBody("", "hello", false)
+	got := board.AppendBody("", "hello", false)
 	if got != "hello" {
 		t.Errorf("appendBody(\"\", \"hello\", false) = %q, want %q", got, "hello")
 	}
 }
 
 func TestAppendBody_NonEmptyExisting(t *testing.T) {
-	got := appendBody("first", "second", false)
+	got := board.AppendBody("first", "second", false)
 	want := "first\n\nsecond"
 	if got != want {
 		t.Errorf("appendBody(\"first\", \"second\", false) = %q, want %q", got, want)
@@ -892,7 +787,7 @@ func TestAppendBody_NonEmptyExisting(t *testing.T) {
 }
 
 func TestAppendBody_TrimsTrailingNewlines(t *testing.T) {
-	got := appendBody("first\n\n\n", "second", false)
+	got := board.AppendBody("first\n\n\n", "second", false)
 	want := "first\n\nsecond"
 	if got != want {
 		t.Errorf("appendBody = %q, want %q", got, want)
@@ -900,7 +795,7 @@ func TestAppendBody_TrimsTrailingNewlines(t *testing.T) {
 }
 
 func TestAppendBody_WithTimestamp(t *testing.T) {
-	got := appendBody("", "note", true)
+	got := board.AppendBody("", "note", true)
 	// Should start with [[YYYY-MM-DD]] Day HH:MM format.
 	if !containsSubstring(got, "[[") || !containsSubstring(got, "]]") {
 		t.Errorf("expected timestamp markers in %q", got)
@@ -911,7 +806,7 @@ func TestAppendBody_WithTimestamp(t *testing.T) {
 }
 
 func TestAppendBody_WithTimestampAndExisting(t *testing.T) {
-	got := appendBody("existing", "note", true)
+	got := board.AppendBody("existing", "note", true)
 	if !containsSubstring(got, "existing\n\n[[") {
 		t.Errorf("expected existing + separator + timestamp, got %q", got)
 	}

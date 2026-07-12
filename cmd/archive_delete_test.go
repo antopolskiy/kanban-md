@@ -19,7 +19,7 @@ func TestExecuteArchiveCore_ArchivesAndIsIdempotent(t *testing.T) {
 		t.Fatalf("load config: %v", err)
 	}
 
-	archived, oldStatus, err := executeArchiveCore(cfg, 1)
+	archived, oldStatus, err := executeArchiveCore(cfg, 1, "")
 	if err != nil {
 		t.Fatalf("executeArchiveCore: %v", err)
 	}
@@ -30,7 +30,7 @@ func TestExecuteArchiveCore_ArchivesAndIsIdempotent(t *testing.T) {
 		t.Errorf("status = %q, want %q", archived.Status, config.ArchivedStatus)
 	}
 
-	again, oldStatus, err := executeArchiveCore(cfg, 1)
+	again, oldStatus, err := executeArchiveCore(cfg, 1, "")
 	if err != nil {
 		t.Fatalf("executeArchiveCore second call: %v", err)
 	}

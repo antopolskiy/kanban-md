@@ -7,6 +7,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/antopolskiy/kanban-md/internal/board"
 	"github.com/antopolskiy/kanban-md/internal/config"
 	"github.com/antopolskiy/kanban-md/internal/task"
 )
@@ -163,8 +164,8 @@ func TestRunLog_TableOutput(t *testing.T) {
 		t.Fatal(err)
 	}
 	// Generate some log entries.
-	logActivity(cfg, "create", 1, "test")
-	logActivity(cfg, "move", 1, "backlog -> todo")
+	board.LogMutation(cfg.Dir(), "create", 1, "test")
+	board.LogMutation(cfg.Dir(), "move", 1, "backlog -> todo")
 
 	oldFlagDir := flagDir
 	flagDir = kanbanDir
@@ -190,7 +191,7 @@ func TestRunLog_JSONOutput(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	logActivity(cfg, "create", 1, "test")
+	board.LogMutation(cfg.Dir(), "create", 1, "test")
 
 	oldFlagDir := flagDir
 	flagDir = kanbanDir
@@ -216,7 +217,7 @@ func TestRunLog_CompactOutput(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	logActivity(cfg, "create", 1, "test")
+	board.LogMutation(cfg.Dir(), "create", 1, "test")
 
 	oldFlagDir := flagDir
 	flagDir = kanbanDir
@@ -281,8 +282,8 @@ func TestRunLog_WithFilters(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	logActivity(cfg, "create", 1, "task one")
-	logActivity(cfg, "move", 2, "backlog -> todo")
+	board.LogMutation(cfg.Dir(), "create", 1, "task one")
+	board.LogMutation(cfg.Dir(), "move", 2, "backlog -> todo")
 
 	oldFlagDir := flagDir
 	flagDir = kanbanDir
@@ -649,9 +650,9 @@ func TestRunLog_WithLimitAndTaskFilter(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	logActivity(cfg, "create", 1, "task one")
-	logActivity(cfg, "create", 2, "task two")
-	logActivity(cfg, "move", 1, "backlog -> todo")
+	board.LogMutation(cfg.Dir(), "create", 1, "task one")
+	board.LogMutation(cfg.Dir(), "create", 2, "task two")
+	board.LogMutation(cfg.Dir(), "move", 1, "backlog -> todo")
 
 	oldFlagDir := flagDir
 	flagDir = kanbanDir
@@ -695,7 +696,7 @@ func TestRunLog_ValidSinceDate(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	logActivity(cfg, "create", 1, "test")
+	board.LogMutation(cfg.Dir(), "create", 1, "test")
 
 	oldFlagDir := flagDir
 	flagDir = kanbanDir
@@ -1006,5 +1007,4 @@ func TestResolveDir_NotFound(t *testing.T) {
 	}
 }
 
-// enforceWIPLimit tests are in move_pick_coverage_test.go.
 // findProjectRoot tests are in skill_extended_test.go.

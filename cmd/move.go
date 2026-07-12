@@ -138,9 +138,6 @@ func resolveTargetStatus(cmd *cobra.Command, args []string, t *task.Task, cfg *c
 	switch {
 	case len(args) == 2: //nolint:mnd // positional arg
 		status := args[1] //nolint:gosec // args length checked by case guard
-		if err := task.ValidateStatus(status, cfg.StatusNames()); err != nil {
-			return "", err
-		}
 		return status, nil
 	case next:
 		names := cfg.StatusNames()
@@ -159,68 +156,6 @@ func resolveTargetStatus(cmd *cobra.Command, args []string, t *task.Task, cfg *c
 	default:
 		return "", clierr.New(clierr.InvalidInput, "provide a target status or use --next/--prev")
 	}
-}
-
-// enforceMoveWIP checks WIP limits for a move, considering class of service.
-// Used by handoff.go and other commands until they are refactored to use board.Move.
-func enforceMoveWIP(cfg *config.Config, t *task.Task, newStatus string) error {
-	if t.Class != "" && len(cfg.Classes) > 0 {
-		return enforceWIPLimitForClass(cfg, t, t.Status, newStatus)
-	}
-	return enforceWIPLimit(cfg, t.Status, newStatus)
-}
-
-// enforceWIPLimit checks if the target status has room.
-func enforceWIPLimit(cfg *config.Config, currentStatus, targetStatus string) error {
-	limit := cfg.WIPLimit(targetStatus)
-	if limit == 0 {
-		return nil
-	}
-
-	allTasks, _, err := task.ReadAllLenient(cfg.TasksPath())
-	if err != nil {
-		return fmt.Errorf("reading tasks for WIP check: %w", err)
-	}
-
-	counts := board.CountByStatus(allTasks)
-	return checkWIPLimit(cfg, counts, targetStatus, currentStatus)
-}
-
-// enforceWIPLimitForClass checks WIP limits considering class of service.
-// Expedite tasks bypass column WIP limits but have their own board-wide limit.
-func enforceWIPLimitForClass(cfg *config.Config, t *task.Task, currentStatus, targetStatus string) error {
-	classConf := cfg.ClassByName(t.Class)
-
-	// Check class-level board-wide WIP limit.
-	if classConf != nil && classConf.WIPLimit > 0 {
-		allTasks, _, err := task.ReadAllLenient(cfg.TasksPath())
-		if err != nil {
-			return fmt.Errorf("reading tasks for class WIP check: %w", err)
-		}
-		count := countByClass(allTasks, t.Class, t.ID)
-		if count >= classConf.WIPLimit {
-			return task.ValidateClassWIPExceeded(t.Class, classConf.WIPLimit, count)
-		}
-	}
-
-	// If class bypasses column WIP, skip column check.
-	if classConf != nil && classConf.BypassColumnWIP {
-		return nil
-	}
-
-	// Normal column WIP check.
-	return enforceWIPLimit(cfg, currentStatus, targetStatus)
-}
-
-// countByClass counts tasks with a given class, excluding a specific task ID.
-func countByClass(tasks []*task.Task, class string, excludeID int) int {
-	count := 0
-	for _, t := range tasks {
-		if t.Class == class && t.ID != excludeID {
-			count++
-		}
-	}
-	return count
 }
 
 func outputMoveResult(t *task.Task, changed bool) error {

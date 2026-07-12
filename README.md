@@ -366,6 +366,7 @@ Soft-delete a task by moving it to the `archived` status. Archived tasks are hid
 
 ```bash
 kanban-md archive ID
+kanban-md archive ID --claim agent-1  # archive a task claimed by agent-1
 kanban-md archive 1,2,3    # batch archive
 ```
 

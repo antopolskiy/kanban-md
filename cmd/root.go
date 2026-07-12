@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"time"
 
 	"github.com/spf13/cobra"
 
@@ -150,43 +149,6 @@ func printConsistencyRepairs(repairs []string) {
 	for _, repair := range repairs {
 		fmt.Fprintf(os.Stderr, "Warning: auto-repaired consistency issue: %s\n", repair)
 	}
-}
-
-// validateDepIDs checks that all dependency IDs exist and none are self-referencing.
-func validateDepIDs(tasksDir string, selfID int, ids []int) error {
-	return task.ValidateDependencyIDs(tasksDir, selfID, ids)
-}
-
-// checkWIPLimit verifies that adding a task to targetStatus would not exceed
-// the WIP limit. currentTaskStatus is the task's current status (empty for new tasks).
-func checkWIPLimit(cfg *config.Config, statusCounts map[string]int, targetStatus, currentTaskStatus string) error {
-	return board.CheckWIPLimit(cfg, statusCounts, targetStatus, currentTaskStatus)
-}
-
-// logActivity appends an entry to the activity log. Errors are silently
-// discarded because logging should never fail a command.
-func logActivity(cfg *config.Config, action string, taskID int, detail string) {
-	board.LogMutation(cfg.Dir(), action, taskID, detail)
-}
-
-// checkClaim verifies that a mutating operation is allowed on a claimed task.
-func checkClaim(t *task.Task, claimant string, timeout time.Duration) error {
-	return task.CheckClaim(t, claimant, timeout)
-}
-
-// validateDeps validates parent and dependency references for a task.
-func validateDeps(cfg *config.Config, t *task.Task) error {
-	if t.Parent != nil {
-		if err := validateDepIDs(cfg.TasksPath(), t.ID, []int{*t.Parent}); err != nil {
-			return fmt.Errorf("invalid parent: %w", err)
-		}
-	}
-	if len(t.DependsOn) > 0 {
-		if err := validateDepIDs(cfg.TasksPath(), t.ID, t.DependsOn); err != nil {
-			return err
-		}
-	}
-	return nil
 }
 
 // parseIDs splits a comma-separated ID string into deduplicated int IDs.
