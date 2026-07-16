@@ -77,13 +77,18 @@ const (
 )
 
 type pointerState struct {
-	pressed       bool
-	kind          pointerTargetKind
-	taskID        int
-	rect          rect
-	generation    uint64
-	lastClickID   int
-	lastClickTime time.Time
+	pressed           bool
+	kind              pointerTargetKind
+	taskID            int
+	rect              rect
+	generation        uint64
+	sourceCol         int
+	destination       int
+	destinationStatus string
+	leftSource        bool
+	dragCanceled      bool
+	lastClickID       int
+	lastClickTime     time.Time
 }
 
 func (b *Board) invalidatePointerState() {
@@ -98,6 +103,11 @@ func (b *Board) clearGesture() {
 	b.pointer.taskID = 0
 	b.pointer.rect = rect{}
 	b.pointer.generation = 0
+	b.pointer.sourceCol = 0
+	b.pointer.destination = -1
+	b.pointer.destinationStatus = ""
+	b.pointer.leftSource = false
+	b.pointer.dragCanceled = false
 }
 
 func (b *Board) clearPendingClick() {
@@ -178,14 +188,15 @@ func (b *Board) handleBoardMouse(msg tea.MouseEvent) (tea.Model, tea.Cmd) {
 			b.pointer.taskID = target.taskID
 			b.pointer.rect = target.rect
 			b.pointer.generation = b.layout.generation
+			b.pointer.sourceCol = target.col
+			b.pointer.destination = -1
 		} else {
 			b.clearGesture()
 			b.clearPendingClick()
 		}
 	case tea.MouseActionMotion:
-		if b.pointer.pressed && !b.pointer.rect.contains(msg.X, msg.Y) {
-			b.clearGesture()
-			b.clearPendingClick()
+		if b.pointer.pressed && b.pointer.kind == pointerTargetCard {
+			b.updateDragTarget(msg.X, msg.Y)
 		}
 	case tea.MouseActionRelease:
 		if msg.Button != tea.MouseButtonLeft && msg.Button != tea.MouseButtonNone {
@@ -193,27 +204,84 @@ func (b *Board) handleBoardMouse(msg tea.MouseEvent) (tea.Model, tea.Cmd) {
 			b.clearPendingClick()
 			return b, nil
 		}
-		b.releaseBoardClick(msg.X, msg.Y)
+		return b.releaseBoardPointer(msg.X, msg.Y)
 	}
 
 	return b, nil
 }
 
-func (b *Board) releaseBoardClick(x, y int) {
-	if !b.pointer.pressed ||
-		b.pointer.kind != pointerTargetCard ||
-		b.pointer.generation != b.layout.generation ||
-		b.layout.generation != b.layoutGeneration ||
-		!b.pointer.rect.contains(x, y) {
-		b.clearGesture()
+func (b *Board) updateDragTarget(x, y int) {
+	if b.pointer.generation != b.layout.generation ||
+		b.layout.generation != b.layoutGeneration {
+		b.pointer.dragCanceled = true
+		b.pointer.destination = -1
+		b.pointer.destinationStatus = ""
 		return
 	}
 
+	target := b.columnAt(x, y)
+	if target == nil {
+		b.pointer.leftSource = true
+		b.pointer.dragCanceled = true
+		b.pointer.destination = -1
+		b.pointer.destinationStatus = ""
+		return
+	}
+
+	if target.col == b.pointer.sourceCol {
+		if b.pointer.leftSource || !b.pointer.rect.contains(x, y) {
+			b.pointer.dragCanceled = true
+		}
+		b.pointer.destination = -1
+		b.pointer.destinationStatus = ""
+		return
+	}
+
+	b.pointer.leftSource = true
+	if b.pointer.dragCanceled {
+		b.pointer.destination = -1
+		b.pointer.destinationStatus = ""
+		return
+	}
+	b.pointer.destination = target.col
+	b.pointer.destinationStatus = target.status
+}
+
+func (b *Board) releaseBoardPointer(x, y int) (tea.Model, tea.Cmd) {
+	if !b.pointer.pressed ||
+		b.pointer.kind != pointerTargetCard ||
+		b.pointer.generation != b.layout.generation ||
+		b.layout.generation != b.layoutGeneration {
+		b.clearGesture()
+		b.clearPendingClick()
+		return b, nil
+	}
+
+	targetColumn := b.columnAt(x, y)
+	if b.pointer.dragCanceled || targetColumn == nil {
+		b.clearGesture()
+		b.clearPendingClick()
+		return b, nil
+	}
+
 	taskID := b.pointer.taskID
+	if targetColumn.col != b.pointer.sourceCol {
+		targetStatus := targetColumn.status
+		b.clearGesture()
+		b.clearPendingClick()
+		return b.executeMoveTask(taskID, targetStatus, true)
+	}
+
+	if b.pointer.leftSource || !b.pointer.rect.contains(x, y) {
+		b.clearGesture()
+		b.clearPendingClick()
+		return b, nil
+	}
+
 	b.clearGesture()
 	if !b.selectTask(taskID) {
 		b.clearPendingClick()
-		return
+		return b, nil
 	}
 
 	now := b.mouseNow()
@@ -223,11 +291,24 @@ func (b *Board) releaseBoardClick(x, y int) {
 		now.Sub(b.pointer.lastClickTime) <= doubleClickWindow {
 		b.clearPendingClick()
 		b.handleEnter()
-		return
+		return b, nil
 	}
 
 	b.pointer.lastClickID = taskID
 	b.pointer.lastClickTime = now
+	return b, nil
+}
+
+func (b *Board) dragDestination() (int, string, bool) {
+	if !b.pointer.pressed ||
+		b.pointer.kind != pointerTargetCard ||
+		b.pointer.dragCanceled ||
+		b.pointer.destination < 0 ||
+		b.pointer.destinationStatus == "" ||
+		b.pointer.generation != b.layoutGeneration {
+		return 0, "", false
+	}
+	return b.pointer.destination, b.pointer.destinationStatus, true
 }
 
 func (b *Board) handleDetailMouse(msg tea.MouseEvent) (tea.Model, tea.Cmd) {

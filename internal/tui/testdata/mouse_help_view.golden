@@ -23,6 +23,7 @@
 │  esc/q         Quit                                                         │
 │  ctrl+c        Force quit                                                   │
 │  click         Select task; double-click opens detail                       │
+│  drag          Release a card over another column to move it                │
 │  wheel         Move selection or scroll task detail                         │
 │                                                                             │
 │  Press any key to close                                                     │

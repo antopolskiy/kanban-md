@@ -315,6 +315,20 @@ func (s *tuiSession) clickX10(x, y int) {
 	s.mouseX10(3, x, y)
 }
 
+func (s *tuiSession) dragSGR(sourceX, sourceY, destinationX, destinationY int) {
+	s.t.Helper()
+	s.mouseSGR(0, sourceX, sourceY, false)
+	s.mouseSGR(32, destinationX, destinationY, false)
+	s.mouseSGR(0, destinationX, destinationY, true)
+}
+
+func (s *tuiSession) dragX10(sourceX, sourceY, destinationX, destinationY int) {
+	s.t.Helper()
+	s.mouseX10(0, sourceX, sourceY)
+	s.mouseX10(32, destinationX, destinationY)
+	s.mouseX10(3, destinationX, destinationY)
+}
+
 func (s *tuiSession) wheelSGR(x, y, direction int) {
 	s.t.Helper()
 	code := 64

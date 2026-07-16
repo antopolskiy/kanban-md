@@ -1,0 +1,12 @@
+ backlog (2)     → todo (0)      in-progress...  review (0)      done (1)
+╭──────────────╮  (empty)       ╭──────────────╮  (empty)       ╭──────────────╮
+│ #1 Task A    │                │ #3 Task C    │                │ #4 Task D    │
+│ high         │                │ high 2h      │                │ low          │
+╰──────────────╯                ╰──────────────╯                ╰──────────────╯
+╭──────────────╮
+│ #2 Task B    │
+│ medium       │
+╰──────────────╯
+
+
+ Move #1 → todo — release to move
