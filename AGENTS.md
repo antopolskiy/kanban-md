@@ -77,7 +77,7 @@ After the release workflow completes, edit the GitHub release with human-written
 ```markdown
 One to three sentence TL;DR of what this release is about and why users should care.
 
-## New: Feature name
+## New: Feature name (by @contributor)
 
 Brief explanation of what it does and why it matters.
 
@@ -105,6 +105,7 @@ Any steps users need to take, or "No action needed" with explanation of auto-mig
 - Title format: `vX.Y.Z "Codename" — Short Theme` (e.g. `v0.8.0 "Iron Gate" — Claim Enforcement`). The codename is a 1-2 word evocative nickname that creates a memorable association with the release — something vivid and fun that works as a mnemonic (e.g. "Quiet Storm", "Paper Trail", "Red Line"). It should loosely relate to the theme but doesn't need to be literal. **Codenames must be unique across all releases** — check `gh release list` before picking one to avoid duplicates.
 - Start with a short TL;DR paragraph (no heading) summarizing the release for someone skimming
 - Use `## New:` for new commands/features, `## Changed:` for behavior changes, `## Fixed:` for bug fixes
+- Add attribution in a feature/change/fix section heading only when that work came from someone other than the maintainer/release author, using `(by @github-handle)`, e.g. `## New: Live TUI search (by @kaijen)`. Use multiple handles when multiple outside contributors materially shaped the work.
 - Every feature section should include a code example
 - End with `## Upgrading` section and a full diff link
 - Write for users, not developers — focus on what they can do, not what files changed
