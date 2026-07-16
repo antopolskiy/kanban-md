@@ -21,9 +21,9 @@ func TestE2E_TUIMouseDrag_MovesTaskWithSGRAndX10(t *testing.T) {
 
 			switch protocol {
 			case "SGR":
-				session.dragSGR(1, 2, 25, 0)
+				session.dragSGR(1, 25)
 			case "X10":
-				session.dragX10(1, 2, 25, 0)
+				session.dragX10(1, 25)
 			}
 			waitForTask(t, kanbanDir, 1, func(tk taskJSON) bool {
 				return tk.Status == statusTodo
@@ -58,15 +58,67 @@ func TestE2E_TUIMouseDrag_RejectsFullWIPColumn(t *testing.T) {
 	})
 	session.waitForOutput("mouse:click/double-click/wheel")
 	checkpoint := session.checkpoint()
-	session.dragSGR(1, 2, 25, 0)
+	session.dragSGR(1, 25)
 	session.waitForOutputSince(checkpoint, "WIP limit")
 	assertTaskStatus(t, kanbanDir, 1, statusBacklog)
 	assertKeyboardResponsiveAfterRejectedDrag(t, session)
 }
 
-func TestE2E_TUIMouseDrag_RejectsTaskClaimedByAnotherActor(t *testing.T) {
+func TestE2E_TUIMouseDrag_CanCrossSourceBeforeChoosingDestination(t *testing.T) {
 	kanbanDir := initBoard(t)
-	mustCreateTask(t, kanbanDir, "Claimed elsewhere", "--priority", "high")
+	mustCreateTask(t, kanbanDir, "Change direction", "--status", statusTodo, "--priority", "high")
+
+	session := startTUIProcessWithOptions(t, kanbanDir, tuiProcessOptions{
+		args: []string{"--mouse"},
+	})
+	session.waitForOutput("mouse:click/double-click/wheel")
+
+	// Start in todo, move left to backlog, cross todo again, then choose
+	// in-progress on the right before releasing.
+	session.mouseSGR(0, 25, 2, false)
+	session.mouseSGR(32, 1, 0, false)
+	session.mouseSGR(32, 25, 0, false)
+	session.mouseSGR(32, 49, 0, false)
+	session.mouseSGR(0, 49, 0, true)
+
+	waitForTask(t, kanbanDir, 1, func(tk taskJSON) bool {
+		return tk.Status == statusInProgress
+	})
+	session.pressKeys("q")
+	session.waitForExit()
+}
+
+func TestE2E_TUIMouseDrag_AutoClaimedTaskCanMoveBack(t *testing.T) {
+	kanbanDir := initBoard(t)
+	mustCreateTask(t, kanbanDir, "Round trip", "--priority", "high")
+
+	session := startTUIProcessWithOptions(t, kanbanDir, tuiProcessOptions{
+		args: []string{"--mouse"},
+	})
+	session.waitForOutput("mouse:click/double-click/wheel")
+
+	session.dragSGR(1, 49)
+	waitForTask(t, kanbanDir, 1, func(tk taskJSON) bool {
+		return tk.Status == statusInProgress && tk.ClaimedBy != ""
+	})
+	claimed := readE2ETask(t, kanbanDir, 1)
+
+	session.dragSGR(49, 25)
+	waitForTask(t, kanbanDir, 1, func(tk taskJSON) bool {
+		return tk.Status == statusTodo && tk.ClaimedBy == claimed.ClaimedBy
+	})
+
+	session.dragSGR(25, 1)
+	waitForTask(t, kanbanDir, 1, func(tk taskJSON) bool {
+		return tk.Status == statusBacklog && tk.ClaimedBy == claimed.ClaimedBy
+	})
+	session.pressKeys("q")
+	session.waitForExit()
+}
+
+func TestE2E_TUIMouseDrag_MovesTaskClaimedByAnotherActor(t *testing.T) {
+	kanbanDir := initBoard(t)
+	mustCreateTask(t, kanbanDir, "Claimed elsewhere", "--status", statusInProgress, "--priority", "high")
 	result := runKanban(t, kanbanDir, "edit", "1", "--claim", "other-agent")
 	if result.exitCode != 0 {
 		t.Fatalf("claiming task failed: %s", result.stderr)
@@ -76,11 +128,12 @@ func TestE2E_TUIMouseDrag_RejectsTaskClaimedByAnotherActor(t *testing.T) {
 		args: []string{"--mouse"},
 	})
 	session.waitForOutput("mouse:click/double-click/wheel")
-	checkpoint := session.checkpoint()
-	session.dragX10(1, 2, 25, 0)
-	session.waitForOutputSince(checkpoint, "claimed by")
-	assertTaskStatus(t, kanbanDir, 1, statusBacklog)
-	assertKeyboardResponsiveAfterRejectedDrag(t, session)
+	session.dragX10(49, 25)
+	waitForTask(t, kanbanDir, 1, func(tk taskJSON) bool {
+		return tk.Status == statusTodo && tk.ClaimedBy == "other-agent"
+	})
+	session.pressKeys("q")
+	session.waitForExit()
 }
 
 func assertTaskStatus(t *testing.T, kanbanDir string, id int, want string) {
@@ -93,6 +146,16 @@ func assertTaskStatus(t *testing.T, kanbanDir string, id int, want string) {
 	if tk.Status != want {
 		t.Fatalf("task #%d status=%q, want %q", id, tk.Status, want)
 	}
+}
+
+func readE2ETask(t *testing.T, kanbanDir string, id int) taskJSON {
+	t.Helper()
+	var tk taskJSON
+	result := runKanbanJSON(t, kanbanDir, &tk, "show", strconv.Itoa(id))
+	if result.exitCode != 0 {
+		t.Fatalf("showing task #%d failed: %s", id, result.stderr)
+	}
+	return tk
 }
 
 func assertKeyboardResponsiveAfterRejectedDrag(t *testing.T, session *tuiSession) {

@@ -85,8 +85,7 @@ type pointerState struct {
 	sourceCol         int
 	destination       int
 	destinationStatus string
-	leftSource        bool
-	dragCanceled      bool
+	dragStarted       bool
 	lastClickID       int
 	lastClickTime     time.Time
 }
@@ -106,8 +105,7 @@ func (b *Board) clearGesture() {
 	b.pointer.sourceCol = 0
 	b.pointer.destination = -1
 	b.pointer.destinationStatus = ""
-	b.pointer.leftSource = false
-	b.pointer.dragCanceled = false
+	b.pointer.dragStarted = false
 }
 
 func (b *Board) clearPendingClick() {
@@ -213,36 +211,23 @@ func (b *Board) handleBoardMouse(msg tea.MouseEvent) (tea.Model, tea.Cmd) {
 func (b *Board) updateDragTarget(x, y int) {
 	if b.pointer.generation != b.layout.generation ||
 		b.layout.generation != b.layoutGeneration {
-		b.pointer.dragCanceled = true
+		b.pointer.dragStarted = true
 		b.pointer.destination = -1
 		b.pointer.destinationStatus = ""
 		return
+	}
+
+	if !b.pointer.rect.contains(x, y) {
+		b.pointer.dragStarted = true
 	}
 
 	target := b.columnAt(x, y)
-	if target == nil {
-		b.pointer.leftSource = true
-		b.pointer.dragCanceled = true
+	if target == nil || target.col == b.pointer.sourceCol {
 		b.pointer.destination = -1
 		b.pointer.destinationStatus = ""
 		return
 	}
 
-	if target.col == b.pointer.sourceCol {
-		if b.pointer.leftSource || !b.pointer.rect.contains(x, y) {
-			b.pointer.dragCanceled = true
-		}
-		b.pointer.destination = -1
-		b.pointer.destinationStatus = ""
-		return
-	}
-
-	b.pointer.leftSource = true
-	if b.pointer.dragCanceled {
-		b.pointer.destination = -1
-		b.pointer.destinationStatus = ""
-		return
-	}
 	b.pointer.destination = target.col
 	b.pointer.destinationStatus = target.status
 }
@@ -258,7 +243,7 @@ func (b *Board) releaseBoardPointer(x, y int) (tea.Model, tea.Cmd) {
 	}
 
 	targetColumn := b.columnAt(x, y)
-	if b.pointer.dragCanceled || targetColumn == nil {
+	if targetColumn == nil {
 		b.clearGesture()
 		b.clearPendingClick()
 		return b, nil
@@ -272,7 +257,7 @@ func (b *Board) releaseBoardPointer(x, y int) (tea.Model, tea.Cmd) {
 		return b.executeMoveTask(taskID, targetStatus, true)
 	}
 
-	if b.pointer.leftSource || !b.pointer.rect.contains(x, y) {
+	if b.pointer.dragStarted || !b.pointer.rect.contains(x, y) {
 		b.clearGesture()
 		b.clearPendingClick()
 		return b, nil
@@ -302,7 +287,6 @@ func (b *Board) releaseBoardPointer(x, y int) (tea.Model, tea.Cmd) {
 func (b *Board) dragDestination() (int, string, bool) {
 	if !b.pointer.pressed ||
 		b.pointer.kind != pointerTargetCard ||
-		b.pointer.dragCanceled ||
 		b.pointer.destination < 0 ||
 		b.pointer.destinationStatus == "" ||
 		b.pointer.generation != b.layoutGeneration {

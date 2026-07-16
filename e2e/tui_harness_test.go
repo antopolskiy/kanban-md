@@ -315,18 +315,18 @@ func (s *tuiSession) clickX10(x, y int) {
 	s.mouseX10(3, x, y)
 }
 
-func (s *tuiSession) dragSGR(sourceX, sourceY, destinationX, destinationY int) {
+func (s *tuiSession) dragSGR(sourceX, destinationX int) {
 	s.t.Helper()
-	s.mouseSGR(0, sourceX, sourceY, false)
-	s.mouseSGR(32, destinationX, destinationY, false)
-	s.mouseSGR(0, destinationX, destinationY, true)
+	s.mouseSGR(0, sourceX, 2, false)
+	s.mouseSGR(32, destinationX, 0, false)
+	s.mouseSGR(0, destinationX, 0, true)
 }
 
-func (s *tuiSession) dragX10(sourceX, sourceY, destinationX, destinationY int) {
+func (s *tuiSession) dragX10(sourceX, destinationX int) {
 	s.t.Helper()
-	s.mouseX10(0, sourceX, sourceY)
-	s.mouseX10(32, destinationX, destinationY)
-	s.mouseX10(3, destinationX, destinationY)
+	s.mouseX10(0, sourceX, 2)
+	s.mouseX10(32, destinationX, 0)
+	s.mouseX10(3, destinationX, 0)
 }
 
 func (s *tuiSession) wheelSGR(x, y, direction int) {

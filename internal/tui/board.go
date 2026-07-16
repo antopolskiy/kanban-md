@@ -1223,8 +1223,12 @@ func (b *Board) executeMoveTask(taskID int, targetStatus string, followTask bool
 		NewStatus: targetStatus,
 	}
 
-	// Auto-claim with hostname when moving to a require_claim status.
-	if b.cfg.StatusRequiresClaim(targetStatus) {
+	// TUI actions represent the human operator, so an existing task claim is
+	// accepted and preserved while moving. Unclaimed tasks still auto-claim
+	// when entering a require_claim status.
+	if claimedBy := b.taskClaimant(taskID); claimedBy != "" {
+		params.Claimant = claimedBy
+	} else if b.cfg.StatusRequiresClaim(targetStatus) {
 		params.Claimant = tuiClaimant()
 		params.SetClaim = true
 	}
@@ -1243,6 +1247,18 @@ func (b *Board) executeMoveTask(taskID int, targetStatus string, followTask bool
 		b.err = fmt.Errorf("moving task #%d: %w", taskID, moveErr)
 	}
 	return b, nil
+}
+
+func (b *Board) taskClaimant(taskID int) string {
+	path, err := task.FindByID(b.cfg.TasksPath(), taskID)
+	if err != nil {
+		return ""
+	}
+	t, err := task.Read(path)
+	if err != nil {
+		return ""
+	}
+	return t.ClaimedBy
 }
 
 func (b *Board) executeDelete() (tea.Model, tea.Cmd) {

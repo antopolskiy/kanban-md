@@ -531,6 +531,10 @@ The wheel moves the selection one task at a time in the hovered column and
 scrolls task details three lines at a time. Keyboard controls remain available
 in mouse mode.
 
+Status moves made in the TUI preserve an existing task claim. If an unclaimed
+task enters a `require_claim` status, the TUI automatically claims it using the
+local hostname; that claim remains attached if the task later moves elsewhere.
+
 Terminals commonly reserve a modifier such as Shift or Option/Alt to bypass
 application mouse reporting for native text selection. The exact modifier is
 terminal-dependent; use the terminal's normal selection shortcut or omit
