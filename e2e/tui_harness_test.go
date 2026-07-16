@@ -4,6 +4,7 @@ package e2e_test
 
 import (
 	"bytes"
+	"fmt"
 	"io"
 	"os"
 	"os/exec"
@@ -49,6 +50,25 @@ func (b *tuiOutputBuffer) String() string {
 	return b.buf.String()
 }
 
+func (b *tuiOutputBuffer) Len() int {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.buf.Len()
+}
+
+func (b *tuiOutputBuffer) StringFrom(offset int) string {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	raw := b.buf.String()
+	if offset < 0 {
+		offset = 0
+	}
+	if offset > len(raw) {
+		offset = len(raw)
+	}
+	return raw[offset:]
+}
+
 type tuiSession struct {
 	t       *testing.T
 	cmd     *exec.Cmd
@@ -59,13 +79,33 @@ type tuiSession struct {
 	cleanup sync.Once
 }
 
+type tuiProcessOptions struct {
+	args []string
+	rows uint16
+	cols uint16
+}
+
 func startTUIProcess(t *testing.T, dir string) *tuiSession {
 	t.Helper()
+	return startTUIProcessWithOptions(t, dir, tuiProcessOptions{})
+}
 
-	cmd := exec.Command(binPath, "--dir", dir, "tui") //nolint:gosec,noctx // command uses test-built binary path
+func startTUIProcessWithOptions(t *testing.T, dir string, options tuiProcessOptions) *tuiSession {
+	t.Helper()
+
+	rows := options.rows
+	if rows == 0 {
+		rows = tuiRows
+	}
+	cols := options.cols
+	if cols == 0 {
+		cols = tuiCols
+	}
+	args := append([]string{"--dir", dir, "tui"}, options.args...)
+	cmd := exec.Command(binPath, args...) //nolint:gosec,noctx // command uses test-built binary path
 	cmd.Env = append(os.Environ(), "NO_COLOR=1", "TERM=dumb")
 
-	ptmx, err := pty.StartWithSize(cmd, &pty.Winsize{Cols: tuiCols, Rows: tuiRows})
+	ptmx, err := pty.StartWithSize(cmd, &pty.Winsize{Cols: cols, Rows: rows})
 	if err != nil {
 		t.Fatalf("starting TUI process: %v", err)
 	}
@@ -129,16 +169,30 @@ func (s *tuiSession) output() string {
 	return sanitizeTTYOutput(s.out.String())
 }
 
-func (s *tuiSession) pressKey(name string) error {
+func (s *tuiSession) checkpoint() int {
+	return s.out.Len()
+}
+
+func (s *tuiSession) outputSince(checkpoint int) string {
+	return sanitizeTTYOutput(s.out.StringFrom(checkpoint))
+}
+
+func (s *tuiSession) rawOutputSince(checkpoint int) string {
+	return s.out.StringFrom(checkpoint)
+}
+
+func (s *tuiSession) writeRaw(input []byte) error {
 	s.t.Helper()
-	_, err := s.ptmx.Write([]byte(encodeKey(name)))
-	if err != nil {
-		return err
-	}
-	if s.t != nil {
+	_, err := s.ptmx.Write(input)
+	if err == nil {
 		time.Sleep(tuiKeyDelay)
 	}
-	return nil
+	return err
+}
+
+func (s *tuiSession) pressKey(name string) error {
+	s.t.Helper()
+	return s.writeRaw([]byte(encodeKey(name)))
 }
 
 func (s *tuiSession) pressKeys(names ...string) {
@@ -182,6 +236,92 @@ func (s *tuiSession) waitForOutput(needle string) {
 		time.Sleep(20 * time.Millisecond)
 	}
 	s.t.Fatalf("timed out waiting for output containing %q; got %q", needle, s.output())
+}
+
+func (s *tuiSession) waitForOutputSince(checkpoint int, needle string) {
+	s.t.Helper()
+	deadline := time.Now().Add(tuiStartupTimeout)
+	for time.Now().Before(deadline) {
+		if strings.Contains(s.outputSince(checkpoint), needle) {
+			return
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	s.t.Fatalf("timed out waiting for new output containing %q; got %q", needle, s.outputSince(checkpoint))
+}
+
+func (s *tuiSession) waitForRawOutput(needle string) {
+	s.t.Helper()
+	s.waitForRawOutputSince(0, needle)
+}
+
+func (s *tuiSession) waitForRawOutputSince(checkpoint int, needle string) {
+	s.t.Helper()
+	deadline := time.Now().Add(tuiStartupTimeout)
+	for time.Now().Before(deadline) {
+		if strings.Contains(s.rawOutputSince(checkpoint), needle) {
+			return
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	s.t.Fatalf("timed out waiting for raw output containing %q; got %q", needle, s.rawOutputSince(checkpoint))
+}
+
+func (s *tuiSession) resize(cols, rows uint16) {
+	s.t.Helper()
+	if err := pty.Setsize(s.ptmx, &pty.Winsize{Cols: cols, Rows: rows}); err != nil {
+		s.t.Fatalf("resizing PTY to %dx%d: %v", cols, rows, err)
+	}
+	time.Sleep(tuiKeyDelay)
+}
+
+func (s *tuiSession) mouseSGR(code, x, y int, release bool) {
+	s.t.Helper()
+	final := byte('M')
+	if release {
+		final = 'm'
+	}
+	sequence := []byte(fmt.Sprintf("\x1b[<%d;%d;%d%c", code, x+1, y+1, final))
+	if err := s.writeRaw(sequence); err != nil {
+		s.t.Fatalf("writing SGR mouse event: %v", err)
+	}
+}
+
+func (s *tuiSession) mouseX10(code, x, y int) {
+	s.t.Helper()
+	if code < 0 || code > 223 || x < 0 || x > 222 || y < 0 || y > 222 {
+		s.t.Fatalf("X10 mouse coordinate/code out of range: code=%d x=%d y=%d", code, x, y)
+	}
+	sequence := []byte{
+		0x1b, '[', 'M',
+		byte(32 + code),  // #nosec G115 -- range checked above
+		byte(32 + x + 1), // #nosec G115 -- range checked above
+		byte(32 + y + 1), // #nosec G115 -- range checked above
+	}
+	if err := s.writeRaw(sequence); err != nil {
+		s.t.Fatalf("writing X10 mouse event: %v", err)
+	}
+}
+
+func (s *tuiSession) clickSGR(x, y int) {
+	s.t.Helper()
+	s.mouseSGR(0, x, y, false)
+	s.mouseSGR(0, x, y, true)
+}
+
+func (s *tuiSession) clickX10(x, y int) {
+	s.t.Helper()
+	s.mouseX10(0, x, y)
+	s.mouseX10(3, x, y)
+}
+
+func (s *tuiSession) wheelSGR(x, y, direction int) {
+	s.t.Helper()
+	code := 64
+	if direction > 0 {
+		code = 65
+	}
+	s.mouseSGR(code, x, y, false)
 }
 
 func (s *tuiSession) waitForExit() {

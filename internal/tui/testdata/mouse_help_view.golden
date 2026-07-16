@@ -1,0 +1,30 @@
+╭─────────────────────────────────────────────────────────────────────────────╮
+│                                                                             │
+│  Keyboard Shortcuts                                                         │
+│                                                                             │
+│  ←/h           Move to left column                                          │
+│  →/l           Move to right column                                         │
+│  ↓/j           Move cursor down                                             │
+│  ↑/k           Move cursor up                                               │
+│  enter         Show task detail                                             │
+│  c             Create new task in column                                    │
+│  e             Edit selected task (same flow as create)                     │
+│  m             Move task (status picker)                                    │
+│  n             Move task to next status                                     │
+│  p             Move task to previous status                                 │
+│  +/=           Raise task priority                                          │
+│  -/_           Lower task priority                                          │
+│  d             Delete task                                                  │
+│  s             Cycle sort field (priority/created/updated/title)            │
+│  S             Reverse sort direction                                       │
+│  /             Search by title, or by ID with #12 (trailing space = exact)  │
+│  r             Refresh board                                                │
+│  ?             Show this help                                               │
+│  esc/q         Quit                                                         │
+│  ctrl+c        Force quit                                                   │
+│  click         Select task; double-click opens detail                       │
+│  wheel         Move selection or scroll task detail                         │
+│                                                                             │
+│  Press any key to close                                                     │
+│                                                                             │
+╰─────────────────────────────────────────────────────────────────────────────╯

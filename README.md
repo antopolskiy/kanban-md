@@ -514,6 +514,7 @@ kanban-md tui             # launch from any directory with a kanban/ board
 kanban-md tui --dir PATH  # point to a specific kanban directory
 kanban-md tui --hide-empty-columns  # override config and hide empty columns
 kanban-md tui --show-empty-columns  # override config and show empty columns
+kanban-md tui --mouse      # opt in to mouse navigation
 ```
 
 Set `tui.hide_empty_columns` in `config.yml` to control the default behavior.
@@ -521,6 +522,17 @@ Set `tui.hide_empty_columns` in `config.yml` to control the default behavior.
 > **Note:** Older releases shipped a standalone `kanban-md-tui` binary. It has been retired — use `kanban-md tui` instead.
 
 In create/edit dialogs, text fields support cursor-based editing (`←/→`, `Home/End`, `Backspace`, `Delete`).
+
+Mouse mode is disabled by default. With `--mouse`, click a card to select it,
+double-click the same card within 500 ms to open its detail view, and click
+`Back` to return to the board. The wheel moves the selection one task at a
+time in the hovered column and scrolls task details three lines at a time.
+Keyboard controls remain available in mouse mode.
+
+Terminals commonly reserve a modifier such as Shift or Option/Alt to bypass
+application mouse reporting for native text selection. The exact modifier is
+terminal-dependent; use the terminal's normal selection shortcut or omit
+`--mouse` when native selection is preferred.
 
 ### Keyboard shortcuts
 

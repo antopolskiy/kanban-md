@@ -85,6 +85,11 @@ type Board struct {
 	// are removed from the board view.
 	hideEmptyColumns bool
 	now              func() time.Time // clock for duration display; defaults to time.Now
+	mouseEnabled     bool
+	mouseNow         func() time.Time
+	layoutGeneration uint64
+	layout           layoutSnapshot
+	pointer          pointerState
 
 	// Sort state.
 	sortField   string // one of sortFields
@@ -131,6 +136,7 @@ func NewBoard(cfg *config.Config) *Board {
 	b := &Board{
 		cfg:              cfg,
 		now:              time.Now,
+		mouseNow:         time.Now,
 		hideEmptyColumns: cfg.TUI.HideEmptyColumns,
 		sortField:        "priority",
 		sortReverse:      true,
@@ -144,9 +150,23 @@ func (b *Board) SetNow(fn func() time.Time) {
 	b.now = fn
 }
 
+// SetMouseEnabled controls whether the board responds to mouse messages and
+// renders mouse-specific affordances. Bubble Tea mouse reporting must also be
+// enabled by the caller.
+func (b *Board) SetMouseEnabled(v bool) {
+	b.mouseEnabled = v
+	b.invalidatePointerState()
+}
+
+// SetMouseNow overrides the clock used for double-click detection.
+func (b *Board) SetMouseNow(fn func() time.Time) {
+	b.mouseNow = fn
+}
+
 // SetHideEmptyColumns controls whether empty status columns are shown.
 func (b *Board) SetHideEmptyColumns(v bool) {
 	b.hideEmptyColumns = v
+	b.invalidatePointerState()
 	b.loadTasks()
 }
 
@@ -159,19 +179,25 @@ func (b *Board) Init() tea.Cmd {
 func (b *Board) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
+		b.invalidatePointerState()
 		return b.handleKey(msg)
+	case tea.MouseMsg:
+		return b.handleMouse(tea.MouseEvent(msg))
 	case tea.WindowSizeMsg:
+		b.invalidatePointerState()
 		b.width = msg.Width
 		b.height = msg.Height
 		b.applyCreateInputLayout()
 		return b, nil
 	case ReloadMsg:
+		b.invalidatePointerState()
 		b.loadTasks()
 		b.refreshDetailTask()
 		return b, nil
 	case TickMsg:
 		return b, tickCmd()
 	case errMsg:
+		b.invalidatePointerState()
 		b.err = msg.err
 		return b, nil
 	}
@@ -182,6 +208,13 @@ func (b *Board) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (b *Board) View() string {
 	if b.width == 0 {
 		return "Loading..."
+	}
+
+	b.layout = layoutSnapshot{
+		generation: b.layoutGeneration,
+		width:      b.width,
+		height:     b.height,
+		view:       b.view,
 	}
 
 	switch b.view {
@@ -420,6 +453,7 @@ func (b *Board) handleEnter() {
 		b.detailTask = t
 		b.detailScrollOff = 0
 		b.view = viewDetail
+		b.invalidatePointerState()
 	}
 }
 
@@ -1328,8 +1362,9 @@ func (b *Board) viewBoard() string {
 
 	// Render columns.
 	renderedCols := make([]string, len(b.columns))
+	renderedTargets := make([][]cardTarget, len(b.columns))
 	for i, col := range b.columns {
-		renderedCols[i] = b.renderColumn(i, col, colWidth)
+		renderedCols[i], renderedTargets[i] = b.renderColumn(i, col, colWidth)
 	}
 
 	boardView := lipgloss.JoinHorizontal(lipgloss.Top, renderedCols...)
@@ -1347,6 +1382,7 @@ func (b *Board) viewBoard() string {
 			boardView += strings.Repeat("\n", targetHeight-actual)
 		}
 	}
+	b.captureBoardLayout(colWidth, targetHeight, renderedTargets)
 
 	bottom := b.renderStatusBar()
 	if b.view == viewSearch {
@@ -1380,7 +1416,7 @@ func (b *Board) columnWidth() int {
 	return w
 }
 
-func (b *Board) renderColumn(colIdx int, col column, width int) string {
+func (b *Board) renderColumn(colIdx int, col column, width int) (string, []cardTarget) {
 	// Header.
 	headerText := fmt.Sprintf("%s (%d)", col.status, len(col.tasks))
 	wip := b.cfg.WIPLimit(col.status)
@@ -1410,11 +1446,14 @@ func (b *Board) renderColumn(colIdx int, col column, width int) string {
 	}
 
 	parts := []string{header}
+	var targets []cardTarget
+	y := 1
 
 	// Show "↑ N more" indicator if scrolled down.
 	if start > 0 {
 		indicator := fmt.Sprintf("  ↑ %d more", start)
 		parts = append(parts, dimStyle.Width(width).Render(truncate(indicator, width)))
+		y++
 	}
 
 	// Render visible cards.
@@ -1425,6 +1464,14 @@ func (b *Board) renderColumn(colIdx int, col column, width int) string {
 			t := col.tasks[rowIdx]
 			active := colIdx == b.activeCol && rowIdx == b.activeRow
 			parts = append(parts, b.renderCard(t, active, width))
+			cardHeight := b.cardHeight(t, width)
+			targets = append(targets, cardTarget{
+				taskID: t.ID,
+				col:    colIdx,
+				row:    rowIdx,
+				rect:   rect{x0: 0, y0: y, x1: width, y1: y + cardHeight},
+			})
+			y += cardHeight
 		}
 	}
 
@@ -1435,7 +1482,7 @@ func (b *Board) renderColumn(colIdx int, col column, width int) string {
 		parts = append(parts, dimStyle.Width(width).Render(truncate(indicator, width)))
 	}
 
-	return lipgloss.JoinVertical(lipgloss.Left, parts...)
+	return lipgloss.JoinVertical(lipgloss.Left, parts...), targets
 }
 
 func (b *Board) renderCard(t *task.Task, active bool, width int) string {
@@ -1655,6 +1702,9 @@ func (b *Board) renderStatusBar() string {
 	}
 	status := fmt.Sprintf(" %s | %d tasks%s | c:create e:edit m:move n/p:status +/-:priority d:del s:sort[%s%s] /:search ?:help q:quit",
 		b.cfg.Board.Name, total, filter, b.sortField, arrow)
+	if b.mouseEnabled {
+		status = " mouse:click/double-click/wheel |" + status
+	}
 	status = truncate(status, b.width)
 
 	if b.err != nil {
@@ -1702,7 +1752,23 @@ func (b *Board) viewDetail() string {
 		end = len(lines)
 	}
 
-	return strings.Join(lines[off:end], "\n") + "\n\n" + dimStyle.Render(hint)
+	visible := strings.Join(lines[off:end], "\n")
+	if !b.mouseEnabled {
+		return visible + "\n\n" + dimStyle.Render(hint)
+	}
+
+	hint = "← Back  " + hint
+	renderedLines := end - off
+	if renderedLines < viewHeight {
+		visible += strings.Repeat("\n", viewHeight-renderedLines)
+	}
+	backWidth := min(lipgloss.Width("← Back"), b.width)
+	if backWidth > 0 && b.height > 0 {
+		b.layout.back = &backTarget{
+			rect: rect{x0: 0, y0: b.height - 1, x1: backWidth, y1: b.height},
+		}
+	}
+	return visible + "\n\n" + dimStyle.Render(truncate(hint, b.width))
 }
 
 func detailLines(t *task.Task, width int) []string {
@@ -2021,6 +2087,12 @@ func (b *Board) viewHelp() string {
 		{"?", "Show this help"},
 		{"esc/q", "Quit"},
 		{"ctrl+c", "Force quit"},
+	}
+	if b.mouseEnabled {
+		help = append(help,
+			struct{ key, desc string }{"click", "Select task; double-click opens detail"},
+			struct{ key, desc string }{"wheel", "Move selection or scroll task detail"},
+		)
 	}
 
 	var lines []string
