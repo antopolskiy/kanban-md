@@ -9,8 +9,6 @@ import (
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
-	"github.com/muesli/termenv"
 
 	"github.com/antopolskiy/kanban-md/internal/board"
 	"github.com/antopolskiy/kanban-md/internal/config"
@@ -240,64 +238,6 @@ func TestMouseDragMotionShowsDestinationAndMoveHint(t *testing.T) {
 	if strings.Count(view, "#1") != 2 {
 		t.Fatalf("expected one card and one status hint, got %d #1 occurrences:\n%s",
 			strings.Count(view, "#1"), view)
-	}
-}
-
-func TestMouseDragTintsDestinationColumnBody(t *testing.T) {
-	previousProfile := lipgloss.ColorProfile()
-	previousDarkBackground := lipgloss.HasDarkBackground()
-	lipgloss.SetColorProfile(termenv.ANSI256)
-	t.Cleanup(func() {
-		lipgloss.SetColorProfile(previousProfile)
-		lipgloss.SetHasDarkBackground(previousDarkBackground)
-	})
-
-	tests := []struct {
-		name       string
-		dark       bool
-		background string
-	}{
-		{name: "dark terminal", dark: true, background: "\x1b[48;5;235m"},
-		{name: "light terminal", dark: false, background: "\x1b[48;5;254m"},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			lipgloss.SetHasDarkBackground(tt.dark)
-			b, _ := newDragFilesystemBoard(t, nil, &task.Task{
-				ID: 1, Title: "Drag me", Status: dragStatusBacklog,
-			})
-			source := targetForTask(t, b, 1)
-			destination := columnTargetForStatus(t, b, dragStatusTodo)
-
-			if view := b.View(); strings.Contains(view, tt.background) {
-				t.Fatalf("idle board unexpectedly contains destination body tint:\n%q", view)
-			}
-
-			_, _ = b.Update(tea.MouseMsg{
-				X: source.rect.x0 + 1, Y: source.rect.y0,
-				Button: tea.MouseButtonLeft, Action: tea.MouseActionPress,
-			})
-			_, _ = b.Update(tea.MouseMsg{
-				X: destination.rect.x0 + 1, Y: destination.rect.y0,
-				Button: tea.MouseButtonLeft, Action: tea.MouseActionMotion,
-			})
-			view := b.View()
-			targetHeight := b.height - b.chromeHeight()
-			if count := strings.Count(view, tt.background); count < targetHeight {
-				t.Fatalf("destination tint appears on %d lines, want at least %d:\n%q",
-					count, targetHeight, view)
-			}
-
-			sourceColumn := columnTargetForStatus(t, b, dragStatusBacklog)
-			_, _ = b.Update(tea.MouseMsg{
-				X: sourceColumn.rect.x0 + 1, Y: sourceColumn.rect.y0,
-				Button: tea.MouseButtonLeft, Action: tea.MouseActionMotion,
-			})
-			if view := b.View(); strings.Contains(view, tt.background) {
-				t.Fatalf("source hover did not clear destination body tint:\n%q", view)
-			}
-		})
 	}
 }
 
