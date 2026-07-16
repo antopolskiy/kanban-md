@@ -360,3 +360,4 @@ kanban-md list --compact --status in-progress,review   # all active/parked work
 - **DO NOT** use `--next` or `--prev` without checking current status. They fail at boundary statuses.
 - **DO NOT** pass both `--status` and `--next`/`--prev` to move. Use one or the other.
 - **DO** quote task titles with special characters: `kanban-md create "Fix: the 'login' bug"`.
+- **DO** escape backticks in `--body` and `--append-body` values. Shell interprets backticks (`` ` ``) and `$(...)` inside double quotes as command substitution, which will **execute the text as commands**. Escape every backtick with a backslash: `` \` `` or use single quotes for the outer string if possible.
