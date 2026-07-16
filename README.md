@@ -526,11 +526,10 @@ In create/edit dialogs, text fields support cursor-based editing (`←/→`, `Ho
 Mouse mode is disabled by default. With `--mouse`, click a card to select it,
 double-click the same card within 500 ms to open its detail view, and click
 `Back` to return to the board. Hold a card and release it over another rendered
-column to move it to that status; the whole visible column is a drop target,
-with its header highlighted and its body subtly shaded while held. The wheel
-moves the selection one task at a time in the hovered column and scrolls task
-details three lines at a time. Keyboard controls remain available in mouse
-mode.
+column to move it to that status; the whole visible column is a drop target.
+The wheel moves the selection one task at a time in the hovered column and
+scrolls task details three lines at a time. Keyboard controls remain available
+in mouse mode.
 
 Status moves made in the TUI preserve an existing task claim. If an unclaimed
 task enters a `require_claim` status, the TUI automatically claims it using the

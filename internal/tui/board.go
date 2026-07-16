@@ -1318,12 +1318,6 @@ var (
 					Background(lipgloss.Color("42")).
 					Padding(0, 1)
 
-	dropTargetColumnStyle = lipgloss.NewStyle().
-				Background(lipgloss.AdaptiveColor{
-			Light: "254",
-			Dark:  "235",
-		})
-
 	cardStyle = lipgloss.NewStyle().
 			Border(lipgloss.RoundedBorder()).
 			BorderForeground(lipgloss.Color("240")).
@@ -1394,17 +1388,12 @@ func (b *Board) viewBoard() string {
 
 	// Calculate column width.
 	colWidth := b.columnWidth()
-	targetHeight := b.height - b.chromeHeight()
-	destinationCol, _, dragging := b.dragDestination()
 
 	// Render columns.
 	renderedCols := make([]string, len(b.columns))
 	renderedTargets := make([][]cardTarget, len(b.columns))
 	for i, col := range b.columns {
 		renderedCols[i], renderedTargets[i] = b.renderColumn(i, col, colWidth)
-		if dragging && i == destinationCol {
-			renderedCols[i] = renderDropTargetColumn(renderedCols[i], colWidth, targetHeight)
-		}
 	}
 
 	boardView := lipgloss.JoinHorizontal(lipgloss.Top, renderedCols...)
@@ -1412,6 +1401,7 @@ func (b *Board) viewBoard() string {
 	// Ensure the board view fits within the available height. At very small
 	// terminal sizes, a single card can exceed the budget. Clamp from the
 	// bottom (keeping headers at the top) and pad if needed.
+	targetHeight := b.height - b.chromeHeight()
 	if targetHeight > 0 {
 		actual := strings.Count(boardView, "\n") + 1
 		if actual > targetHeight {
@@ -1429,14 +1419,6 @@ func (b *Board) viewBoard() string {
 	}
 
 	return lipgloss.JoinVertical(lipgloss.Left, boardView, "", bottom)
-}
-
-func renderDropTargetColumn(column string, width, height int) string {
-	style := dropTargetColumnStyle.Width(width)
-	if height > 0 {
-		style = style.Height(height)
-	}
-	return style.Render(column)
 }
 
 // renderSearchBar renders the live title-filter input line shown while the
