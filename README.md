@@ -525,9 +525,11 @@ In create/edit dialogs, text fields support cursor-based editing (`←/→`, `Ho
 
 Mouse mode is disabled by default. With `--mouse`, click a card to select it,
 double-click the same card within 500 ms to open its detail view, and click
-`Back` to return to the board. The wheel moves the selection one task at a
-time in the hovered column and scrolls task details three lines at a time.
-Keyboard controls remain available in mouse mode.
+`Back` to return to the board. Hold a card and release it over another rendered
+column to move it to that status; the whole visible column is a drop target.
+The wheel moves the selection one task at a time in the hovered column and
+scrolls task details three lines at a time. Keyboard controls remain available
+in mouse mode.
 
 Terminals commonly reserve a modifier such as Shift or Option/Alt to bypass
 application mouse reporting for native text selection. The exact modifier is

@@ -1214,9 +1214,12 @@ func (b *Board) executeMove(targetStatus string) (tea.Model, tea.Cmd) {
 		b.view = viewBoard
 		return b, nil
 	}
+	return b.executeMoveTask(t.ID, targetStatus, false)
+}
 
+func (b *Board) executeMoveTask(taskID int, targetStatus string, followTask bool) (tea.Model, tea.Cmd) {
 	params := board.MoveParams{
-		ID:        t.ID,
+		ID:        taskID,
 		NewStatus: targetStatus,
 	}
 
@@ -1229,11 +1232,15 @@ func (b *Board) executeMove(targetStatus string) (tea.Model, tea.Cmd) {
 	_, moveErr := board.Move(b.cfg, params, b.now())
 
 	b.view = viewBoard
+	b.invalidatePointerState()
 	b.loadTasks()
+	if followTask {
+		b.selectTask(taskID)
+	}
 
 	// Set error after loadTasks so it isn't cleared by a successful reload.
 	if moveErr != nil {
-		b.err = fmt.Errorf("moving task #%d: %w", t.ID, moveErr)
+		b.err = fmt.Errorf("moving task #%d: %w", taskID, moveErr)
 	}
 	return b, nil
 }
@@ -1288,6 +1295,12 @@ var (
 				Foreground(lipgloss.Color("230")).
 				Background(lipgloss.Color("62")).
 				Padding(0, 1)
+
+	dropTargetColumnHeaderStyle = lipgloss.NewStyle().
+					Bold(true).
+					Foreground(lipgloss.Color("232")).
+					Background(lipgloss.Color("42")).
+					Padding(0, 1)
 
 	cardStyle = lipgloss.NewStyle().
 			Border(lipgloss.RoundedBorder()).
@@ -1423,14 +1436,21 @@ func (b *Board) renderColumn(colIdx int, col column, width int) (string, []cardT
 	if wip > 0 {
 		headerText = fmt.Sprintf("%s (%d/%d)", col.status, len(col.tasks), wip)
 	}
+	destinationCol, _, dragging := b.dragDestination()
+	if dragging && colIdx == destinationCol {
+		headerText = "→ " + headerText
+	}
 	// Truncate to fit within padding (1 left + 1 right).
 	const headerPad = 2
 	headerText = truncate(headerText, width-headerPad)
 
 	var header string
-	if colIdx == b.activeCol {
+	switch {
+	case dragging && colIdx == destinationCol:
+		header = dropTargetColumnHeaderStyle.Width(width).Render(headerText)
+	case colIdx == b.activeCol:
 		header = activeColumnHeaderStyle.Width(width).Render(headerText)
-	} else {
+	default:
 		header = columnHeaderStyle.Width(width).Render(headerText)
 	}
 
@@ -1691,6 +1711,16 @@ func wrapLinesCap(maxLines int) int {
 }
 
 func (b *Board) renderStatusBar() string {
+	if _, status, dragging := b.dragDestination(); dragging {
+		hint := fmt.Sprintf(" Move #%d → %s — release to move", b.pointer.taskID, status)
+		hint = statusBarStyle.Render(truncate(hint, b.width))
+		if b.err != nil {
+			errStr := errorStyle.Render(truncate("Error: "+b.err.Error(), b.width))
+			return errStr + "\n" + hint
+		}
+		return hint
+	}
+
 	total := len(b.tasks)
 	arrow := "↑"
 	if b.sortReverse {
@@ -2091,6 +2121,7 @@ func (b *Board) viewHelp() string {
 	if b.mouseEnabled {
 		help = append(help,
 			struct{ key, desc string }{"click", "Select task; double-click opens detail"},
+			struct{ key, desc string }{"drag", "Release a card over another column to move it"},
 			struct{ key, desc string }{"wheel", "Move selection or scroll task detail"},
 		)
 	}
