@@ -35,8 +35,7 @@ func TestPickHighestPriority(t *testing.T) {
 	picked := Pick(cfg, tasks, PickOptions{})
 	if picked == nil {
 		t.Fatal("Pick() returned nil, want task #2")
-	}
-	if picked.ID != 2 {
+	} else if picked.ID != 2 {
 		t.Errorf("Pick() ID = %d, want 2 (critical priority)", picked.ID)
 	}
 }
@@ -52,8 +51,7 @@ func TestPickSkipsClaimed(t *testing.T) {
 	picked := Pick(cfg, tasks, PickOptions{ClaimTimeout: time.Hour})
 	if picked == nil {
 		t.Fatal("Pick() returned nil, want task #2")
-	}
-	if picked.ID != 2 {
+	} else if picked.ID != 2 {
 		t.Errorf("Pick() ID = %d, want 2 (skip claimed)", picked.ID)
 	}
 }
@@ -68,8 +66,7 @@ func TestPickSkipsBlocked(t *testing.T) {
 	picked := Pick(cfg, tasks, PickOptions{})
 	if picked == nil {
 		t.Fatal("Pick() returned nil, want task #2")
-	}
-	if picked.ID != 2 {
+	} else if picked.ID != 2 {
 		t.Errorf("Pick() ID = %d, want 2 (skip blocked)", picked.ID)
 	}
 }
@@ -85,8 +82,7 @@ func TestPickSkipsUnmetDeps(t *testing.T) {
 	picked := Pick(cfg, tasks, PickOptions{})
 	if picked == nil {
 		t.Fatal("Pick() returned nil, want task #2")
-	}
-	if picked.ID != 2 {
+	} else if picked.ID != 2 {
 		t.Errorf("Pick() ID = %d, want 2 (skip unmet deps)", picked.ID)
 	}
 }
@@ -102,8 +98,7 @@ func TestPickSatisfiedDeps(t *testing.T) {
 	picked := Pick(cfg, tasks, PickOptions{})
 	if picked == nil {
 		t.Fatal("Pick() returned nil")
-	}
-	if picked.ID != 1 {
+	} else if picked.ID != 1 {
 		t.Errorf("Pick() ID = %d, want 1 (deps satisfied, critical priority)", picked.ID)
 	}
 }
@@ -118,8 +113,7 @@ func TestPickFromSpecificStatus(t *testing.T) {
 	picked := Pick(cfg, tasks, PickOptions{Statuses: []string{"backlog"}})
 	if picked == nil {
 		t.Fatal("Pick() returned nil, want task #2")
-	}
-	if picked.ID != 2 {
+	} else if picked.ID != 2 {
 		t.Errorf("Pick() ID = %d, want 2 (from backlog only)", picked.ID)
 	}
 }
@@ -148,8 +142,7 @@ func TestPickExpiredClaimIsAvailable(t *testing.T) {
 	picked := Pick(cfg, tasks, PickOptions{ClaimTimeout: time.Hour})
 	if picked == nil {
 		t.Fatal("Pick() returned nil, want task #1 (expired claim)")
-	}
-	if picked.ID != 1 {
+	} else if picked.ID != 1 {
 		t.Errorf("Pick() ID = %d, want 1", picked.ID)
 	}
 }
@@ -164,8 +157,7 @@ func TestPickWithTagFilter(t *testing.T) {
 	picked := Pick(cfg, tasks, PickOptions{Tags: []string{"frontend"}})
 	if picked == nil {
 		t.Fatal("Pick() returned nil, want task #2")
-	}
-	if picked.ID != 2 {
+	} else if picked.ID != 2 {
 		t.Errorf("Pick() ID = %d, want 2 (tag filter)", picked.ID)
 	}
 }
@@ -182,8 +174,7 @@ func TestPickWithMultipleTagFilter(t *testing.T) {
 	picked := Pick(cfg, tasks, PickOptions{Tags: []string{"frontend", "coverage"}})
 	if picked == nil {
 		t.Fatal("Pick() returned nil, want task #2")
-	}
-	if picked.ID != 2 {
+	} else if picked.ID != 2 {
 		t.Errorf("Pick() ID = %d, want 2 (multi-tag filter, highest priority)", picked.ID)
 	}
 }
@@ -198,8 +189,7 @@ func TestPickExpediteBeforeStandard(t *testing.T) {
 	picked := Pick(cfg, tasks, PickOptions{})
 	if picked == nil {
 		t.Fatal("Pick() returned nil")
-	}
-	if picked.ID != 2 {
+	} else if picked.ID != 2 {
 		t.Errorf("Pick() ID = %d, want 2 (expedite before standard)", picked.ID)
 	}
 }
@@ -214,8 +204,7 @@ func TestPickIntangibleLast(t *testing.T) {
 	picked := Pick(cfg, tasks, PickOptions{})
 	if picked == nil {
 		t.Fatal("Pick() returned nil")
-	}
-	if picked.ID != 2 {
+	} else if picked.ID != 2 {
 		t.Errorf("Pick() ID = %d, want 2 (standard before intangible)", picked.ID)
 	}
 }
@@ -230,8 +219,7 @@ func TestPickFixedDateByDueDate(t *testing.T) {
 	picked := Pick(cfg, tasks, PickOptions{})
 	if picked == nil {
 		t.Fatal("Pick() returned nil")
-	}
-	if picked.ID != 2 {
+	} else if picked.ID != 2 {
 		t.Errorf("Pick() ID = %d, want 2 (soonest due date first)", picked.ID)
 	}
 }

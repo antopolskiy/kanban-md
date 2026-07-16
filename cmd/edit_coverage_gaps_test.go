@@ -398,17 +398,3 @@ func createClaimedTaskFile(t *testing.T, tasksDir string, id int, title, claiman
 		t.Fatal(err)
 	}
 }
-
-func createTaskFileWithClassAndStatus(t *testing.T, tasksDir string, id int, title, status, class string) {
-	t.Helper()
-	slug := task.GenerateSlug(title)
-	filename := task.GenerateFilename(id, slug)
-	content := "---\nid: " + idStr(id) + "\ntitle: " + title +
-		"\nstatus: " + status + "\npriority: medium" +
-		"\nclass: " + class +
-		"\ncreated: 2025-01-01T00:00:00Z\nupdated: 2025-01-01T00:00:00Z\n---\n"
-	path := filepath.Join(tasksDir, filename)
-	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
-		t.Fatal(err)
-	}
-}

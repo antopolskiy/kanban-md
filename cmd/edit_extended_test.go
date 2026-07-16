@@ -768,7 +768,6 @@ func TestWriteAndRename_TitleChanged(t *testing.T) {
 	}
 }
 
-
 // --- appendBody unit tests ---
 
 func TestAppendBody_EmptyExisting(t *testing.T) {

@@ -301,8 +301,7 @@ func TestCreate_BodyInputWraps(t *testing.T) {
 	}
 	if createdTask == nil {
 		t.Fatalf("expected task with title %q to be created", "Body wrap test")
-	}
-	if !strings.Contains(createdTask.Body, "Body text should display across a narrow textarea") {
+	} else if !strings.Contains(createdTask.Body, "Body text should display across a narrow textarea") {
 		t.Error("expected typed body text in created task")
 	}
 }

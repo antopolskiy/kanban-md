@@ -251,7 +251,6 @@ func TestMoveSingleTask_SuccessTable(t *testing.T) {
 
 // --- resolveTargetStatus ---
 
-
 func TestResolveTargetStatus_NextSuccess(t *testing.T) {
 	cfg := config.NewDefault("Test")
 	tk := &task.Task{ID: 1, Status: "backlog"}
@@ -349,9 +348,6 @@ func TestResolveTargetStatus_NextUnknownStatus(t *testing.T) {
 		t.Fatal("expected boundary error for unknown status")
 	}
 }
-
-
-
 
 // --- outputMoveResult ---
 
@@ -706,20 +702,4 @@ func newPickCmd() *cobra.Command {
 	cmd.Flags().StringSlice("tags", nil, "")
 	cmd.Flags().Bool("no-body", false, "")
 	return cmd
-}
-
-// writeTaskWithClass creates a task file with a specific class of service.
-func writeTaskWithClass(t *testing.T, tasksDir string, id int, title, status, class string) {
-	t.Helper()
-	now := time.Now()
-	tk := &task.Task{
-		ID: id, Title: title, Status: status, Priority: "medium",
-		Class: class, Created: now, Updated: now,
-	}
-	slug := task.GenerateSlug(title)
-	filename := task.GenerateFilename(id, slug)
-	path := filepath.Join(tasksDir, filename)
-	if err := task.Write(path, tk); err != nil {
-		t.Fatal(err)
-	}
 }

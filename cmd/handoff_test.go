@@ -457,8 +457,6 @@ func TestHandoffSingleTask_PropagatesError(t *testing.T) {
 
 // --- logHandoffActivity tests ---
 
-
-
 func TestExecuteHandoff_ExpiredClaimAllowsHandoff(t *testing.T) {
 	kanbanDir := setupBoard(t)
 	cfg, err := config.Load(kanbanDir)

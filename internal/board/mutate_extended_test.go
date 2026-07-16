@@ -17,7 +17,7 @@ func setupMutateBoard(t *testing.T) string {
 	dir := t.TempDir()
 	cfg := config.NewDefault(dir)
 	cfg.SetDir(dir)
-	if err := os.MkdirAll(cfg.TasksPath(), 0755); err != nil {
+	if err := os.MkdirAll(cfg.TasksPath(), 0o750); err != nil {
 		t.Fatal(err)
 	}
 	if err := cfg.Save(); err != nil {
@@ -45,8 +45,6 @@ func WriteTaskWithClass(t *testing.T, tasksDir string, id int, title, status, cl
 }
 
 // --- logEditActivity tests ---
-
-
 
 func TestLogEditActivity_BlockTransition(t *testing.T) {
 	kanbanDir := setupMutateBoard(t)

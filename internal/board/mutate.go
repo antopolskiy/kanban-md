@@ -483,6 +483,8 @@ type HandoffParams struct {
 }
 
 // Handoff executes the handoff workflow for a task.
+//
+//nolint:gocyclo // Handoff coordinates validation, mutation, persistence, and audit logging atomically.
 func Handoff(cfg *config.Config, params HandoffParams, now time.Time) (*task.Task, error) {
 	if params.Claimant == "" {
 		return nil, clierr.New(clierr.InvalidInput, "claim name is required")

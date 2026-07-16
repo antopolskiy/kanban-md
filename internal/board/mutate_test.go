@@ -18,7 +18,7 @@ func setupMutateBoard(t *testing.T) (*config.Config, string) {
 	cfg.SetDir(dir)
 	// Add "review" status so handoff doesn't error out
 	cfg.Statuses = append(cfg.Statuses, config.StatusConfig{Name: "review"})
-	if err := os.MkdirAll(cfg.TasksPath(), 0755); err != nil {
+	if err := os.MkdirAll(cfg.TasksPath(), 0o750); err != nil {
 		t.Fatal(err)
 	}
 	return cfg, dir
@@ -50,7 +50,7 @@ func TestHandoff_MoveAndBlock(t *testing.T) {
 	}
 
 	logPath := filepath.Join(kanbanDir, "activity.jsonl")
-	data, err := os.ReadFile(logPath)
+	data, err := os.ReadFile(logPath) //nolint:gosec // test reads its own temporary activity log
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -79,9 +79,9 @@ func TestHandoff_ReleaseOnly(t *testing.T) {
 	}
 
 	params := board.HandoffParams{
-		ID:          1,
-		Claimant:    "agent-a",
-		Release:     true,
+		ID:       1,
+		Claimant: "agent-a",
+		Release:  true,
 	}
 
 	_, err = board.Handoff(cfg, params, time.Now())
@@ -90,7 +90,7 @@ func TestHandoff_ReleaseOnly(t *testing.T) {
 	}
 
 	logPath := filepath.Join(kanbanDir, "activity.jsonl")
-	data, err := os.ReadFile(logPath)
+	data, err := os.ReadFile(logPath) //nolint:gosec // test reads its own temporary activity log
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -117,9 +117,9 @@ func TestHandoff_NoMoveNoBlockNoClaim(t *testing.T) {
 	}
 
 	params := board.HandoffParams{
-		ID:          1,
-		Claimant:    "agent-b", // keeping claim
-		Release:     false,
+		ID:       1,
+		Claimant: "agent-b", // keeping claim
+		Release:  false,
 	}
 
 	_, err = board.Handoff(cfg, params, time.Now())
@@ -128,7 +128,7 @@ func TestHandoff_NoMoveNoBlockNoClaim(t *testing.T) {
 	}
 
 	logPath := filepath.Join(kanbanDir, "activity.jsonl")
-	data, err := os.ReadFile(logPath)
+	data, err := os.ReadFile(logPath) //nolint:gosec // test reads its own temporary activity log
 	if err != nil {
 		t.Fatal(err)
 	}

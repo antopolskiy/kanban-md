@@ -17,13 +17,14 @@ func TestValidateClaimRequired_ReturnsError(t *testing.T) {
 	err := ValidateClaimRequired("in-progress")
 	if err == nil {
 		t.Fatal("expected non-nil error from ValidateClaimRequired")
-	}
-	if err.Code == "" {
-		t.Error("error code should be set")
-	}
-	wantSubstr := "in-progress"
-	if msg := err.Error(); !containsStr(msg, wantSubstr) {
-		t.Errorf("error = %q, want to contain %q", msg, wantSubstr)
+	} else {
+		if err.Code == "" {
+			t.Error("error code should be set")
+		}
+		wantSubstr := "in-progress"
+		if msg := err.Error(); !containsStr(msg, wantSubstr) {
+			t.Errorf("error = %q, want to contain %q", msg, wantSubstr)
+		}
 	}
 }
 

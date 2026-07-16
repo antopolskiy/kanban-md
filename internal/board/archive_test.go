@@ -12,12 +12,12 @@ import (
 
 const testBacklogStatus = "backlog"
 
-// Helper copied from cmd tests
+// Helper copied from cmd tests.
 func setupArchiveBoard(t *testing.T) string {
 	dir := t.TempDir()
 	cfg := config.NewDefault(dir)
 	cfg.SetDir(dir)
-	if err := os.MkdirAll(cfg.TasksPath(), 0755); err != nil {
+	if err := os.MkdirAll(cfg.TasksPath(), 0o750); err != nil {
 		t.Fatal(err)
 	}
 	if err := cfg.Save(); err != nil {
@@ -127,7 +127,7 @@ func TestArchive_LogsActivity(t *testing.T) {
 	}
 
 	logPath := filepath.Join(kanbanDir, "activity.jsonl")
-	data, err := os.ReadFile(logPath)
+	data, err := os.ReadFile(logPath) //nolint:gosec // test reads its own temporary activity log
 	if err != nil {
 		t.Fatal(err)
 	}

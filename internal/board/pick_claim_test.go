@@ -33,14 +33,14 @@ func TestPickAndClaim_Success(t *testing.T) {
 	}
 	if picked == nil {
 		t.Fatal("expected picked task, got nil")
-	}
-
-	// Verify claim was set
-	if picked.ClaimedBy != "agent-test" {
-		t.Errorf("expected ClaimedBy = agent-test, got %q", picked.ClaimedBy)
-	}
-	if picked.ClaimedAt == nil || !picked.ClaimedAt.Equal(now) {
-		t.Errorf("expected ClaimedAt = %v, got %v", now, picked.ClaimedAt)
+	} else {
+		// Verify claim was set.
+		if picked.ClaimedBy != "agent-test" {
+			t.Errorf("expected ClaimedBy = agent-test, got %q", picked.ClaimedBy)
+		}
+		if picked.ClaimedAt == nil || !picked.ClaimedAt.Equal(now) {
+			t.Errorf("expected ClaimedAt = %v, got %v", now, picked.ClaimedAt)
+		}
 	}
 
 	// Verify file was saved correctly
@@ -59,7 +59,7 @@ func TestPickAndClaim_Success(t *testing.T) {
 
 	// Verify activity log
 	logPath := filepath.Join(kanbanDir, "activity.jsonl")
-	data, _ := os.ReadFile(logPath)
+	data, _ := os.ReadFile(logPath) //nolint:gosec // test reads its own temporary activity log
 	if !containsSubstring(string(data), "claim") {
 		t.Errorf("expected 'claim' log, got: %s", data)
 	}
@@ -97,7 +97,7 @@ func TestPickAndClaim_WithMove(t *testing.T) {
 
 	// Verify activity log has BOTH claim and move
 	logPath := filepath.Join(kanbanDir, "activity.jsonl")
-	data, _ := os.ReadFile(logPath)
+	data, _ := os.ReadFile(logPath) //nolint:gosec // test reads its own temporary activity log
 	if !containsSubstring(string(data), "claim") {
 		t.Errorf("expected 'claim' log, got: %s", data)
 	}
