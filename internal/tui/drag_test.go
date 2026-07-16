@@ -241,6 +241,73 @@ func TestMouseDragMotionShowsDestinationAndMoveHint(t *testing.T) {
 	}
 }
 
+func TestMouseDragCanCrossSourceAndChooseDestinationLater(t *testing.T) {
+	tests := []struct {
+		name        string
+		firstStatus string
+		finalStatus string
+	}{
+		{
+			name:        "return to the same destination",
+			firstStatus: dragStatusBacklog,
+			finalStatus: dragStatusBacklog,
+		},
+		{
+			name:        "cross from left destination to right destination",
+			firstStatus: dragStatusBacklog,
+			finalStatus: "in-progress",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			b, cfg := newDragFilesystemBoard(t, nil, &task.Task{
+				ID: 1, Title: "Change destination", Status: dragStatusTodo,
+			})
+			source := targetForTask(t, b, 1)
+			sourceColumn := columnTargetForStatus(t, b, dragStatusTodo)
+			firstDestination := columnTargetForStatus(t, b, tt.firstStatus)
+			finalDestination := columnTargetForStatus(t, b, tt.finalStatus)
+
+			_, _ = b.Update(tea.MouseMsg{
+				X: source.rect.x0 + 1, Y: source.rect.y0,
+				Button: tea.MouseButtonLeft, Action: tea.MouseActionPress,
+			})
+			_, _ = b.Update(tea.MouseMsg{
+				X: firstDestination.rect.x0 + 1, Y: firstDestination.rect.y0,
+				Button: tea.MouseButtonLeft, Action: tea.MouseActionMotion,
+			})
+			if view := b.View(); !strings.Contains(view, "release to move") {
+				t.Fatalf("first destination did not activate drag hint:\n%s", view)
+			}
+
+			_, _ = b.Update(tea.MouseMsg{
+				X: sourceColumn.rect.x0 + 1, Y: sourceColumn.rect.y0,
+				Button: tea.MouseButtonLeft, Action: tea.MouseActionMotion,
+			})
+			if view := b.View(); strings.Contains(view, "release to move") {
+				t.Fatalf("source hover did not clear drag hint:\n%s", view)
+			}
+
+			_, _ = b.Update(tea.MouseMsg{
+				X: finalDestination.rect.x0 + 1, Y: finalDestination.rect.y0,
+				Button: tea.MouseButtonLeft, Action: tea.MouseActionMotion,
+			})
+			if view := b.View(); !strings.Contains(view, "Move #1 → "+tt.finalStatus) {
+				t.Fatalf("final destination did not reactivate drag hint:\n%s", view)
+			}
+			_, _ = b.Update(tea.MouseMsg{
+				X: finalDestination.rect.x0 + 1, Y: finalDestination.rect.y0,
+				Button: tea.MouseButtonLeft, Action: tea.MouseActionRelease,
+			})
+
+			if got := readDragTask(t, cfg, 1).Status; got != tt.finalStatus {
+				t.Fatalf("status=%q, want %q", got, tt.finalStatus)
+			}
+		})
+	}
+}
+
 func TestMouseDragCanceledReleaseZonesDoNotMutate(t *testing.T) {
 	tests := []struct {
 		name string
@@ -480,6 +547,93 @@ func TestMouseDragSuccessfulMoveAppliesClaimTimestampsAndActivity(t *testing.T) 
 	}
 }
 
+func TestMouseDragAutoClaimedTaskCanMoveBackAndPreservesClaim(t *testing.T) {
+	b, cfg := newDragFilesystemBoard(t, nil, &task.Task{
+		ID: 1, Title: "Round trip", Status: dragStatusBacklog,
+	})
+
+	dragTask(t, b, 1, "in-progress", tea.MouseButtonLeft, true)
+	inProgress := readDragTask(t, cfg, 1)
+	if inProgress.ClaimedBy == "" {
+		t.Fatal("move to require_claim status did not auto-claim")
+	}
+	claimant := inProgress.ClaimedBy
+	claimedAt := inProgress.ClaimedAt
+
+	dragTask(t, b, 1, dragStatusTodo, tea.MouseButtonLeft, true)
+	inTodo := readDragTask(t, cfg, 1)
+	if inTodo.Status != dragStatusTodo {
+		t.Fatalf("status=%q, want todo", inTodo.Status)
+	}
+	if inTodo.ClaimedBy != claimant || !sameTimePointer(inTodo.ClaimedAt, claimedAt) {
+		t.Fatalf("todo move changed claim: got %q/%v, want %q/%v",
+			inTodo.ClaimedBy, inTodo.ClaimedAt, claimant, claimedAt)
+	}
+
+	dragTask(t, b, 1, dragStatusBacklog, tea.MouseButtonLeft, true)
+	inBacklog := readDragTask(t, cfg, 1)
+	if inBacklog.Status != dragStatusBacklog {
+		t.Fatalf("status=%q, want backlog", inBacklog.Status)
+	}
+	if inBacklog.ClaimedBy != claimant || !sameTimePointer(inBacklog.ClaimedAt, claimedAt) {
+		t.Fatalf("backlog move changed claim: got %q/%v, want %q/%v",
+			inBacklog.ClaimedBy, inBacklog.ClaimedAt, claimant, claimedAt)
+	}
+}
+
+func TestMouseDragExistingClaimIsPreservedWhileMoving(t *testing.T) {
+	claimedAt := time.Now()
+	b, cfg := newDragFilesystemBoard(t, nil, &task.Task{
+		ID:        1,
+		Title:     "Claimed elsewhere",
+		Status:    "in-progress",
+		ClaimedBy: "other-agent",
+		ClaimedAt: &claimedAt,
+	})
+
+	dragTask(t, b, 1, dragStatusTodo, tea.MouseButtonLeft, true)
+	moved := readDragTask(t, cfg, 1)
+	if moved.Status != dragStatusTodo {
+		t.Fatalf("status=%q, want todo", moved.Status)
+	}
+	if moved.ClaimedBy != "other-agent" || !sameTimePointer(moved.ClaimedAt, &claimedAt) {
+		t.Fatalf("claim changed: got %q/%v", moved.ClaimedBy, moved.ClaimedAt)
+	}
+	if b.err != nil {
+		t.Fatalf("claimed TUI move returned error: %v", b.err)
+	}
+}
+
+func TestKeyboardMovePreservesExistingClaim(t *testing.T) {
+	claimedAt := time.Now()
+	b, cfg := newDragFilesystemBoard(t, nil, &task.Task{
+		ID:        1,
+		Title:     "Keyboard claimed move",
+		Status:    "in-progress",
+		ClaimedBy: "other-agent",
+		ClaimedAt: &claimedAt,
+	})
+	if !b.selectTask(1) {
+		t.Fatal("could not select claimed task")
+	}
+
+	_, _ = b.movePrev()
+	moved := readDragTask(t, cfg, 1)
+	if moved.Status != dragStatusTodo {
+		t.Fatalf("status=%q, want todo", moved.Status)
+	}
+	if moved.ClaimedBy != "other-agent" || !sameTimePointer(moved.ClaimedAt, &claimedAt) {
+		t.Fatalf("keyboard move changed claim: got %q/%v", moved.ClaimedBy, moved.ClaimedAt)
+	}
+}
+
+func sameTimePointer(a, b *time.Time) bool {
+	if a == nil || b == nil {
+		return a == nil && b == nil
+	}
+	return a.Equal(*b)
+}
+
 func TestMouseDragMoveToDoneSetsCompletionTimestamp(t *testing.T) {
 	b, cfg := newDragFilesystemBoard(t, nil, &task.Task{
 		ID: 1, Title: "Complete me", Status: dragStatusBacklog,
@@ -491,8 +645,7 @@ func TestMouseDragMoveToDoneSetsCompletionTimestamp(t *testing.T) {
 	}
 }
 
-func TestMouseDragRejectedMovesReloadAndKeepTaskSelected(t *testing.T) {
-	now := time.Now()
+func TestMouseDragRejectedWIPMovesReloadAndKeepTaskSelected(t *testing.T) {
 	tests := []struct {
 		name      string
 		configure func(*config.Config)
@@ -520,17 +673,6 @@ func TestMouseDragRejectedMovesReloadAndKeepTaskSelected(t *testing.T) {
 			},
 			target:    dragStatusTodo,
 			errorText: "expedite WIP",
-		},
-		{
-			name: "claim conflict",
-			tasks: []*task.Task{
-				{
-					ID: 1, Title: "Claimed elsewhere", Status: dragStatusBacklog,
-					ClaimedBy: "other-agent", ClaimedAt: &now,
-				},
-			},
-			target:    dragStatusTodo,
-			errorText: "claimed",
 		},
 	}
 
