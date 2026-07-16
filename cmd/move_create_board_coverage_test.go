@@ -149,16 +149,22 @@ func TestExecuteMove_WriteError(t *testing.T) {
 	}
 	createTaskFile(t, cfg.TasksPath(), 1, "test-task")
 
-	// Make the task file read-only.
+	// Replace the task file with a directory to force a write error.
+	// task.Write now handles chmod-readonly files (chmod dance), so
+	// simple chmod 400 no longer triggers write errors.
 	path, findErr := task.FindByID(cfg.TasksPath(), 1)
 	if findErr != nil {
 		t.Fatal(findErr)
 	}
-	chmodErr := os.Chmod(path, 0o400)
-	if chmodErr != nil {
-		t.Fatal(chmodErr)
+	rmErr := os.Remove(path)
+	if rmErr != nil {
+		t.Fatal(rmErr)
 	}
-	t.Cleanup(func() { _ = os.Chmod(path, 0o600) })
+	mkErr := os.Mkdir(path, 0o755) //nolint:gosec // test dir
+	if mkErr != nil {
+		t.Fatal(mkErr)
+	}
+	t.Cleanup(func() { _ = os.RemoveAll(path) })
 
 	cmd := newMoveCmd()
 	_, _, err = executeMove(cfg, 1, cmd, []string{"1", "todo"})

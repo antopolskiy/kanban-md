@@ -49,6 +49,9 @@ func EnsureConsistency(cfg *config.Config) (ConsistencyReport, error) {
 		report.Repairs = append(report.Repairs, nextIDRepair)
 	}
 
+	// Fix file permissions to match claim state (silent, best-effort).
+	repairFilePermissions(tasks, cfg.ClaimTimeoutDuration())
+
 	return report, nil
 }
 
@@ -255,4 +258,39 @@ func chooseTaskPath(tasksDir string, t *Task, currentPath string, occupied map[s
 			return candidate
 		}
 	}
+}
+
+// repairFilePermissions ensures file permissions match claim state.
+// Claimed (non-expired) tasks should be read-only (0o444).
+// Unclaimed (or expired) tasks should be writable (0o600).
+// Errors are silently ignored (best-effort for filesystems without Unix permissions).
+func repairFilePermissions(tasks []*Task, timeout time.Duration) {
+	for _, t := range tasks {
+		if t.File == "" {
+			continue
+		}
+		claimed := isActiveClaim(t, timeout)
+		info, err := os.Stat(t.File)
+		if err != nil {
+			continue
+		}
+		isWritable := info.Mode().Perm()&0o200 != 0 //nolint:mnd // owner-write bit
+		if claimed && isWritable {
+			_ = os.Chmod(t.File, fileModeReadOnly)
+		} else if !claimed && !isWritable {
+			_ = os.Chmod(t.File, fileMode)
+		}
+	}
+}
+
+// isActiveClaim returns true if the task has a non-expired claim.
+// Unlike CheckClaim, this is a pure read-only check that does not mutate the task.
+func isActiveClaim(t *Task, timeout time.Duration) bool {
+	if t.ClaimedBy == "" {
+		return false
+	}
+	if timeout > 0 && t.ClaimedAt != nil && time.Since(*t.ClaimedAt) > timeout {
+		return false
+	}
+	return true
 }

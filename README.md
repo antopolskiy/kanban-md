@@ -659,6 +659,8 @@ kanban-md is designed for concurrent work by multiple agents (AI or human) throu
 
 Claims provide cooperative locking — an agent claims a task before working on it, preventing other agents from picking the same task. Claims expire after the configured timeout (default: 1 hour).
 
+On Unix-like systems, kanban-md also makes actively claimed task files read-only. Commands from the current claimant temporarily unlock the file while updating it, then restore read-only permissions; releasing or expiring the claim makes the file writable again. This protects against accidental direct edits by another process running as the same user, but it is not a security boundary: that user can still change permissions, rename, or delete the file.
+
 Statuses with `require_claim: true` (default: `in-progress` and `review`) enforce that every `move` or `edit` includes `--claim <name>`. This prevents accidental anonymous moves in multi-agent environments.
 
 ```bash

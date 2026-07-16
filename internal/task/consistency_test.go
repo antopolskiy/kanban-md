@@ -3,6 +3,7 @@ package task
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"testing"
 	"time"
@@ -133,5 +134,120 @@ func assertTaskFilename(t *testing.T, cfg *config.Config, id int, wantBase strin
 	}
 	if filepath.Base(path) != wantBase {
 		t.Fatalf("task #%d filename = %s, want %s", id, filepath.Base(path), wantBase)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// File permission self-healing tests
+// ---------------------------------------------------------------------------
+
+func TestRepairFilePermissions_ClaimedWritableGetsLocked(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("file permission checks differ on Windows")
+	}
+	dir := t.TempDir()
+	path := filepath.Join(dir, "001-claimed.md")
+
+	now := time.Now()
+	tk := &Task{
+		ID: 1, Title: "Claimed", Status: "in-progress", Priority: "high",
+		Created: now, Updated: now, ClaimedBy: "agent-x", ClaimedAt: &now,
+		File: path,
+	}
+	mustWriteTask(t, path, tk)
+
+	// File is 0o600 after write (because Write locks it, but let's force writable
+	// to simulate git pull resetting permissions).
+	if err := os.Chmod(path, fileMode); err != nil {
+		t.Fatal(err)
+	}
+
+	repairFilePermissions([]*Task{tk}, time.Hour)
+
+	info, _ := os.Stat(path)
+	if info.Mode().Perm()&0o200 != 0 {
+		t.Errorf("claimed writable file should be locked after repair, got %o", info.Mode().Perm())
+	}
+}
+
+func TestRepairFilePermissions_UnclaimedReadOnlyGetsUnlocked(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("file permission checks differ on Windows")
+	}
+	dir := t.TempDir()
+	path := filepath.Join(dir, "001-unclaimed.md")
+
+	now := time.Now()
+	tk := &Task{
+		ID: 1, Title: "Unclaimed", Status: "todo", Priority: "medium",
+		Created: now, Updated: now,
+		File: path,
+	}
+	mustWriteTask(t, path, tk)
+
+	// Force read-only to simulate stale permissions.
+	if err := os.Chmod(path, fileModeReadOnly); err != nil {
+		t.Fatal(err)
+	}
+
+	repairFilePermissions([]*Task{tk}, time.Hour)
+
+	info, _ := os.Stat(path)
+	if info.Mode().Perm()&0o200 == 0 {
+		t.Errorf("unclaimed read-only file should be unlocked after repair, got %o", info.Mode().Perm())
+	}
+}
+
+func TestRepairFilePermissions_ExpiredClaimGetsUnlocked(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("file permission checks differ on Windows")
+	}
+	dir := t.TempDir()
+	path := filepath.Join(dir, "001-expired.md")
+
+	pastTime := time.Now().Add(-2 * time.Hour) // 2h ago, well past 1h timeout
+	tk := &Task{
+		ID: 1, Title: "Expired", Status: "in-progress", Priority: "high",
+		Created: pastTime, Updated: pastTime, ClaimedBy: "agent-old", ClaimedAt: &pastTime,
+		File: path,
+	}
+	mustWriteTask(t, path, tk)
+
+	// Force read-only.
+	if err := os.Chmod(path, fileModeReadOnly); err != nil {
+		t.Fatal(err)
+	}
+
+	repairFilePermissions([]*Task{tk}, time.Hour)
+
+	info, _ := os.Stat(path)
+	if info.Mode().Perm()&0o200 == 0 {
+		t.Errorf("expired-claim file should be unlocked after repair, got %o", info.Mode().Perm())
+	}
+}
+
+func TestIsActiveClaim(t *testing.T) {
+	now := time.Now()
+	pastTime := time.Now().Add(-2 * time.Hour) // 2h ago
+
+	tests := []struct {
+		name    string
+		task    *Task
+		timeout time.Duration
+		want    bool
+	}{
+		{"unclaimed", &Task{}, time.Hour, false},
+		{"claimed, no timeout", &Task{ClaimedBy: "x", ClaimedAt: &now}, 0, true},
+		{"claimed, within timeout", &Task{ClaimedBy: "x", ClaimedAt: &now}, time.Hour, true},
+		{"claimed, expired", &Task{ClaimedBy: "x", ClaimedAt: &pastTime}, time.Hour, false},
+		{"claimed, no timestamp", &Task{ClaimedBy: "x"}, time.Hour, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := isActiveClaim(tt.task, tt.timeout)
+			if got != tt.want {
+				t.Errorf("isActiveClaim() = %v, want %v", got, tt.want)
+			}
+		})
 	}
 }

@@ -305,12 +305,18 @@ func TestSoftDeleteAndLog_WriteError(t *testing.T) {
 		t.Fatal(readErr)
 	}
 
-	// Make the task file read-only to trigger a write error.
-	chmodErr := os.Chmod(path, 0o400)
-	if chmodErr != nil {
-		t.Fatal(chmodErr)
+	// Replace the task file with a directory to force a write error.
+	// task.Write now handles chmod-readonly files (chmod dance for claimed
+	// file protection), so simple chmod 400 no longer triggers write errors.
+	rmErr := os.Remove(path)
+	if rmErr != nil {
+		t.Fatal(rmErr)
 	}
-	t.Cleanup(func() { _ = os.Chmod(path, 0o600) })
+	mkErr := os.Mkdir(path, 0o755) //nolint:gosec // test dir
+	if mkErr != nil {
+		t.Fatal(mkErr)
+	}
+	t.Cleanup(func() { _ = os.RemoveAll(path) })
 
 	err = softDeleteAndLog(cfg, path, tk)
 	if err == nil {
@@ -363,16 +369,22 @@ func TestDeleteSingleTask_SoftDeleteWriteError(t *testing.T) {
 		t.Skip("chmod does not restrict file writes on Windows")
 	}
 
-	// Make the task file read-only to trigger a write error.
+	// Replace the task file with a directory to force a write error.
+	// task.Write now handles chmod-readonly files (chmod dance), so
+	// simple chmod 400 no longer triggers write errors.
 	path, findErr := task.FindByID(cfg.TasksPath(), 1)
 	if findErr != nil {
 		t.Fatal(findErr)
 	}
-	chmodErr := os.Chmod(path, 0o400)
-	if chmodErr != nil {
-		t.Fatal(chmodErr)
+	rmErr := os.Remove(path)
+	if rmErr != nil {
+		t.Fatal(rmErr)
 	}
-	t.Cleanup(func() { _ = os.Chmod(path, 0o600) })
+	mkErr := os.Mkdir(path, 0o755) //nolint:gosec // test dir
+	if mkErr != nil {
+		t.Fatal(mkErr)
+	}
+	t.Cleanup(func() { _ = os.RemoveAll(path) })
 
 	err = deleteSingleTask(cfg, 1, true)
 	if err == nil {

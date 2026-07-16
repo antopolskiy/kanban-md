@@ -3,6 +3,7 @@ package task
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -95,6 +96,172 @@ func TestWriteNoBody(t *testing.T) {
 
 	if loaded.Body != "" {
 		t.Errorf("Body = %q, want empty", loaded.Body)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// File protection: chmod behavior in Write/WriteAndRename
+// ---------------------------------------------------------------------------
+
+const testClaimAgent = "agent-x"
+
+func newTestTask(title string) *Task {
+	now := time.Now()
+	return &Task{
+		ID:       1,
+		Title:    title,
+		Status:   "todo",
+		Priority: "medium",
+		Created:  now,
+		Updated:  now,
+	}
+}
+
+func TestWrite_ClaimedTaskBecomesReadOnly(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("file permission checks differ on Windows")
+	}
+	dir := t.TempDir()
+	path := filepath.Join(dir, "001-claimed.md")
+
+	tk := newTestTask("Claimed")
+	now := time.Now()
+	tk.ClaimedBy = testClaimAgent
+	tk.ClaimedAt = &now
+
+	if err := Write(path, tk); err != nil {
+		t.Fatalf("Write() error: %v", err)
+	}
+
+	info, err := os.Stat(path)
+	if err != nil {
+		t.Fatalf("Stat error: %v", err)
+	}
+	if info.Mode().Perm()&0o200 != 0 {
+		t.Errorf("claimed file should be read-only (0o444), got %o", info.Mode().Perm())
+	}
+}
+
+func TestWrite_UnclaimedTaskStaysWritable(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("file permission checks differ on Windows")
+	}
+	dir := t.TempDir()
+	path := filepath.Join(dir, "001-unclaimed.md")
+
+	tk := newTestTask("Unclaimed")
+
+	if err := Write(path, tk); err != nil {
+		t.Fatalf("Write() error: %v", err)
+	}
+
+	info, err := os.Stat(path)
+	if err != nil {
+		t.Fatalf("Stat error: %v", err)
+	}
+	if info.Mode().Perm()&0o200 == 0 {
+		t.Errorf("unclaimed file should be writable (0o600), got %o", info.Mode().Perm())
+	}
+}
+
+func TestWrite_OverwriteReadOnlyFile(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("file permission checks differ on Windows")
+	}
+	dir := t.TempDir()
+	path := filepath.Join(dir, "001-overwrite.md")
+
+	now := time.Now()
+	tk := newTestTask("Overwrite")
+	tk.ClaimedBy = testClaimAgent
+	tk.ClaimedAt = &now
+
+	// First write → becomes 0o444.
+	if err := Write(path, tk); err != nil {
+		t.Fatalf("first Write() error: %v", err)
+	}
+
+	// Second write on same 0o444 file should succeed.
+	tk.Priority = "high"
+	if err := Write(path, tk); err != nil {
+		t.Fatalf("second Write() on read-only file error: %v", err)
+	}
+
+	// Still read-only after overwrite.
+	info, _ := os.Stat(path)
+	if info.Mode().Perm()&0o200 != 0 {
+		t.Errorf("file should still be read-only after overwrite, got %o", info.Mode().Perm())
+	}
+}
+
+func TestWrite_ReleaseRestoresWritable(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("file permission checks differ on Windows")
+	}
+	dir := t.TempDir()
+	path := filepath.Join(dir, "001-release.md")
+
+	now := time.Now()
+	tk := newTestTask("Release")
+	tk.ClaimedBy = testClaimAgent
+	tk.ClaimedAt = &now
+
+	// Write claimed → 0o444.
+	if err := Write(path, tk); err != nil {
+		t.Fatalf("Write() error: %v", err)
+	}
+	info, _ := os.Stat(path)
+	if info.Mode().Perm()&0o200 != 0 {
+		t.Fatal("precondition: claimed file should be read-only")
+	}
+
+	// Release claim and write again → 0o600.
+	tk.ClaimedBy = ""
+	tk.ClaimedAt = nil
+	if err := Write(path, tk); err != nil {
+		t.Fatalf("Write() after release error: %v", err)
+	}
+	info, _ = os.Stat(path)
+	if info.Mode().Perm()&0o200 == 0 {
+		t.Errorf("released file should be writable, got %o", info.Mode().Perm())
+	}
+}
+
+func TestWriteAndRename_ClaimedPreservesProtection(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("file permission checks differ on Windows")
+	}
+	dir := t.TempDir()
+	oldPath := filepath.Join(dir, "001-old-title.md")
+
+	now := time.Now()
+	tk := newTestTask("Old title")
+	tk.ClaimedBy = testClaimAgent
+	tk.ClaimedAt = &now
+
+	if err := Write(oldPath, tk); err != nil {
+		t.Fatalf("initial Write() error: %v", err)
+	}
+
+	// Rename by changing title.
+	tk.Title = "New title"
+	newPath, err := WriteAndRename(oldPath, tk, "Old title")
+	if err != nil {
+		t.Fatalf("WriteAndRename() error: %v", err)
+	}
+
+	// Old file gone.
+	if _, statErr := os.Stat(oldPath); !os.IsNotExist(statErr) {
+		t.Error("old file should be removed after rename")
+	}
+
+	// New file is read-only.
+	info, err := os.Stat(newPath)
+	if err != nil {
+		t.Fatalf("Stat new file error: %v", err)
+	}
+	if info.Mode().Perm()&0o200 != 0 {
+		t.Errorf("renamed claimed file should be read-only, got %o", info.Mode().Perm())
 	}
 }
 

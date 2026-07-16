@@ -13,6 +13,9 @@ import (
 
 const fileMode = 0o600
 
+// fileModeReadOnly is used for claimed task files to prevent external modification.
+const fileModeReadOnly = 0o444
+
 // Read parses a task file and returns the Task with body populated.
 func Read(path string) (*Task, error) {
 	data, err := os.ReadFile(path) //nolint:gosec // task path from trusted source
@@ -58,7 +61,19 @@ func Write(path string, t *Task) error {
 		}
 	}
 
-	return os.WriteFile(path, buf.Bytes(), fileMode)
+	// If the file exists and is read-only (claimed), make it writable before writing.
+	unlockForWrite(path)
+
+	if err := os.WriteFile(path, buf.Bytes(), fileMode); err != nil {
+		return err
+	}
+
+	// If the task is claimed, lock the file to prevent external modifications.
+	if t.ClaimedBy != "" {
+		lockFile(path)
+	}
+
+	return nil
 }
 
 // splitFrontmatter splits a markdown file into YAML frontmatter and body.
@@ -113,6 +128,18 @@ func WriteAndRename(path string, t *Task, oldTitle string) (string, error) {
 		}
 	}
 	return newPath, nil
+}
+
+// unlockForWrite makes a file writable if it exists and is read-only.
+// Errors are silently ignored (best-effort for filesystems without Unix permissions).
+func unlockForWrite(path string) {
+	_ = os.Chmod(path, fileMode)
+}
+
+// lockFile makes a file read-only to prevent external modifications.
+// Errors are silently ignored (best-effort for filesystems without Unix permissions).
+func lockFile(path string) {
+	_ = os.Chmod(path, fileModeReadOnly)
 }
 
 func validateRequiredFields(t *Task) error {

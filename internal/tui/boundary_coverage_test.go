@@ -52,20 +52,35 @@ func setupSingleTaskBoard(t *testing.T, title, priority string) *tui.Board {
 	return b
 }
 
-// makeReadOnly sets a file to read-only and registers a cleanup to restore permissions.
-func makeReadOnly(t *testing.T, path string) {
+// makeReadOnly forces task.Write to fail by replacing the file with a directory
+// of the same name. os.WriteFile on a directory path returns "is a directory".
+// task.Write now handles read-only files (chmod dance for claimed file
+// protection), so simple chmod 444 no longer triggers write errors.
+// Returns the original file content so restoreReadable can recreate it.
+func makeReadOnly(t *testing.T, path string) []byte {
 	t.Helper()
-	if err := os.Chmod(path, 0o444); err != nil { //nolint:gosec // test intentionally uses restrictive perms
+	data, err := os.ReadFile(path) //nolint:gosec // test file
+	if err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() {
-		_ = os.Chmod(path, 0o600)
+		_ = os.RemoveAll(path)
+		_ = os.WriteFile(path, data, 0o600)
 	})
+	if err := os.Remove(path); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Mkdir(path, 0o755); err != nil { //nolint:gosec // test dir
+		t.Fatal(err)
+	}
+	return data
 }
 
-// restoreReadable restores a read-only file to readable/writable for verification.
-func restoreReadable(path string) {
-	_ = os.Chmod(path, 0o600)
+// restoreReadable removes the directory placeholder and recreates the original
+// file so tests can task.Read it back to verify it was not modified.
+func restoreReadable(path string, data []byte) {
+	_ = os.RemoveAll(path)
+	_ = os.WriteFile(path, data, 0o600)
 }
 
 // --- tickCmd: verify Init() returns a cmd that produces TickMsg ---
@@ -166,7 +181,7 @@ func TestBoundary_ExecuteMove_WriteError(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	makeReadOnly(t, path)
+	origData := makeReadOnly(t, path)
 
 	// Open move dialog and move to "todo".
 	b = sendKey(b, "m")
@@ -179,7 +194,7 @@ func TestBoundary_ExecuteMove_WriteError(t *testing.T) {
 	_ = b.View()
 
 	// The task status should be reverted on disk (still backlog, not todo).
-	restoreReadable(path)
+	restoreReadable(path, origData)
 	tk, err := task.Read(path)
 	if err != nil {
 		t.Fatal(err)
@@ -310,9 +325,18 @@ func TestBoundary_ExecuteCreate_ConfigSaveError(t *testing.T) {
 	b.SetNow(testNow)
 	b.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 
+	if runtime.GOOS == "windows" {
+		t.Skip("file permission checks differ on Windows")
+	}
+
 	// Make config file read-only so cfg.Save() fails after task creation.
+	// Note: we use chmod (not the directory trick) because config files are
+	// not subject to the task chmod dance — config.Load only needs read access.
 	cfgPath := filepath.Join(kanbanDir, "config.yml")
-	makeReadOnly(t, cfgPath)
+	if err := os.Chmod(cfgPath, 0o400); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(cfgPath, 0o600) })
 
 	// Open create dialog and type a title, then Enter to create immediately.
 	b = sendKey(b, "c")
@@ -326,7 +350,7 @@ func TestBoundary_ExecuteCreate_ConfigSaveError(t *testing.T) {
 	// loadTasks() call. The task file was still created on disk (the write
 	// succeeded), but the config wasn't updated. Verify the config on disk
 	// still has the old NextID (because Save failed).
-	restoreReadable(cfgPath)
+	_ = os.Chmod(cfgPath, 0o600)
 	reloaded, err := config.Load(kanbanDir)
 	if err != nil {
 		t.Fatal(err)
@@ -385,14 +409,14 @@ func TestBoundary_ExecuteDelete_WriteError(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	makeReadOnly(t, path)
+	origData := makeReadOnly(t, path)
 
 	// Confirm delete -- Write should fail, but loadTasks clears b.err.
 	b = sendKey(b, "y")
 	_ = b.View()
 
 	// The task should NOT be archived on disk since the write failed.
-	restoreReadable(path)
+	restoreReadable(path, origData)
 	tk, err := task.Read(path)
 	if err != nil {
 		t.Fatal(err)
@@ -452,7 +476,7 @@ func TestBoundary_PriorityChange_WriteError(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	makeReadOnly(t, path)
+	origData := makeReadOnly(t, path)
 
 	// Raise priority -- should fail on write and revert.
 	b = sendKey(b, "+")
@@ -462,7 +486,7 @@ func TestBoundary_PriorityChange_WriteError(t *testing.T) {
 	}
 
 	// Verify priority was reverted (still "high", not "critical").
-	restoreReadable(path)
+	restoreReadable(path, origData)
 	tk, err := task.Read(path)
 	if err != nil {
 		t.Fatal(err)
