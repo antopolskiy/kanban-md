@@ -1339,6 +1339,11 @@ var (
 	statusBarStyle = lipgloss.NewStyle().
 			Foreground(lipgloss.Color("241"))
 
+	statusShortcutStyle = lipgloss.NewStyle().
+				Bold(true).
+				Underline(true).
+				Foreground(lipgloss.Color("252"))
+
 	errorStyle = lipgloss.NewStyle().
 			Foreground(lipgloss.Color("196")).
 			Bold(true)
@@ -1742,23 +1747,104 @@ func (b *Board) renderStatusBar() string {
 	if b.sortReverse {
 		arrow = "↓"
 	}
-	filter := ""
-	if b.filterQuery != "" {
-		filter = fmt.Sprintf(" | filter:%q", b.filterQuery)
+
+	cardLabel := "cards"
+	if total == 1 {
+		cardLabel = "card"
 	}
-	status := fmt.Sprintf(" %s | %d tasks%s | c:create e:edit m:move n/p:status +/-:priority d:del s:sort[%s%s] /:search ?:help q:quit",
-		b.cfg.Board.Name, total, filter, b.sortField, arrow)
+	parts := []statusBarPart{{text: fmt.Sprintf(" %d %s | ", total, cardLabel)}}
+	parts = appendStatusShortcut(parts, "?", "help")
 	if b.mouseEnabled {
-		status = " mouse:click/double-click/wheel |" + status
+		parts = append(parts, statusBarPart{text: " | mouse"})
 	}
-	status = truncate(status, b.width)
+	if b.filterQuery != "" {
+		parts = append(parts, statusBarPart{text: fmt.Sprintf(" | filter:%q", b.filterQuery)})
+	}
+	parts = append(parts, statusBarPart{text: " | "})
+	actions := [][2]string{
+		{"c", "create"},
+		{"e", "edit"},
+		{"m", "move"},
+		{"+/-", "priority"},
+		{"d", "delete"},
+		{"s", fmt.Sprintf("sort[%s%s]", b.sortField, arrow)},
+		{"/", "search"},
+		{"q", "quit"},
+	}
+	for i, action := range actions {
+		if i > 0 {
+			parts = append(parts, statusBarPart{text: " "})
+		}
+		parts = appendStatusShortcut(parts, action[0], action[1])
+	}
+	status := renderStatusBarParts(parts, b.width)
 
 	if b.err != nil {
 		errStr := errorStyle.Render(truncate("Error: "+b.err.Error(), b.width))
-		return errStr + "\n" + statusBarStyle.Render(status)
+		return errStr + "\n" + status
 	}
 
-	return statusBarStyle.Render(status)
+	return status
+}
+
+type statusBarPart struct {
+	text     string
+	shortcut bool
+}
+
+func appendStatusShortcut(parts []statusBarPart, shortcut, label string) []statusBarPart {
+	if len([]rune(shortcut)) == 1 {
+		if idx := strings.Index(label, shortcut); idx >= 0 {
+			parts = append(parts,
+				statusBarPart{text: label[:idx]},
+				statusBarPart{text: shortcut, shortcut: true},
+				statusBarPart{text: label[idx+len(shortcut):]},
+			)
+			return parts
+		}
+	}
+	return append(parts,
+		statusBarPart{text: shortcut, shortcut: true},
+		statusBarPart{text: " " + label},
+	)
+}
+
+func renderStatusBarParts(parts []statusBarPart, width int) string {
+	var plain strings.Builder
+	for _, part := range parts {
+		plain.WriteString(part.text)
+	}
+
+	full := plain.String()
+	clipped := truncate(full, width)
+	prefix := clipped
+	tail := ""
+	if clipped != full {
+		prefix = strings.TrimSuffix(clipped, "...")
+		tail = "..."
+	}
+
+	remaining := len(prefix)
+	var rendered strings.Builder
+	for _, part := range parts {
+		if remaining == 0 {
+			break
+		}
+		text := part.text
+		if len(text) > remaining {
+			text = text[:remaining]
+		}
+		style := statusBarStyle
+		if part.shortcut {
+			style = statusShortcutStyle
+		}
+		rendered.WriteString(style.Render(text))
+		remaining -= len(text)
+	}
+	if tail != "" {
+		rendered.WriteString(statusBarStyle.Render(tail))
+	}
+	return rendered.String()
 }
 
 func (b *Board) viewDetail() string {

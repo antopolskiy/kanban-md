@@ -37,4 +37,4 @@
                                                                                                                         
                                                                                                                         
                                                                                                                         
- Empty Board | 0 tasks | c:create e:edit m:move n/p:status +/-:priority d:del s:sort[priority↓] /:search ?:help q:quit  
+ 0 cards | ? help | create edit move +/- priority delete sort[priority↓] / search quit                                  

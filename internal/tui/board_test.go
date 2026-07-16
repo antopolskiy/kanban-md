@@ -426,8 +426,8 @@ func TestBoard_StatusBarShowsQuit(t *testing.T) {
 
 	v := b.View()
 
-	if !containsStr(v, "q:quit") {
-		t.Error("expected status bar to mention q:quit")
+	if !containsStr(v, "quit") {
+		t.Error("expected status bar to mention quit")
 	}
 }
 
@@ -436,8 +436,8 @@ func TestBoard_StatusBarShowsPriorityHint(t *testing.T) {
 
 	v := b.View()
 
-	if !containsStr(v, "+/-:priority") {
-		t.Error("expected status bar to contain +/-:priority hint")
+	if !containsStr(v, "+/- priority") {
+		t.Error("expected status bar to contain +/- priority hint")
 	}
 }
 
@@ -2380,7 +2380,7 @@ func TestBoard_SortCycleUpdatesStatusBar(t *testing.T) {
 	b, _ := setupTestBoard(t)
 
 	// Default sort is priority, descending.
-	if !containsStr(b.View(), "s:sort[priority↓]") {
+	if !containsStr(b.View(), "sort[priority↓]") {
 		t.Fatalf("expected default sort priority↓ in status bar")
 	}
 
@@ -2388,7 +2388,7 @@ func TestBoard_SortCycleUpdatesStatusBar(t *testing.T) {
 	want := []string{"created", "updated", "title", "priority"}
 	for _, field := range want {
 		b = sendKey(b, "s")
-		if !containsStr(b.View(), "s:sort["+field) {
+		if !containsStr(b.View(), "sort["+field) {
 			t.Errorf("expected sort field %q after pressing s, got:\n%s", field, b.View())
 		}
 	}
@@ -2399,12 +2399,12 @@ func TestBoard_SortReverseTogglesArrow(t *testing.T) {
 
 	// 'S' flips descending (↓) to ascending (↑).
 	b = sendKey(b, "S")
-	if !containsStr(b.View(), "s:sort[priority↑]") {
+	if !containsStr(b.View(), "sort[priority↑]") {
 		t.Errorf("expected ascending arrow after S, got:\n%s", b.View())
 	}
 
 	b = sendKey(b, "S")
-	if !containsStr(b.View(), "s:sort[priority↓]") {
+	if !containsStr(b.View(), "sort[priority↓]") {
 		t.Errorf("expected descending arrow after second S, got:\n%s", b.View())
 	}
 }

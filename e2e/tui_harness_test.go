@@ -26,6 +26,8 @@ const (
 	tuiExitTimeout    = 3 * time.Second
 	tuiKeyDelay       = 12 * time.Millisecond
 	tuiTaskTimeout    = 2 * time.Second
+	tuiBoardStatus    = "? help"
+	tuiMouseStatus    = tuiBoardStatus + " | mouse"
 )
 
 var (
