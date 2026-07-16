@@ -18,19 +18,29 @@ import (
 	"github.com/antopolskiy/kanban-md/internal/watcher"
 )
 
-var tuiCmd = &cobra.Command{
-	Use:   "tui",
-	Short: "Open the interactive board UI",
-	Long: `Launches the interactive terminal UI for browsing and managing the
+var tuiCmd = newTUICommand()
+
+func newTUICommand() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "tui",
+		Short: "Open the interactive board UI",
+		Long: `Launches the interactive terminal UI for browsing and managing the
 kanban board. The board live-reloads when task files change on disk.
 
 Navigate with arrow keys or vim-style h/j/k/l, press ? for help.`,
-	RunE: runTUI,
+		RunE: runTUI,
+	}
+	addTUIFlags(cmd)
+	return cmd
+}
+
+func addTUIFlags(cmd *cobra.Command) {
+	cmd.Flags().Bool("hide-empty-columns", false, "hide empty columns in TUI (overrides config)")
+	cmd.Flags().Bool("show-empty-columns", false, "show empty columns in TUI (overrides config)")
+	cmd.Flags().Bool("mouse", false, "enable mouse navigation in TUI")
 }
 
 func init() {
-	tuiCmd.Flags().Bool("hide-empty-columns", false, "hide empty columns in TUI (overrides config)")
-	tuiCmd.Flags().Bool("show-empty-columns", false, "show empty columns in TUI (overrides config)")
 	rootCmd.AddCommand(tuiCmd)
 }
 
@@ -39,14 +49,12 @@ func RunTUI(dir string) error {
 	if dir != "" {
 		flagDir = dir
 	}
-	return runTUI(tuiCmd, nil)
+	return runTUI(newTUICommand(), nil)
 }
 
 func runTUI(cmd *cobra.Command, _ []string) error {
 	if cmd == nil {
-		cmd = &cobra.Command{Use: "tui"}
-		cmd.Flags().Bool("hide-empty-columns", false, "")
-		cmd.Flags().Bool("show-empty-columns", false, "")
+		cmd = newTUICommand()
 	}
 
 	cfg, err := loadConfig()
@@ -65,10 +73,20 @@ func runTUI(cmd *cobra.Command, _ []string) error {
 	if err != nil {
 		return err
 	}
+	mouseEnabled, err := cmd.Flags().GetBool("mouse")
+	if err != nil {
+		return err
+	}
 
 	model := tui.NewBoard(cfg)
 	model.SetHideEmptyColumns(hideEmptyColumns)
-	p := tea.NewProgram(model, tea.WithAltScreen())
+	model.SetMouseEnabled(mouseEnabled)
+
+	programOptions := []tea.ProgramOption{tea.WithAltScreen()}
+	if mouseEnabled {
+		programOptions = append(programOptions, tea.WithMouseCellMotion())
+	}
+	p := tea.NewProgram(model, programOptions...)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()

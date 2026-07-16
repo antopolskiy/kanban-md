@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -79,6 +80,35 @@ func TestSnapshot_HelpView(t *testing.T) {
 	b, _ := setupTestBoard(t)
 	b = sendKey(b, "?") // open help
 	assertGolden(t, "help_view", b.View())
+}
+
+func TestSnapshot_MouseHelpView(t *testing.T) {
+	b, _ := setupTestBoard(t)
+	b.SetMouseEnabled(true)
+	b = sendKey(b, "?") // open help
+	assertGolden(t, "mouse_help_view", b.View())
+}
+
+func TestSnapshot_MouseDetailBackAffordance(t *testing.T) {
+	b, _ := setupTestBoard(t)
+	b.SetMouseEnabled(true)
+	b = sendKey(b, "enter")
+	assertGolden(t, "mouse_detail_back", b.View())
+}
+
+func TestSnapshot_MouseNarrowTerminal(t *testing.T) {
+	b, _ := setupTestBoard(t)
+	b.SetMouseEnabled(true)
+	b.Update(tea.WindowSizeMsg{Width: 20, Height: 10})
+	assertGolden(t, "mouse_narrow", trimSnapshotLineEnds(b.View()))
+}
+
+func trimSnapshotLineEnds(value string) string {
+	lines := strings.Split(value, "\n")
+	for i := range lines {
+		lines[i] = strings.TrimRight(lines[i], " ")
+	}
+	return strings.Join(lines, "\n")
 }
 
 func TestSnapshot_SearchActive(t *testing.T) {

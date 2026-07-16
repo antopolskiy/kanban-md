@@ -1,0 +1,10 @@
+ bac...  tod...  in-...  rev...  don...
+╭──────╮        ╭──────╮        ╭──────╮
+│ #1   │(empty) │ #3   │(empty) │ #4   │
+│ Task │        │ Task │        │ Task │
+│ A    │        │ C    │        │ D    │
+│ high │        │ high │        │ low  │
+╰──────╯        │ 2h   │        ╰──────╯
+  ↓ 1...        ╰──────╯
+
+ mouse:click/doub...
