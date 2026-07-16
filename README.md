@@ -531,6 +531,11 @@ The wheel moves the selection one task at a time in the hovered column and
 scrolls task details three lines at a time. Keyboard controls remain available
 in mouse mode.
 
+The board status line begins with the card count and `? help`, followed by the
+optional mouse indicator and the remaining actions. Shortcut characters are
+highlighted inside their action labels so the essential hints survive narrow
+terminal widths.
+
 Status moves made in the TUI preserve an existing task claim. If an unclaimed
 task enters a `require_claim` status, the TUI automatically claims it using the
 local hostname; that claim remains attached if the task later moves elsewhere.

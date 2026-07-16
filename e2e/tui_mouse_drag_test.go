@@ -17,7 +17,7 @@ func TestE2E_TUIMouseDrag_MovesTaskWithSGRAndX10(t *testing.T) {
 			session := startTUIProcessWithOptions(t, kanbanDir, tuiProcessOptions{
 				args: []string{"--mouse"},
 			})
-			session.waitForOutput("mouse:click/double-click/wheel")
+			session.waitForOutput(tuiMouseStatus)
 
 			switch protocol {
 			case "SGR":
@@ -56,7 +56,7 @@ func TestE2E_TUIMouseDrag_RejectsFullWIPColumn(t *testing.T) {
 	session := startTUIProcessWithOptions(t, kanbanDir, tuiProcessOptions{
 		args: []string{"--mouse"},
 	})
-	session.waitForOutput("mouse:click/double-click/wheel")
+	session.waitForOutput(tuiMouseStatus)
 	checkpoint := session.checkpoint()
 	session.dragSGR(1, 25)
 	session.waitForOutputSince(checkpoint, "WIP limit")
@@ -71,7 +71,7 @@ func TestE2E_TUIMouseDrag_CanCrossSourceBeforeChoosingDestination(t *testing.T) 
 	session := startTUIProcessWithOptions(t, kanbanDir, tuiProcessOptions{
 		args: []string{"--mouse"},
 	})
-	session.waitForOutput("mouse:click/double-click/wheel")
+	session.waitForOutput(tuiMouseStatus)
 
 	// Start in todo, move left to backlog, cross todo again, then choose
 	// in-progress on the right before releasing.
@@ -95,7 +95,7 @@ func TestE2E_TUIMouseDrag_AutoClaimedTaskCanMoveBack(t *testing.T) {
 	session := startTUIProcessWithOptions(t, kanbanDir, tuiProcessOptions{
 		args: []string{"--mouse"},
 	})
-	session.waitForOutput("mouse:click/double-click/wheel")
+	session.waitForOutput(tuiMouseStatus)
 
 	session.dragSGR(1, 49)
 	waitForTask(t, kanbanDir, 1, func(tk taskJSON) bool {
@@ -127,7 +127,7 @@ func TestE2E_TUIMouseDrag_MovesTaskClaimedByAnotherActor(t *testing.T) {
 	session := startTUIProcessWithOptions(t, kanbanDir, tuiProcessOptions{
 		args: []string{"--mouse"},
 	})
-	session.waitForOutput("mouse:click/double-click/wheel")
+	session.waitForOutput(tuiMouseStatus)
 	session.dragX10(49, 25)
 	waitForTask(t, kanbanDir, 1, func(tk taskJSON) bool {
 		return tk.Status == statusTodo && tk.ClaimedBy == "other-agent"

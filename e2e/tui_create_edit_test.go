@@ -11,7 +11,7 @@ import (
 func TestE2E_TUI_CreateTask_KeyboardFlow(t *testing.T) {
 	kanbanDir := initBoardWithSeededTasks(t)
 	session := startTUIProcess(t, kanbanDir)
-	session.waitForOutput("q:quit")
+	session.waitForOutput(tuiBoardStatus)
 
 	session.pressKeys("c")
 	session.waitForOutput("Create task in")
@@ -28,7 +28,7 @@ func TestE2E_TUI_CreateTask_KeyboardFlow(t *testing.T) {
 	session.waitForOutput("Step 4/4")
 	session.typeText("e2e,ui,hotkeys")
 	session.pressKeys("enter")
-	session.waitForOutput("q:quit")
+	session.waitForOutput(tuiBoardStatus)
 
 	session.pressKeys("q")
 	session.waitForExit()
@@ -67,14 +67,14 @@ func TestE2E_TUI_CreateTask_KeyboardFlow(t *testing.T) {
 func TestE2E_TUI_CreateTaskWithoutBody(t *testing.T) {
 	kanbanDir := initBoardWithSeededTasks(t)
 	session := startTUIProcess(t, kanbanDir)
-	session.waitForOutput("q:quit")
+	session.waitForOutput(tuiBoardStatus)
 
 	session.pressKeys("c")
 	session.waitForOutput("Create task in")
 	session.typeText("No body task")
 	session.pressKeys("tab", "tab", "tab")
 	session.pressKeys("enter")
-	session.waitForOutput("q:quit")
+	session.waitForOutput(tuiBoardStatus)
 
 	session.pressKeys("q")
 	session.waitForExit()
@@ -96,12 +96,12 @@ func TestE2E_TUI_CreateTaskWithoutBody(t *testing.T) {
 func TestE2E_TUI_CreateCancel_KeyboardFlow(t *testing.T) {
 	kanbanDir := initBoardWithSeededTasks(t)
 	session := startTUIProcess(t, kanbanDir)
-	session.waitForOutput("q:quit")
+	session.waitForOutput(tuiBoardStatus)
 
 	session.pressKeys("c")
 	session.waitForOutput("Create task in")
 	session.pressKeys("esc")
-	session.waitForOutput("q:quit")
+	session.waitForOutput(tuiBoardStatus)
 
 	var tasks []taskJSON
 	r := runKanbanJSON(t, kanbanDir, &tasks, "list")
@@ -119,14 +119,14 @@ func TestE2E_TUI_CreateCancel_KeyboardFlow(t *testing.T) {
 func TestE2E_TUI_EditBackspaceFromTitleFlow(t *testing.T) {
 	kanbanDir := initBoardWithSeededTasks(t)
 	session := startTUIProcess(t, kanbanDir)
-	session.waitForOutput("q:quit")
+	session.waitForOutput(tuiBoardStatus)
 
 	session.pressKeys("e")
 	session.waitForOutput("Edit task #1")
 	session.pressBackspaceRunes("Task A")
 	session.typeText("Reworked")
 	session.pressKeys("enter")
-	session.waitForOutput("q:quit")
+	session.waitForOutput(tuiBoardStatus)
 
 	session.pressKeys("q")
 	session.waitForExit()
@@ -146,7 +146,7 @@ func TestE2E_TUI_EditTask_KeyboardFlow(t *testing.T) {
 	seed := mustCreateTask(t, kanbanDir, "Edit target", "--body", "Original body", "--tag", "legacy")
 
 	session := startTUIProcess(t, kanbanDir)
-	session.waitForOutput("q:quit")
+	session.waitForOutput(tuiBoardStatus)
 
 	session.pressKeys("e")
 	session.waitForOutput("Edit task #" + strconv.Itoa(seed.ID))
@@ -164,7 +164,7 @@ func TestE2E_TUI_EditTask_KeyboardFlow(t *testing.T) {
 	session.pressBackspaceRunes(seed.Tags[0])
 	session.typeText("e2e,updated")
 	session.pressKeys("enter")
-	session.waitForOutput("q:quit")
+	session.waitForOutput(tuiBoardStatus)
 
 	session.pressKeys("q")
 	session.waitForExit()

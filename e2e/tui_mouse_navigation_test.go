@@ -14,7 +14,7 @@ func TestE2E_TUIMouse_DoubleClickDetailBackAndKeyboardSync(t *testing.T) {
 		args: []string{"--mouse"},
 	})
 	session.waitForRawOutput("\x1b[?1002h")
-	session.waitForOutput("mouse:click/double-click/wheel")
+	session.waitForOutput(tuiMouseStatus)
 	session.resize(120, 40)
 
 	// The default 120-column board has five 24-cell columns. Task C is the
@@ -26,7 +26,7 @@ func TestE2E_TUIMouse_DoubleClickDetailBackAndKeyboardSync(t *testing.T) {
 
 	checkpoint = session.checkpoint()
 	session.clickX10(1, 39)
-	session.waitForOutputSince(checkpoint, "mouse:click/double-click/wheel")
+	session.waitForOutputSince(checkpoint, tuiMouseStatus)
 
 	// Back preserves the card selection, so keyboard Enter must reopen Task C.
 	checkpoint = session.checkpoint()
@@ -58,7 +58,7 @@ func TestE2E_TUIMouse_WheelRevealsTaskAndScrollsLongDetail(t *testing.T) {
 		cols: 100,
 		rows: 14,
 	})
-	session.waitForOutput("mouse:click/double-click/wheel")
+	session.waitForOutput(tuiMouseStatus)
 
 	checkpoint := session.checkpoint()
 	session.wheelSGR(1, 2, 1)
@@ -87,7 +87,7 @@ func TestE2E_TUIMouse_WheelRevealsTaskAndScrollsLongDetail(t *testing.T) {
 	}
 	checkpoint = session.checkpoint()
 	session.pressKeys("q")
-	session.waitForOutputSince(checkpoint, "mouse:click/double-click/wheel")
+	session.waitForOutputSince(checkpoint, tuiMouseStatus)
 	session.pressKeys("q")
 	session.waitForExit()
 }

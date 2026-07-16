@@ -309,8 +309,8 @@ func TestCreate_BodyInputWraps(t *testing.T) {
 func TestCreate_StatusBarShowsCreateHint(t *testing.T) {
 	b, _ := setupTestBoard(t)
 	v := b.View()
-	if !containsStr(v, "c:create") {
-		t.Error("expected 'c:create' in status bar")
+	if !containsStr(v, "create") {
+		t.Error("expected 'create' in status bar")
 	}
 }
 
