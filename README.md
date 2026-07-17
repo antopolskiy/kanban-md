@@ -523,13 +523,28 @@ Set `tui.hide_empty_columns` in `config.yml` to control the default behavior.
 
 In create/edit dialogs, text fields support cursor-based editing (`←/→`, `Home/End`, `Backspace`, `Delete`).
 
-Mouse mode is disabled by default. With `--mouse`, click a card to select it,
-double-click the same card within 500 ms to open its detail view, and click
-`Back` to return to the board. Hold a card and release it over another rendered
-column to move it to that status; the whole visible column is a drop target.
-The wheel moves the selection one task at a time in the hovered column and
-scrolls task details three lines at a time. Keyboard controls remain available
-in mouse mode.
+### Mouse mode
+
+Mouse controls are opt-in, so the normal keyboard-only TUI remains unchanged.
+Start mouse mode with:
+
+```bash
+kanban-md tui --mouse
+```
+
+| Mouse action | Result |
+|--------------|--------|
+| Click a card | Select the card and synchronize keyboard navigation |
+| Double-click the same card within 500 ms | Open its detail view |
+| Click `Back` | Return to the board |
+| Wheel over a column | Activate that column and move its selection one card |
+| Wheel in a detail view | Scroll the task body three lines |
+| Hold a card, drag to another visible column, and release | Move the task to that status |
+
+The entire rendered destination column is a drop target, including its header,
+cards, and visible empty area. Releasing over the source column or outside a
+valid column cancels the drag. Keyboard shortcuts continue to work while mouse
+mode is active, so both input styles can be mixed freely.
 
 The board status line begins with the card count and `? help`, followed by the
 optional mouse indicator and the remaining actions. Shortcut characters are
