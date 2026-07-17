@@ -101,12 +101,16 @@ func TestE2E_TUIMouseDrag_AutoClaimedTaskCanMoveBack(t *testing.T) {
 	waitForTask(t, kanbanDir, 1, func(tk taskJSON) bool {
 		return tk.Status == statusInProgress && tk.ClaimedBy != ""
 	})
+	// Let the debounced watcher process the move before beginning another
+	// gesture; otherwise its ReloadMsg can legitimately cancel the new drag.
+	session.waitForOutputSettled()
 	claimed := readE2ETask(t, kanbanDir, 1)
 
 	session.dragSGR(49, 25)
 	waitForTask(t, kanbanDir, 1, func(tk taskJSON) bool {
 		return tk.Status == statusTodo && tk.ClaimedBy == claimed.ClaimedBy
 	})
+	session.waitForOutputSettled()
 
 	session.dragSGR(25, 1)
 	waitForTask(t, kanbanDir, 1, func(tk taskJSON) bool {
