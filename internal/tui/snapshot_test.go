@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -79,6 +80,63 @@ func TestSnapshot_HelpView(t *testing.T) {
 	b, _ := setupTestBoard(t)
 	b = sendKey(b, "?") // open help
 	assertGolden(t, "help_view", b.View())
+}
+
+func TestSnapshot_MouseHelpView(t *testing.T) {
+	b, _ := setupTestBoard(t)
+	b.SetMouseEnabled(true)
+	b = sendKey(b, "?") // open help
+	assertGolden(t, "mouse_help_view", b.View())
+}
+
+func TestSnapshot_MouseDetailBackAffordance(t *testing.T) {
+	b, _ := setupTestBoard(t)
+	b.SetMouseEnabled(true)
+	b = sendKey(b, "enter")
+	assertGolden(t, "mouse_detail_back", b.View())
+}
+
+func TestSnapshot_MouseNarrowTerminal(t *testing.T) {
+	b, _ := setupTestBoard(t)
+	b.SetMouseEnabled(true)
+	b.Update(tea.WindowSizeMsg{Width: 20, Height: 10})
+	assertGolden(t, "mouse_narrow", trimSnapshotLineEnds(b.View()))
+}
+
+func TestSnapshot_MouseDragDestinationHighlight(t *testing.T) {
+	b, _ := setupTestBoard(t)
+	b.SetMouseEnabled(true)
+	_ = b.View()
+	beginMouseDrag(b, 1, 2, 25, 0)
+	assertGolden(t, "mouse_drag_destination", trimSnapshotLineEnds(b.View()))
+}
+
+func TestSnapshot_MouseDragStatusHint(t *testing.T) {
+	b, _ := setupTestBoard(t)
+	b.SetMouseEnabled(true)
+	b.Update(tea.WindowSizeMsg{Width: 80, Height: 12})
+	_ = b.View()
+	beginMouseDrag(b, 1, 2, 17, 0)
+	assertGolden(t, "mouse_drag_status_hint", trimSnapshotLineEnds(b.View()))
+}
+
+func beginMouseDrag(b *tui.Board, sourceX, sourceY, destinationX, destinationY int) {
+	b.Update(tea.MouseMsg{
+		X: sourceX, Y: sourceY,
+		Button: tea.MouseButtonLeft, Action: tea.MouseActionPress,
+	})
+	b.Update(tea.MouseMsg{
+		X: destinationX, Y: destinationY,
+		Button: tea.MouseButtonLeft, Action: tea.MouseActionMotion,
+	})
+}
+
+func trimSnapshotLineEnds(value string) string {
+	lines := strings.Split(value, "\n")
+	for i := range lines {
+		lines[i] = strings.TrimRight(lines[i], " ")
+	}
+	return strings.Join(lines, "\n")
 }
 
 func TestSnapshot_SearchActive(t *testing.T) {

@@ -514,6 +514,7 @@ kanban-md tui             # launch from any directory with a kanban/ board
 kanban-md tui --dir PATH  # point to a specific kanban directory
 kanban-md tui --hide-empty-columns  # override config and hide empty columns
 kanban-md tui --show-empty-columns  # override config and show empty columns
+kanban-md tui --mouse      # opt in to mouse navigation
 ```
 
 Set `tui.hide_empty_columns` in `config.yml` to control the default behavior.
@@ -521,6 +522,43 @@ Set `tui.hide_empty_columns` in `config.yml` to control the default behavior.
 > **Note:** Older releases shipped a standalone `kanban-md-tui` binary. It has been retired — use `kanban-md tui` instead.
 
 In create/edit dialogs, text fields support cursor-based editing (`←/→`, `Home/End`, `Backspace`, `Delete`).
+
+### Mouse mode
+
+Mouse controls are opt-in, so the normal keyboard-only TUI remains unchanged.
+Start mouse mode with:
+
+```bash
+kanban-md tui --mouse
+```
+
+| Mouse action | Result |
+|--------------|--------|
+| Click a card | Select the card and synchronize keyboard navigation |
+| Double-click the same card within 500 ms | Open its detail view |
+| Click `Back` | Return to the board |
+| Wheel over a column | Activate that column and move its selection one card |
+| Wheel in a detail view | Scroll the task body three lines |
+| Hold a card, drag to another visible column, and release | Move the task to that status |
+
+The entire rendered destination column is a drop target, including its header,
+cards, and visible empty area. Releasing over the source column or outside a
+valid column cancels the drag. Keyboard shortcuts continue to work while mouse
+mode is active, so both input styles can be mixed freely.
+
+The board status line begins with the card count and `? help`, followed by the
+optional mouse indicator and the remaining actions. Shortcut characters are
+highlighted inside their action labels so the essential hints survive narrow
+terminal widths.
+
+Status moves made in the TUI preserve an existing task claim. If an unclaimed
+task enters a `require_claim` status, the TUI automatically claims it using the
+local hostname; that claim remains attached if the task later moves elsewhere.
+
+Terminals commonly reserve a modifier such as Shift or Option/Alt to bypass
+application mouse reporting for native text selection. The exact modifier is
+terminal-dependent; use the terminal's normal selection shortcut or omit
+`--mouse` when native selection is preferred.
 
 ### Keyboard shortcuts
 

@@ -33,7 +33,7 @@ func TestEdit_DialogOpensAndCloses(t *testing.T) {
 
 func TestEdit_StatusBarShowsEditHint(t *testing.T) {
 	b, _ := setupTestBoard(t)
-	if !containsStr(b.View(), "e:edit") {
+	if !containsStr(b.View(), "edit") {
 		t.Fatal("expected edit hint in status bar")
 	}
 }

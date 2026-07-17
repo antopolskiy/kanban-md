@@ -9,13 +9,13 @@ import (
 func TestE2E_TUI_MoveTask_KeyboardFlow(t *testing.T) {
 	kanbanDir := initBoardWithSeededTasks(t)
 	session := startTUIProcess(t, kanbanDir)
-	session.waitForOutput("q:quit")
+	session.waitForOutput(tuiBoardStatus)
 
 	session.pressKeys("m")
 	session.waitForOutput("Move #1 to:")
 	session.pressKeys("j")
 	session.pressKeys("enter")
-	session.waitForOutput("q:quit")
+	session.waitForOutput(tuiBoardStatus)
 
 	waitForTask(t, kanbanDir, 1, func(tk taskJSON) bool {
 		return tk.Status == "todo"
@@ -27,12 +27,12 @@ func TestE2E_TUI_MoveTask_KeyboardFlow(t *testing.T) {
 func TestE2E_TUI_MoveTaskCancel_KeyboardFlow(t *testing.T) {
 	kanbanDir := initBoardWithSeededTasks(t)
 	session := startTUIProcess(t, kanbanDir)
-	session.waitForOutput("q:quit")
+	session.waitForOutput(tuiBoardStatus)
 
 	session.pressKeys("m")
 	session.waitForOutput("Move #1 to:")
 	session.pressKeys("esc")
-	session.waitForOutput("q:quit")
+	session.waitForOutput(tuiBoardStatus)
 
 	session.pressKeys("q")
 	session.waitForExit()
@@ -50,7 +50,7 @@ func TestE2E_TUI_MoveTaskCancel_KeyboardFlow(t *testing.T) {
 func TestE2E_TUI_MoveTaskQuickKeys_KeyboardFlow(t *testing.T) {
 	kanbanDir := initBoardWithSeededTasks(t)
 	session := startTUIProcess(t, kanbanDir)
-	session.waitForOutput("q:quit")
+	session.waitForOutput(tuiBoardStatus)
 
 	session.pressKeys("n")
 	waitForTask(t, kanbanDir, 1, func(tk taskJSON) bool {
@@ -63,7 +63,7 @@ func TestE2E_TUI_MoveTaskQuickKeys_KeyboardFlow(t *testing.T) {
 		return tk.Status == "backlog"
 	})
 
-	session.waitForOutput("q:quit")
+	session.waitForOutput(tuiBoardStatus)
 	session.pressKeys("q")
 	session.waitForExit()
 }
@@ -71,7 +71,7 @@ func TestE2E_TUI_MoveTaskQuickKeys_KeyboardFlow(t *testing.T) {
 func TestE2E_TUI_PriorityKeyboardFlow(t *testing.T) {
 	kanbanDir := initBoardWithSeededTasks(t)
 	session := startTUIProcess(t, kanbanDir)
-	session.waitForOutput("q:quit")
+	session.waitForOutput(tuiBoardStatus)
 
 	session.pressKeys("+")
 	waitForTask(t, kanbanDir, 1, func(tk taskJSON) bool {
@@ -90,7 +90,7 @@ func TestE2E_TUI_PriorityKeyboardFlow(t *testing.T) {
 func TestE2E_TUI_DeleteTask_KeyboardFlow(t *testing.T) {
 	kanbanDir := initBoardWithSeededTasks(t)
 	session := startTUIProcess(t, kanbanDir)
-	session.waitForOutput("q:quit")
+	session.waitForOutput(tuiBoardStatus)
 
 	session.pressKeys("d")
 	session.waitForOutput("Delete task?")
@@ -106,12 +106,12 @@ func TestE2E_TUI_DeleteTask_KeyboardFlow(t *testing.T) {
 func TestE2E_TUI_DeleteTaskCancel_KeyboardFlow(t *testing.T) {
 	kanbanDir := initBoardWithSeededTasks(t)
 	session := startTUIProcess(t, kanbanDir)
-	session.waitForOutput("q:quit")
+	session.waitForOutput(tuiBoardStatus)
 
 	session.pressKeys("d")
 	session.waitForOutput("Delete task?")
 	session.pressKeys("n")
-	session.waitForOutput("q:quit")
+	session.waitForOutput(tuiBoardStatus)
 
 	var remaining []taskJSON
 	r := runKanbanJSON(t, kanbanDir, &remaining, "list")
@@ -129,7 +129,7 @@ func TestE2E_TUI_DeleteTaskCancel_KeyboardFlow(t *testing.T) {
 func TestE2E_TUI_DeleteTaskFromSecondRow(t *testing.T) {
 	kanbanDir := initBoardWithSeededTasks(t)
 	session := startTUIProcess(t, kanbanDir)
-	session.waitForOutput("q:quit")
+	session.waitForOutput(tuiBoardStatus)
 
 	session.pressKeys("j")
 	session.pressKeys("d")
@@ -146,12 +146,12 @@ func TestE2E_TUI_DeleteTaskFromSecondRow(t *testing.T) {
 func TestE2E_TUI_DetailKeyboardFlow(t *testing.T) {
 	kanbanDir := initBoardWithSeededTasks(t)
 	session := startTUIProcess(t, kanbanDir)
-	session.waitForOutput("q:quit")
+	session.waitForOutput(tuiBoardStatus)
 
 	session.pressKeys("enter")
 	session.waitForOutput("Status:")
 	session.pressKeys("q")
-	session.waitForOutput("q:quit")
+	session.waitForOutput(tuiBoardStatus)
 
 	session.pressKeys("q")
 	session.waitForExit()
@@ -160,13 +160,13 @@ func TestE2E_TUI_DetailKeyboardFlow(t *testing.T) {
 func TestE2E_TUI_DetailFromSecondTaskViaNavigation(t *testing.T) {
 	kanbanDir := initBoardWithSeededTasks(t)
 	session := startTUIProcess(t, kanbanDir)
-	session.waitForOutput("q:quit")
+	session.waitForOutput(tuiBoardStatus)
 
 	session.pressKeys("j")
 	session.pressKeys("enter")
 	session.waitForOutput("Task B")
 	session.pressKeys("q")
-	session.waitForOutput("q:quit")
+	session.waitForOutput(tuiBoardStatus)
 	session.pressKeys("q")
 	session.waitForExit()
 }
@@ -174,12 +174,12 @@ func TestE2E_TUI_DetailFromSecondTaskViaNavigation(t *testing.T) {
 func TestE2E_TUI_HelpFlow(t *testing.T) {
 	kanbanDir := initBoardWithSeededTasks(t)
 	session := startTUIProcess(t, kanbanDir)
-	session.waitForOutput("q:quit")
+	session.waitForOutput(tuiBoardStatus)
 
 	session.pressKeys("?")
 	session.waitForOutput("Keyboard Shortcuts")
 	session.pressKeys("q")
-	session.waitForOutput("q:quit")
+	session.waitForOutput(tuiBoardStatus)
 
 	session.pressKeys("q")
 	session.waitForExit()
@@ -188,7 +188,7 @@ func TestE2E_TUI_HelpFlow(t *testing.T) {
 func TestE2E_TUI_NavigateColumnsAndRows_KeyboardFlow(t *testing.T) {
 	kanbanDir := initBoardWithSeededTasks(t)
 	session := startTUIProcess(t, kanbanDir)
-	session.waitForOutput("q:quit")
+	session.waitForOutput(tuiBoardStatus)
 
 	session.pressKeys("l")
 	session.pressKeys("h")
@@ -203,7 +203,7 @@ func TestE2E_TUI_NavigateColumnsAndRows_KeyboardFlow(t *testing.T) {
 func TestE2E_TUI_EscapeExits(t *testing.T) {
 	kanbanDir := initBoardWithSeededTasks(t)
 	session := startTUIProcess(t, kanbanDir)
-	session.waitForOutput("q:quit")
+	session.waitForOutput(tuiBoardStatus)
 
 	session.pressKeys("esc")
 	session.waitForExit()
@@ -214,7 +214,7 @@ func TestE2E_TUI_EscapeExits(t *testing.T) {
 func TestE2E_TUI_CtrlCExits(t *testing.T) {
 	kanbanDir := initBoardWithSeededTasks(t)
 	session := startTUIProcess(t, kanbanDir)
-	session.waitForOutput("q:quit")
+	session.waitForOutput(tuiBoardStatus)
 
 	session.pressKeys("ctrl+c")
 	session.waitForExit()
@@ -225,7 +225,7 @@ func TestE2E_TUI_CtrlCExits(t *testing.T) {
 func TestE2E_TUI_Edit_And_CloseWithBackspace(t *testing.T) {
 	kanbanDir := initBoardWithSeededTasks(t)
 	session := startTUIProcess(t, kanbanDir)
-	session.waitForOutput("q:quit")
+	session.waitForOutput(tuiBoardStatus)
 
 	session.pressKeys("e")
 	session.waitForOutput("Edit task #1")
@@ -242,7 +242,7 @@ func TestE2E_TUI_Edit_And_CloseWithBackspace(t *testing.T) {
 	session.pressKeys("backspace")
 	session.pressKeys("backspace")
 	session.pressKeys("esc")
-	session.waitForOutput("q:quit")
+	session.waitForOutput(tuiBoardStatus)
 
 	session.pressKeys("q")
 	session.waitForExit()

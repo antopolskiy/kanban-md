@@ -85,6 +85,11 @@ type Board struct {
 	// are removed from the board view.
 	hideEmptyColumns bool
 	now              func() time.Time // clock for duration display; defaults to time.Now
+	mouseEnabled     bool
+	mouseNow         func() time.Time
+	layoutGeneration uint64
+	layout           layoutSnapshot
+	pointer          pointerState
 
 	// Sort state.
 	sortField   string // one of sortFields
@@ -131,6 +136,7 @@ func NewBoard(cfg *config.Config) *Board {
 	b := &Board{
 		cfg:              cfg,
 		now:              time.Now,
+		mouseNow:         time.Now,
 		hideEmptyColumns: cfg.TUI.HideEmptyColumns,
 		sortField:        "priority",
 		sortReverse:      true,
@@ -144,9 +150,23 @@ func (b *Board) SetNow(fn func() time.Time) {
 	b.now = fn
 }
 
+// SetMouseEnabled controls whether the board responds to mouse messages and
+// renders mouse-specific affordances. Bubble Tea mouse reporting must also be
+// enabled by the caller.
+func (b *Board) SetMouseEnabled(v bool) {
+	b.mouseEnabled = v
+	b.invalidatePointerState()
+}
+
+// SetMouseNow overrides the clock used for double-click detection.
+func (b *Board) SetMouseNow(fn func() time.Time) {
+	b.mouseNow = fn
+}
+
 // SetHideEmptyColumns controls whether empty status columns are shown.
 func (b *Board) SetHideEmptyColumns(v bool) {
 	b.hideEmptyColumns = v
+	b.invalidatePointerState()
 	b.loadTasks()
 }
 
@@ -159,19 +179,25 @@ func (b *Board) Init() tea.Cmd {
 func (b *Board) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
+		b.invalidatePointerState()
 		return b.handleKey(msg)
+	case tea.MouseMsg:
+		return b.handleMouse(tea.MouseEvent(msg))
 	case tea.WindowSizeMsg:
+		b.invalidatePointerState()
 		b.width = msg.Width
 		b.height = msg.Height
 		b.applyCreateInputLayout()
 		return b, nil
 	case ReloadMsg:
+		b.invalidatePointerState()
 		b.loadTasks()
 		b.refreshDetailTask()
 		return b, nil
 	case TickMsg:
 		return b, tickCmd()
 	case errMsg:
+		b.invalidatePointerState()
 		b.err = msg.err
 		return b, nil
 	}
@@ -182,6 +208,13 @@ func (b *Board) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (b *Board) View() string {
 	if b.width == 0 {
 		return "Loading..."
+	}
+
+	b.layout = layoutSnapshot{
+		generation: b.layoutGeneration,
+		width:      b.width,
+		height:     b.height,
+		view:       b.view,
 	}
 
 	switch b.view {
@@ -420,6 +453,7 @@ func (b *Board) handleEnter() {
 		b.detailTask = t
 		b.detailScrollOff = 0
 		b.view = viewDetail
+		b.invalidatePointerState()
 	}
 }
 
@@ -1180,14 +1214,21 @@ func (b *Board) executeMove(targetStatus string) (tea.Model, tea.Cmd) {
 		b.view = viewBoard
 		return b, nil
 	}
+	return b.executeMoveTask(t.ID, targetStatus, false)
+}
 
+func (b *Board) executeMoveTask(taskID int, targetStatus string, followTask bool) (tea.Model, tea.Cmd) {
 	params := board.MoveParams{
-		ID:        t.ID,
+		ID:        taskID,
 		NewStatus: targetStatus,
 	}
 
-	// Auto-claim with hostname when moving to a require_claim status.
-	if b.cfg.StatusRequiresClaim(targetStatus) {
+	// TUI actions represent the human operator, so an existing task claim is
+	// accepted and preserved while moving. Unclaimed tasks still auto-claim
+	// when entering a require_claim status.
+	if claimedBy := b.taskClaimant(taskID); claimedBy != "" {
+		params.Claimant = claimedBy
+	} else if b.cfg.StatusRequiresClaim(targetStatus) {
 		params.Claimant = tuiClaimant()
 		params.SetClaim = true
 	}
@@ -1195,13 +1236,29 @@ func (b *Board) executeMove(targetStatus string) (tea.Model, tea.Cmd) {
 	_, moveErr := board.Move(b.cfg, params, b.now())
 
 	b.view = viewBoard
+	b.invalidatePointerState()
 	b.loadTasks()
+	if followTask {
+		b.selectTask(taskID)
+	}
 
 	// Set error after loadTasks so it isn't cleared by a successful reload.
 	if moveErr != nil {
-		b.err = fmt.Errorf("moving task #%d: %w", t.ID, moveErr)
+		b.err = fmt.Errorf("moving task #%d: %w", taskID, moveErr)
 	}
 	return b, nil
+}
+
+func (b *Board) taskClaimant(taskID int) string {
+	path, err := task.FindByID(b.cfg.TasksPath(), taskID)
+	if err != nil {
+		return ""
+	}
+	t, err := task.Read(path)
+	if err != nil {
+		return ""
+	}
+	return t.ClaimedBy
 }
 
 func (b *Board) executeDelete() (tea.Model, tea.Cmd) {
@@ -1255,6 +1312,12 @@ var (
 				Background(lipgloss.Color("62")).
 				Padding(0, 1)
 
+	dropTargetColumnHeaderStyle = lipgloss.NewStyle().
+					Bold(true).
+					Foreground(lipgloss.Color("232")).
+					Background(lipgloss.Color("42")).
+					Padding(0, 1)
+
 	cardStyle = lipgloss.NewStyle().
 			Border(lipgloss.RoundedBorder()).
 			BorderForeground(lipgloss.Color("240")).
@@ -1275,6 +1338,11 @@ var (
 
 	statusBarStyle = lipgloss.NewStyle().
 			Foreground(lipgloss.Color("241"))
+
+	statusShortcutStyle = lipgloss.NewStyle().
+				Bold(true).
+				Underline(true).
+				Foreground(lipgloss.Color("252"))
 
 	errorStyle = lipgloss.NewStyle().
 			Foreground(lipgloss.Color("196")).
@@ -1328,8 +1396,9 @@ func (b *Board) viewBoard() string {
 
 	// Render columns.
 	renderedCols := make([]string, len(b.columns))
+	renderedTargets := make([][]cardTarget, len(b.columns))
 	for i, col := range b.columns {
-		renderedCols[i] = b.renderColumn(i, col, colWidth)
+		renderedCols[i], renderedTargets[i] = b.renderColumn(i, col, colWidth)
 	}
 
 	boardView := lipgloss.JoinHorizontal(lipgloss.Top, renderedCols...)
@@ -1347,6 +1416,7 @@ func (b *Board) viewBoard() string {
 			boardView += strings.Repeat("\n", targetHeight-actual)
 		}
 	}
+	b.captureBoardLayout(colWidth, targetHeight, renderedTargets)
 
 	bottom := b.renderStatusBar()
 	if b.view == viewSearch {
@@ -1380,21 +1450,28 @@ func (b *Board) columnWidth() int {
 	return w
 }
 
-func (b *Board) renderColumn(colIdx int, col column, width int) string {
+func (b *Board) renderColumn(colIdx int, col column, width int) (string, []cardTarget) {
 	// Header.
 	headerText := fmt.Sprintf("%s (%d)", col.status, len(col.tasks))
 	wip := b.cfg.WIPLimit(col.status)
 	if wip > 0 {
 		headerText = fmt.Sprintf("%s (%d/%d)", col.status, len(col.tasks), wip)
 	}
+	destinationCol, _, dragging := b.dragDestination()
+	if dragging && colIdx == destinationCol {
+		headerText = "→ " + headerText
+	}
 	// Truncate to fit within padding (1 left + 1 right).
 	const headerPad = 2
 	headerText = truncate(headerText, width-headerPad)
 
 	var header string
-	if colIdx == b.activeCol {
+	switch {
+	case dragging && colIdx == destinationCol:
+		header = dropTargetColumnHeaderStyle.Width(width).Render(headerText)
+	case colIdx == b.activeCol:
 		header = activeColumnHeaderStyle.Width(width).Render(headerText)
-	} else {
+	default:
 		header = columnHeaderStyle.Width(width).Render(headerText)
 	}
 
@@ -1410,11 +1487,14 @@ func (b *Board) renderColumn(colIdx int, col column, width int) string {
 	}
 
 	parts := []string{header}
+	var targets []cardTarget
+	y := 1
 
 	// Show "↑ N more" indicator if scrolled down.
 	if start > 0 {
 		indicator := fmt.Sprintf("  ↑ %d more", start)
 		parts = append(parts, dimStyle.Width(width).Render(truncate(indicator, width)))
+		y++
 	}
 
 	// Render visible cards.
@@ -1425,6 +1505,14 @@ func (b *Board) renderColumn(colIdx int, col column, width int) string {
 			t := col.tasks[rowIdx]
 			active := colIdx == b.activeCol && rowIdx == b.activeRow
 			parts = append(parts, b.renderCard(t, active, width))
+			cardHeight := b.cardHeight(t, width)
+			targets = append(targets, cardTarget{
+				taskID: t.ID,
+				col:    colIdx,
+				row:    rowIdx,
+				rect:   rect{x0: 0, y0: y, x1: width, y1: y + cardHeight},
+			})
+			y += cardHeight
 		}
 	}
 
@@ -1435,7 +1523,7 @@ func (b *Board) renderColumn(colIdx int, col column, width int) string {
 		parts = append(parts, dimStyle.Width(width).Render(truncate(indicator, width)))
 	}
 
-	return lipgloss.JoinVertical(lipgloss.Left, parts...)
+	return lipgloss.JoinVertical(lipgloss.Left, parts...), targets
 }
 
 func (b *Board) renderCard(t *task.Task, active bool, width int) string {
@@ -1644,25 +1732,119 @@ func wrapLinesCap(maxLines int) int {
 }
 
 func (b *Board) renderStatusBar() string {
+	if _, status, dragging := b.dragDestination(); dragging {
+		hint := fmt.Sprintf(" Move #%d → %s — release to move", b.pointer.taskID, status)
+		hint = statusBarStyle.Render(truncate(hint, b.width))
+		if b.err != nil {
+			errStr := errorStyle.Render(truncate("Error: "+b.err.Error(), b.width))
+			return errStr + "\n" + hint
+		}
+		return hint
+	}
+
 	total := len(b.tasks)
 	arrow := "↑"
 	if b.sortReverse {
 		arrow = "↓"
 	}
-	filter := ""
-	if b.filterQuery != "" {
-		filter = fmt.Sprintf(" | filter:%q", b.filterQuery)
+
+	cardLabel := "cards"
+	if total == 1 {
+		cardLabel = "card"
 	}
-	status := fmt.Sprintf(" %s | %d tasks%s | c:create e:edit m:move n/p:status +/-:priority d:del s:sort[%s%s] /:search ?:help q:quit",
-		b.cfg.Board.Name, total, filter, b.sortField, arrow)
-	status = truncate(status, b.width)
+	parts := []statusBarPart{{text: fmt.Sprintf(" %d %s | ", total, cardLabel)}}
+	parts = appendStatusShortcut(parts, "?", "help")
+	if b.mouseEnabled {
+		parts = append(parts, statusBarPart{text: " | mouse"})
+	}
+	if b.filterQuery != "" {
+		parts = append(parts, statusBarPart{text: fmt.Sprintf(" | filter:%q", b.filterQuery)})
+	}
+	parts = append(parts, statusBarPart{text: " | "})
+	actions := [][2]string{
+		{"c", "create"},
+		{"e", "edit"},
+		{"m", "move"},
+		{"+/-", "priority"},
+		{"d", "delete"},
+		{"s", fmt.Sprintf("sort[%s%s]", b.sortField, arrow)},
+		{"/", "search"},
+		{"q", "quit"},
+	}
+	for i, action := range actions {
+		if i > 0 {
+			parts = append(parts, statusBarPart{text: " "})
+		}
+		parts = appendStatusShortcut(parts, action[0], action[1])
+	}
+	status := renderStatusBarParts(parts, b.width)
 
 	if b.err != nil {
 		errStr := errorStyle.Render(truncate("Error: "+b.err.Error(), b.width))
-		return errStr + "\n" + statusBarStyle.Render(status)
+		return errStr + "\n" + status
 	}
 
-	return statusBarStyle.Render(status)
+	return status
+}
+
+type statusBarPart struct {
+	text     string
+	shortcut bool
+}
+
+func appendStatusShortcut(parts []statusBarPart, shortcut, label string) []statusBarPart {
+	if len([]rune(shortcut)) == 1 {
+		if idx := strings.Index(label, shortcut); idx >= 0 {
+			parts = append(parts,
+				statusBarPart{text: label[:idx]},
+				statusBarPart{text: shortcut, shortcut: true},
+				statusBarPart{text: label[idx+len(shortcut):]},
+			)
+			return parts
+		}
+	}
+	return append(parts,
+		statusBarPart{text: shortcut, shortcut: true},
+		statusBarPart{text: " " + label},
+	)
+}
+
+func renderStatusBarParts(parts []statusBarPart, width int) string {
+	var plain strings.Builder
+	for _, part := range parts {
+		plain.WriteString(part.text)
+	}
+
+	full := plain.String()
+	clipped := truncate(full, width)
+	prefix := clipped
+	tail := ""
+	if clipped != full {
+		prefix = strings.TrimSuffix(clipped, "...")
+		tail = "..."
+	}
+
+	remaining := len(prefix)
+	var rendered strings.Builder
+	for _, part := range parts {
+		if remaining == 0 {
+			break
+		}
+		text := part.text
+		if len(text) > remaining {
+			text = text[:remaining]
+		}
+		style := statusBarStyle
+		if part.shortcut {
+			style = statusShortcutStyle
+		}
+		rendered.WriteString(style.Render(text))
+		remaining -= len(text)
+	}
+	if tail != "" {
+		rendered.WriteString(statusBarStyle.Render(tail))
+	}
+	return rendered.String()
 }
 
 func (b *Board) viewDetail() string {
@@ -1702,7 +1884,23 @@ func (b *Board) viewDetail() string {
 		end = len(lines)
 	}
 
-	return strings.Join(lines[off:end], "\n") + "\n\n" + dimStyle.Render(hint)
+	visible := strings.Join(lines[off:end], "\n")
+	if !b.mouseEnabled {
+		return visible + "\n\n" + dimStyle.Render(hint)
+	}
+
+	hint = "← Back  " + hint
+	renderedLines := end - off
+	if renderedLines < viewHeight {
+		visible += strings.Repeat("\n", viewHeight-renderedLines)
+	}
+	backWidth := min(lipgloss.Width("← Back"), b.width)
+	if backWidth > 0 && b.height > 0 {
+		b.layout.back = &backTarget{
+			rect: rect{x0: 0, y0: b.height - 1, x1: backWidth, y1: b.height},
+		}
+	}
+	return visible + "\n\n" + dimStyle.Render(truncate(hint, b.width))
 }
 
 func detailLines(t *task.Task, width int) []string {
@@ -2021,6 +2219,13 @@ func (b *Board) viewHelp() string {
 		{"?", "Show this help"},
 		{"esc/q", "Quit"},
 		{"ctrl+c", "Force quit"},
+	}
+	if b.mouseEnabled {
+		help = append(help,
+			struct{ key, desc string }{"click", "Select task; double-click opens detail"},
+			struct{ key, desc string }{"drag", "Release a card over another column to move it"},
+			struct{ key, desc string }{"wheel", "Move selection or scroll task detail"},
+		)
 	}
 
 	var lines []string

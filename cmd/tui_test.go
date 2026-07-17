@@ -359,10 +359,36 @@ func newTUIFlagTestCmd(t *testing.T, args ...string) *cobra.Command {
 	cmd := &cobra.Command{Use: "tui"}
 	cmd.Flags().Bool("hide-empty-columns", false, "")
 	cmd.Flags().Bool("show-empty-columns", false, "")
+	cmd.Flags().Bool("mouse", false, "")
 	if err := cmd.ParseFlags(args); err != nil {
 		t.Fatalf("parse flags: %v", err)
 	}
 	return cmd
+}
+
+func TestTUICommandMouseFlagDefaultsOff(t *testing.T) {
+	cmd := newTUICommand()
+	enabled, err := cmd.Flags().GetBool("mouse")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if enabled {
+		t.Fatal("--mouse should be disabled by default")
+	}
+}
+
+func TestTUICommandMouseFlagCanBeEnabled(t *testing.T) {
+	cmd := newTUICommand()
+	if err := cmd.ParseFlags([]string{"--mouse"}); err != nil {
+		t.Fatal(err)
+	}
+	enabled, err := cmd.Flags().GetBool("mouse")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !enabled {
+		t.Fatal("--mouse did not enable mouse mode")
+	}
 }
 
 func TestResolveHideEmptyColumns_DefaultFromConfig(t *testing.T) {
