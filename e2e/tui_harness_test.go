@@ -25,6 +25,7 @@ const (
 	tuiStartupTimeout = 3 * time.Second
 	tuiExitTimeout    = 3 * time.Second
 	tuiKeyDelay       = 12 * time.Millisecond
+	tuiOutputQuiet    = 200 * time.Millisecond
 	tuiTaskTimeout    = 2 * time.Second
 	tuiBoardStatus    = "? help"
 	tuiMouseStatus    = tuiBoardStatus + " | mouse"
@@ -250,6 +251,30 @@ func (s *tuiSession) waitForOutputSince(checkpoint int, needle string) {
 		time.Sleep(20 * time.Millisecond)
 	}
 	s.t.Fatalf("timed out waiting for new output containing %q; got %q", needle, s.outputSince(checkpoint))
+}
+
+// waitForOutputSettled waits until the TUI has stopped rendering for a short
+// period. Mutations are rendered immediately and then trigger a debounced file
+// watcher reload; starting another gesture between those renders can have that
+// gesture correctly invalidated by the pending reload.
+func (s *tuiSession) waitForOutputSettled() {
+	s.t.Helper()
+	deadline := time.Now().Add(tuiStartupTimeout)
+	lastLen := s.out.Len()
+	quietSince := time.Now()
+	for time.Now().Before(deadline) {
+		time.Sleep(tuiKeyDelay)
+		currentLen := s.out.Len()
+		if currentLen != lastLen {
+			lastLen = currentLen
+			quietSince = time.Now()
+			continue
+		}
+		if time.Since(quietSince) >= tuiOutputQuiet {
+			return
+		}
+	}
+	s.t.Fatal("timed out waiting for TUI output to settle")
 }
 
 func (s *tuiSession) waitForRawOutput(needle string) {
