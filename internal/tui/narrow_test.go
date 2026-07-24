@@ -236,9 +236,79 @@ func TestCompactNarrowHeader_TinyWidthsDoNotOverflow(t *testing.T) {
 	if got := compactNarrowHeader("backlog (2)", true, true, 3, 5, 2); got != "◂▸" {
 		t.Errorf("two-cell header should prioritize both navigation cues, got %q", got)
 	}
-	if got := compactNarrowHeader("backlog (2)", true, true, 3, 5, 6); got != "◂▸ 3/5" {
+	if got := compactNarrowHeader("backlog (2)", true, true, 3, 5, 6); got != "◂3/5 ▸" {
 		t.Errorf("six-cell header should show navigation and position, got %q", got)
 	}
+}
+
+func TestNarrow_CompactBarTinyWidthsAlignCuesAndTargets(t *testing.T) {
+	for width := 1; width <= 10; width++ {
+		for _, active := range []int{0, 2, 4} {
+			name := fmt.Sprintf("width_%d/column_%d", width, active)
+			t.Run(name, func(t *testing.T) {
+				b := newMouseTestBoard()
+				b.activeCol = active
+				b.SetForceNarrow(true)
+				b.Update(tea.WindowSizeMsg{Width: width, Height: 20})
+
+				rendered, _ := b.renderNarrowCompactBar()
+				if got := lipgloss.Width(rendered); got > width {
+					t.Fatalf("compact bar rendered %d cells in terminal width %d: %q", got, width, rendered)
+				}
+
+				visibleCues := 0
+				for _, cue := range []struct {
+					rune rune
+					col  int
+				}{
+					{rune: '◂', col: active - 1},
+					{rune: '▸', col: active + 1},
+				} {
+					x, visible := displayCellForRune(rendered, cue.rune)
+					if !visible {
+						continue
+					}
+					visibleCues++
+
+					b.activeCol = active
+					_ = b.View()
+					var target *columnTarget
+					for i := range b.layout.tabs {
+						if b.layout.tabs[i].col == cue.col {
+							target = &b.layout.tabs[i]
+							break
+						}
+					}
+					if target == nil {
+						t.Fatalf("visible cue %q has no target: %q %#v", cue.rune, rendered, b.layout.tabs)
+					}
+					if !target.rect.contains(x, 0) {
+						t.Errorf("visible cue %q at cell %d is outside target %#v: %q", cue.rune, x, target.rect, rendered)
+					}
+
+					b.Update(tea.MouseMsg{
+						X: x, Y: 0,
+						Button: tea.MouseButtonLeft,
+						Action: tea.MouseActionPress,
+					})
+					if b.activeCol != cue.col {
+						t.Errorf("clicking visible cue %q selected column %d, want %d", cue.rune, b.activeCol, cue.col)
+					}
+				}
+				if visibleCues == 0 && len(b.columns) > 1 {
+					t.Errorf("compact bar exposes no navigation cue: %q", rendered)
+				}
+			})
+		}
+	}
+}
+
+func displayCellForRune(s string, want rune) (int, bool) {
+	index := strings.IndexRune(s, want)
+	if index < 0 {
+		return 0, false
+	}
+	return lipgloss.Width(s[:index]), true
 }
 
 // A card tap in narrow mode must select the card under it (guards the

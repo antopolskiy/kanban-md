@@ -1604,86 +1604,137 @@ func (b *Board) renderNarrowTabBar() (string, []columnTarget) {
 
 // renderNarrowCompactBar is the tab strip's fallback for terminals too narrow
 // to fit even abbreviated tabs: "◂ in-progress (3) ▸  4/6". The returned hit
-// targets split the bar into prev (left half) and next (right half) tap zones.
+// targets split the bar near its midpoint while always including the visible
+// arrow for their direction.
 func (b *Board) renderNarrowCompactBar() (string, []columnTarget) {
 	col := b.columns[b.activeCol]
 	headerText := fmt.Sprintf("%s (%d)", col.status, len(col.tasks))
-	const barPad = 2 // header style pads 1 cell each side
-	line := compactNarrowHeader(
+	layout := layoutCompactNarrowHeader(
 		headerText,
 		b.activeCol > 0,
 		b.activeCol < len(b.columns)-1,
 		b.activeCol+1,
 		len(b.columns),
-		b.width-barPad,
+		b.width,
 	)
-	rendered := activeColumnHeaderStyle.Width(b.width).Render(line)
+	rendered := activeColumnHeaderStyle.Padding(0).Width(b.width).Render(layout.text)
 
 	var targets []columnTarget
-	half := b.width / 2 //nolint:mnd // two tap zones: left half = prev, right half = next
-	if b.activeCol > 0 {
+	half := b.width / 2 //nolint:mnd // two tap zones centered near the middle
+	switch {
+	case layout.prevX >= 0 && layout.nextX >= 0:
+		split := min(max(half, layout.prevX+1), layout.nextX)
 		targets = append(targets, columnTarget{
 			col:    b.activeCol - 1,
 			status: b.columns[b.activeCol-1].status,
-			rect:   rect{x0: 0, y0: 0, x1: half, y1: 1},
+			rect:   rect{x0: 0, y0: 0, x1: split, y1: 1},
 		})
-	}
-	if b.activeCol < len(b.columns)-1 {
 		targets = append(targets, columnTarget{
 			col:    b.activeCol + 1,
 			status: b.columns[b.activeCol+1].status,
-			rect:   rect{x0: half, y0: 0, x1: b.width, y1: 1},
+			rect:   rect{x0: split, y0: 0, x1: b.width, y1: 1},
+		})
+	case layout.prevX >= 0:
+		targets = append(targets, columnTarget{
+			col:    b.activeCol - 1,
+			status: b.columns[b.activeCol-1].status,
+			rect:   rect{x0: 0, y0: 0, x1: max(half, layout.prevX+1), y1: 1},
+		})
+	case layout.nextX >= 0:
+		targets = append(targets, columnTarget{
+			col:    b.activeCol + 1,
+			status: b.columns[b.activeCol+1].status,
+			rect:   rect{x0: min(half, layout.nextX), y0: 0, x1: b.width, y1: 1},
 		})
 	}
 	return rendered, targets
+}
+
+type compactHeaderLayout struct {
+	text         string
+	prevX, nextX int
 }
 
 // compactNarrowHeader preserves the available navigation cues and position,
 // truncating only the label between them. At widths too small for the full
 // layout, arrows take priority over position and label text.
 func compactNarrowHeader(label string, hasPrev, hasNext bool, current, total, width int) string {
+	return layoutCompactNarrowHeader(label, hasPrev, hasNext, current, total, width).text
+}
+
+func layoutCompactNarrowHeader(
+	label string,
+	hasPrev, hasNext bool,
+	current, total, width int,
+) compactHeaderLayout {
+	layout := compactHeaderLayout{prevX: -1, nextX: -1}
 	if width <= 0 {
-		return ""
+		return layout
 	}
 
 	left, right := "  ", "  "
 	if hasPrev {
 		left = "◂ "
+		layout.prevX = 0
 	}
 	if hasNext {
 		right = " ▸"
 	}
 	position := fmt.Sprintf(" %d/%d", current, total)
 	fixedWidth := lipgloss.Width(left) + lipgloss.Width(right) + lipgloss.Width(position)
-	if width < fixedWidth {
+	if width <= fixedWidth {
 		return compactNarrowControls(hasPrev, hasNext, current, total, width)
 	}
 
 	labelWidth := width - fixedWidth
 	label = truncate(label, labelWidth)
 	label += strings.Repeat(" ", max(0, labelWidth-lipgloss.Width(label)))
-	return left + label + right + position
+	if hasNext {
+		layout.nextX = lipgloss.Width(left) + labelWidth + 1
+	}
+	layout.text = left + label + right + position
+	return layout
 }
 
-func compactNarrowControls(hasPrev, hasNext bool, current, total, width int) string {
-	var arrows string
-	if hasPrev {
-		arrows += "◂"
+func compactNarrowControls(hasPrev, hasNext bool, current, total, width int) compactHeaderLayout {
+	layout := compactHeaderLayout{prevX: -1, nextX: -1}
+	if width <= 0 {
+		return layout
 	}
-	if hasNext {
-		arrows += "▸"
-	}
-	position := fmt.Sprintf("%d/%d", current, total)
 
-	line := arrows
-	switch {
-	case line == "":
-		line = position
-	case lipgloss.Width(line)+1+lipgloss.Width(position) <= width:
-		line += " " + position
+	position := fmt.Sprintf("%d/%d", current, total)
+	if !hasPrev && !hasNext {
+		layout.text = truncateCells(position, width)
+		layout.text += strings.Repeat(" ", max(0, width-lipgloss.Width(layout.text)))
+		return layout
 	}
-	line = truncateCells(line, width)
-	return line + strings.Repeat(" ", max(0, width-lipgloss.Width(line)))
+
+	cells := []rune(strings.Repeat(" ", width))
+	if hasPrev {
+		cells[0] = '◂'
+		layout.prevX = 0
+	}
+	if hasNext && (!hasPrev || width > 1) {
+		cells[width-1] = '▸'
+		layout.nextX = width - 1
+	}
+
+	start, end := 0, width
+	if layout.prevX >= 0 {
+		start++
+	}
+	if layout.nextX >= 0 {
+		end--
+	}
+	positionWidth := lipgloss.Width(position)
+	if positionWidth <= end-start {
+		centeredStart := (width - positionWidth) / 2 //nolint:mnd // center within the compact bar
+		positionStart := min(max(centeredStart, start), end-positionWidth)
+		copy(cells[positionStart:], []rune(position))
+	}
+
+	layout.text = string(cells)
+	return layout
 }
 
 // renderSearchBar renders the live title-filter input line shown while the
