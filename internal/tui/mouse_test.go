@@ -598,7 +598,13 @@ func TestMouseLayoutUnicodeCardHeightMatchesTarget(t *testing.T) {
 	_ = b.View()
 
 	target := targetForTask(t, b, 1)
-	want := b.cardHeight(b.columns[0].tasks[0], b.columnWidth())
+	// Width 40 is below the narrow threshold, so the card renders at the full
+	// terminal width rather than columnWidth().
+	renderWidth := b.columnWidth()
+	if b.narrow() {
+		renderWidth = b.width
+	}
+	want := b.cardHeight(b.columns[0].tasks[0], renderWidth)
 	if got := target.rect.y1 - target.rect.y0; got != want {
 		t.Fatalf("Unicode card target height=%d, want rendered height %d", got, want)
 	}

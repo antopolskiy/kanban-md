@@ -37,15 +37,16 @@ func migrate(cfg *Config) error {
 // migrations maps each version to the function that migrates it to the next version.
 // The migration function must increment cfg.Version after a successful migration.
 var migrations = map[int]func(*Config) error{
-	1: migrateV1ToV2,
-	2: migrateV2ToV3,
-	3: migrateV3ToV4,
-	4: migrateV4ToV5,
-	5: migrateV5ToV6,
-	6: migrateV6ToV7,
-	7: migrateV7ToV8,
-	8: migrateV8ToV9,
-	9: migrateV9ToV10,
+	1:  migrateV1ToV2,
+	2:  migrateV2ToV3,
+	3:  migrateV3ToV4,
+	4:  migrateV4ToV5,
+	5:  migrateV5ToV6,
+	6:  migrateV6ToV7,
+	7:  migrateV7ToV8,
+	8:  migrateV8ToV9,
+	9:  migrateV9ToV10,
+	10: migrateV10ToV11,
 }
 
 // migrateV1ToV2 adds the wip_limits field (defaults to nil/empty = unlimited).
@@ -139,5 +140,11 @@ func migrateV8ToV9(cfg *Config) error { //nolint:unparam // signature must match
 // migrateV9ToV10 adds tui.hide_empty_columns (default false).
 func migrateV9ToV10(cfg *Config) error { //nolint:unparam // signature must match migrations map type
 	cfg.Version = 10
+	return nil
+}
+
+// migrateV10ToV11 adds tui.narrow_threshold (default 0 = automatic).
+func migrateV10ToV11(cfg *Config) error { //nolint:unparam // signature must match migrations map type
+	cfg.Version = 11
 	return nil
 }

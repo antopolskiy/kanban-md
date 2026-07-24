@@ -63,6 +63,9 @@ type TUIConfig struct {
 	TitleLines       int            `yaml:"title_lines,omitempty"`
 	AgeThresholds    []AgeThreshold `yaml:"age_thresholds,omitempty"`
 	HideEmptyColumns bool           `yaml:"hide_empty_columns,omitempty"`
+	// NarrowThreshold is the terminal width below which the TUI renders a
+	// single column at a time; 0 = automatic, 1 effectively disables it.
+	NarrowThreshold int `yaml:"narrow_threshold,omitempty"`
 }
 
 // StatusConfig defines a status column and its enforcement rules.
@@ -266,6 +269,9 @@ func (c *Config) validateTUI() error {
 	if c.TUI.TitleLines < minTitleLines || c.TUI.TitleLines > maxTitleLines {
 		return fmt.Errorf("%w: tui.title_lines must be between %d and %d",
 			ErrInvalid, minTitleLines, maxTitleLines)
+	}
+	if c.TUI.NarrowThreshold < 0 {
+		return fmt.Errorf("%w: tui.narrow_threshold must be >= 0", ErrInvalid)
 	}
 	for i, at := range c.TUI.AgeThresholds {
 		if _, err := time.ParseDuration(at.After); err != nil {
