@@ -174,6 +174,19 @@ func addExtendedConfigAccessors(accessors map[string]configAccessor) {
 		},
 		writable: true,
 	}
+	accessors["tui.narrow_threshold"] = configAccessor{
+		get: func(c *config.Config) any { return c.TUI.NarrowThreshold },
+		set: func(c *config.Config, v string) error {
+			n, err := strconv.Atoi(v)
+			if err != nil {
+				return clierr.Newf(clierr.InvalidInput,
+					"invalid tui.narrow_threshold %q: must be an integer", v)
+			}
+			c.TUI.NarrowThreshold = n
+			return nil // validation handles non-negative check
+		},
+		writable: true,
+	}
 	accessors["tui.age_thresholds"] = configAccessor{
 		get: func(c *config.Config) any { return c.TUI.AgeThresholds },
 	}
@@ -196,6 +209,7 @@ func allConfigKeys() []string {
 		"classes",
 		"tui.title_lines",
 		"tui.hide_empty_columns",
+		"tui.narrow_threshold",
 		"tui.age_thresholds",
 		"next_id",
 	}

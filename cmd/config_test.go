@@ -38,6 +38,7 @@ func TestAllConfigKeys_ExpectedCoverage(t *testing.T) {
 		"classes",
 		"tui.title_lines",
 		"tui.hide_empty_columns",
+		"tui.narrow_threshold",
 		"tui.age_thresholds",
 		"next_id",
 	}
@@ -206,6 +207,35 @@ func TestConfigAccessors_SetTUIHideEmptyColumns_Invalid(t *testing.T) {
 	}
 }
 
+func TestConfigAccessors_SetTUINarrowThreshold(t *testing.T) {
+	accessors := configAccessors()
+	cfg := config.NewDefault("Test")
+
+	acc, ok := accessors["tui.narrow_threshold"]
+	if !ok {
+		t.Fatal("accessor for tui.narrow_threshold not found")
+	}
+	if err := acc.set(cfg, "200"); err != nil {
+		t.Fatal(err)
+	}
+	if cfg.TUI.NarrowThreshold != 200 {
+		t.Errorf("tui.narrow_threshold = %d, want 200", cfg.TUI.NarrowThreshold)
+	}
+}
+
+func TestConfigAccessors_SetTUINarrowThreshold_Invalid(t *testing.T) {
+	accessors := configAccessors()
+	cfg := config.NewDefault("Test")
+
+	acc, ok := accessors["tui.narrow_threshold"]
+	if !ok {
+		t.Fatal("accessor for tui.narrow_threshold not found")
+	}
+	if err := acc.set(cfg, "abc"); err == nil {
+		t.Fatal("expected error for non-numeric narrow_threshold")
+	}
+}
+
 func TestConfigAccessors_ReadOnlyKeys(t *testing.T) {
 	accessors := configAccessors()
 	readOnlyKeys := []string{
@@ -230,6 +260,7 @@ func TestConfigAccessors_WritableKeys(t *testing.T) {
 	writableKeys := []string{
 		"board.name", "board.description", "defaults.status", "defaults.priority",
 		"defaults.class", "claim_timeout", "tui.title_lines", "tui.hide_empty_columns",
+		"tui.narrow_threshold",
 	}
 
 	for _, key := range writableKeys {

@@ -204,6 +204,7 @@ func TestConfigAccessors_GetReadOnlyValues(t *testing.T) {
 		{"classes", true},
 		{"tui.title_lines", true},
 		{"tui.hide_empty_columns", true},
+		{"tui.narrow_threshold", true},
 		{"tui.age_thresholds", true},
 		{"claim_timeout", true},
 	}

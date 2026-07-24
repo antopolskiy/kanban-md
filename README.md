@@ -540,12 +540,14 @@ Narrow mode activates automatically once columns can no longer get a usable
 width. To force or tune it:
 
 ```bash
-kanban-md tui --narrow   # force the single-column layout at any width
+kanban-md tui --narrow                         # force narrow mode for this run
+kanban-md config set tui.narrow_threshold 80  # persist a custom trigger width
 ```
 
-Set `tui.narrow_threshold` in `config.yml` to override the automatic trigger — the
-board goes narrow below that terminal width. Leave it unset (or `0`) for the
-automatic behavior; set it to `1` to effectively disable narrow mode.
+Set `tui.narrow_threshold` with `kanban-md config set` (or directly in
+`config.yml`) to override the automatic trigger — the board goes narrow below
+that terminal width. Use `0` for automatic behavior or `1` to effectively
+disable narrow mode.
 
 ### Mouse mode
 
