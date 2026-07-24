@@ -1608,16 +1608,15 @@ func (b *Board) renderNarrowTabBar() (string, []columnTarget) {
 func (b *Board) renderNarrowCompactBar() (string, []columnTarget) {
 	col := b.columns[b.activeCol]
 	headerText := fmt.Sprintf("%s (%d)", col.status, len(col.tasks))
-	left, right := "◂ ", " ▸"
-	if b.activeCol == 0 {
-		left = "  "
-	}
-	if b.activeCol == len(b.columns)-1 {
-		right = "  "
-	}
-	position := fmt.Sprintf("  %d/%d", b.activeCol+1, len(b.columns))
 	const barPad = 2 // header style pads 1 cell each side
-	line := truncate(left+headerText+right+position, b.width-barPad)
+	line := compactNarrowHeader(
+		headerText,
+		b.activeCol > 0,
+		b.activeCol < len(b.columns)-1,
+		b.activeCol+1,
+		len(b.columns),
+		b.width-barPad,
+	)
 	rendered := activeColumnHeaderStyle.Width(b.width).Render(line)
 
 	var targets []columnTarget
@@ -1637,6 +1636,54 @@ func (b *Board) renderNarrowCompactBar() (string, []columnTarget) {
 		})
 	}
 	return rendered, targets
+}
+
+// compactNarrowHeader preserves the available navigation cues and position,
+// truncating only the label between them. At widths too small for the full
+// layout, arrows take priority over position and label text.
+func compactNarrowHeader(label string, hasPrev, hasNext bool, current, total, width int) string {
+	if width <= 0 {
+		return ""
+	}
+
+	left, right := "  ", "  "
+	if hasPrev {
+		left = "◂ "
+	}
+	if hasNext {
+		right = " ▸"
+	}
+	position := fmt.Sprintf(" %d/%d", current, total)
+	fixedWidth := lipgloss.Width(left) + lipgloss.Width(right) + lipgloss.Width(position)
+	if width < fixedWidth {
+		return compactNarrowControls(hasPrev, hasNext, current, total, width)
+	}
+
+	labelWidth := width - fixedWidth
+	label = truncate(label, labelWidth)
+	label += strings.Repeat(" ", max(0, labelWidth-lipgloss.Width(label)))
+	return left + label + right + position
+}
+
+func compactNarrowControls(hasPrev, hasNext bool, current, total, width int) string {
+	var arrows string
+	if hasPrev {
+		arrows += "◂"
+	}
+	if hasNext {
+		arrows += "▸"
+	}
+	position := fmt.Sprintf("%d/%d", current, total)
+
+	line := arrows
+	switch {
+	case line == "":
+		line = position
+	case lipgloss.Width(line)+1+lipgloss.Width(position) <= width:
+		line += " " + position
+	}
+	line = truncateCells(line, width)
+	return line + strings.Repeat(" ", max(0, width-lipgloss.Width(line)))
 }
 
 // renderSearchBar renders the live title-filter input line shown while the
@@ -1676,7 +1723,7 @@ func (b *Board) renderColumn(colIdx int, col column, width int) (string, []cardT
 	}
 	// Truncate to fit within padding (1 left + 1 right).
 	const headerPad = 2
-	headerText = truncate(headerText, width-headerPad)
+	headerText = b.fitColumnHeader(colIdx, col.status, headerText, width-headerPad)
 
 	var header string
 	switch {
@@ -1737,6 +1784,15 @@ func (b *Board) renderColumn(colIdx int, col column, width int) (string, []cardT
 	}
 
 	return lipgloss.JoinVertical(lipgloss.Left, parts...), targets
+}
+
+func (b *Board) fitColumnHeader(colIdx int, status, headerText string, width int) string {
+	if b.narrow() && colIdx == b.activeCol &&
+		lipgloss.Width(status) <= width &&
+		lipgloss.Width(headerText) > width {
+		return status
+	}
+	return truncate(headerText, width)
 }
 
 func (b *Board) renderCard(t *task.Task, active bool, width int) string {
@@ -2495,11 +2551,14 @@ func (b *Board) viewDebugScreen() string {
 }
 
 func truncate(s string, maxLen int) string {
-	if maxLen < 4 { //nolint:mnd // minimum length for truncation
-		maxLen = 4
+	if maxLen <= 0 {
+		return ""
 	}
 	if lipgloss.Width(s) <= maxLen {
 		return s
+	}
+	if maxLen < 4 { //nolint:mnd // no room for a three-cell ellipsis
+		return truncateCells(s, maxLen)
 	}
 	// Slice by runes to avoid breaking multi-byte UTF-8 characters.
 	runes := []rune(s)
@@ -2512,6 +2571,17 @@ func truncate(s string, maxLen int) string {
 		target--
 	}
 	return string(runes[:target]) + "..."
+}
+
+func truncateCells(s string, maxWidth int) string {
+	if maxWidth <= 0 {
+		return ""
+	}
+	runes := []rune(s)
+	for len(runes) > 0 && lipgloss.Width(string(runes)) > maxWidth {
+		runes = runes[:len(runes)-1]
+	}
+	return string(runes)
 }
 
 // humanDuration formats a duration as a compact human-readable string.

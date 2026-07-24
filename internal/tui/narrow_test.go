@@ -1,10 +1,12 @@
 package tui
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 
 	"github.com/antopolskiy/kanban-md/internal/task"
 )
@@ -65,6 +67,24 @@ func TestNarrow_ActiveHeaderShowsFullName(t *testing.T) {
 	view := b.View()
 	if !strings.Contains(view, longName) {
 		t.Errorf("narrow view should show the full active column name %q even when the tab strip abbreviates it:\n%s", longName, view)
+	}
+}
+
+func TestNarrow_ActiveHeaderPrioritizesNameOverMetadata(t *testing.T) {
+	b := newMouseTestBoard()
+	const statusName = "abcdefghijklmnopq" // 17 cells; fits in width 20 after header padding
+	b.columns[0].status = statusName
+	b.activeCol = 0
+	b.SetForceNarrow(true)
+	b.Update(tea.WindowSizeMsg{Width: 20, Height: 30})
+
+	rendered, _ := b.renderColumn(0, b.columns[0], b.width)
+	header := strings.SplitN(rendered, "\n", 2)[0]
+	if !strings.Contains(header, statusName) {
+		t.Fatalf("active header should preserve fitting status name %q: %q", statusName, header)
+	}
+	if strings.Contains(header, "(2)") {
+		t.Fatalf("active header should omit metadata that would truncate the status name: %q", header)
 	}
 }
 
@@ -168,6 +188,56 @@ func TestNarrow_CompactBarTapSwitchesColumn(t *testing.T) {
 	b.Update(tea.MouseMsg{X: x, Y: 0, Button: tea.MouseButtonLeft, Action: tea.MouseActionPress})
 	if b.activeCol != want {
 		t.Errorf("tapping compact-bar next zone left activeCol=%d, want %d", b.activeCol, want)
+	}
+}
+
+func TestNarrow_CompactBarShowsNavigationAndPosition(t *testing.T) {
+	tests := []struct {
+		name     string
+		active   int
+		wantPrev bool
+		wantNext bool
+	}{
+		{name: "first", active: 0, wantNext: true},
+		{name: "middle", active: 2, wantPrev: true, wantNext: true},
+		{name: "last", active: 4, wantPrev: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			b := newMouseTestBoard()
+			b.activeCol = tt.active
+			b.SetForceNarrow(true)
+			b.Update(tea.WindowSizeMsg{Width: 14, Height: 20})
+
+			rendered, _ := b.renderNarrowCompactBar()
+			if got := strings.Contains(rendered, "◂"); got != tt.wantPrev {
+				t.Errorf("previous cue visible=%v, want %v: %q", got, tt.wantPrev, rendered)
+			}
+			if got := strings.Contains(rendered, "▸"); got != tt.wantNext {
+				t.Errorf("next cue visible=%v, want %v: %q", got, tt.wantNext, rendered)
+			}
+			position := fmt.Sprintf("%d/%d", tt.active+1, len(b.columns))
+			if !strings.Contains(rendered, position) {
+				t.Errorf("compact bar should preserve position %q: %q", position, rendered)
+			}
+		})
+	}
+}
+
+func TestCompactNarrowHeader_TinyWidthsDoNotOverflow(t *testing.T) {
+	for width := 1; width <= 8; width++ {
+		got := compactNarrowHeader("backlog (2)", true, true, 3, 5, width)
+		if gotWidth := lipgloss.Width(got); gotWidth != width {
+			t.Errorf("width %d rendered %d cells: %q", width, gotWidth, got)
+		}
+	}
+
+	if got := compactNarrowHeader("backlog (2)", true, true, 3, 5, 2); got != "◂▸" {
+		t.Errorf("two-cell header should prioritize both navigation cues, got %q", got)
+	}
+	if got := compactNarrowHeader("backlog (2)", true, true, 3, 5, 6); got != "◂▸ 3/5" {
+		t.Errorf("six-cell header should show navigation and position, got %q", got)
 	}
 }
 
