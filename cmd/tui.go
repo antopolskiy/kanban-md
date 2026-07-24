@@ -38,6 +38,7 @@ func addTUIFlags(cmd *cobra.Command) {
 	cmd.Flags().Bool("hide-empty-columns", false, "hide empty columns in TUI (overrides config)")
 	cmd.Flags().Bool("show-empty-columns", false, "show empty columns in TUI (overrides config)")
 	cmd.Flags().Bool("mouse", false, "enable mouse navigation in TUI")
+	cmd.Flags().Bool("narrow", false, "force single-column (narrow) layout at any width")
 }
 
 func init() {
@@ -78,9 +79,16 @@ func runTUI(cmd *cobra.Command, _ []string) error {
 		return err
 	}
 
+	forceNarrow, err := cmd.Flags().GetBool("narrow")
+	if err != nil {
+		return err
+	}
+
 	model := tui.NewBoard(cfg)
 	model.SetHideEmptyColumns(hideEmptyColumns)
 	model.SetMouseEnabled(mouseEnabled)
+	model.SetNarrowThreshold(cfg.TUI.NarrowThreshold)
+	model.SetForceNarrow(forceNarrow)
 
 	programOptions := []tea.ProgramOption{tea.WithAltScreen()}
 	if mouseEnabled {

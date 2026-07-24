@@ -515,6 +515,7 @@ kanban-md tui --dir PATH  # point to a specific kanban directory
 kanban-md tui --hide-empty-columns  # override config and hide empty columns
 kanban-md tui --show-empty-columns  # override config and show empty columns
 kanban-md tui --mouse      # opt in to mouse navigation
+kanban-md tui --narrow     # force the single-column layout at any width
 ```
 
 Set `tui.hide_empty_columns` in `config.yml` to control the default behavior.
@@ -522,6 +523,31 @@ Set `tui.hide_empty_columns` in `config.yml` to control the default behavior.
 > **Note:** Older releases shipped a standalone `kanban-md-tui` binary. It has been retired — use `kanban-md tui` instead.
 
 In create/edit dialogs, text fields support cursor-based editing (`←/→`, `Home/End`, `Backspace`, `Delete`).
+
+### Narrow mode (small terminals)
+
+On terminals too narrow to show every column side by side — a phone over SSH, a
+split pane — the board automatically switches to a single-column layout. It shows
+one column at a time, full width, under a two-line header: a tab strip of all
+columns (the active one highlighted) on top, and the active column's own full
+name, count, and WIP limit below. Card titles stay readable instead of being
+crushed to a few characters per column.
+
+Switch columns with `←`/`→`, `h`/`l`, or `Tab`/`Shift+Tab`. With `--mouse`, tap a
+tab to jump straight to that column; tapping a card selects it as usual.
+
+Narrow mode activates automatically once columns can no longer get a usable
+width. To force or tune it:
+
+```bash
+kanban-md tui --narrow                         # force narrow mode for this run
+kanban-md config set tui.narrow_threshold 80  # persist a custom trigger width
+```
+
+Set `tui.narrow_threshold` with `kanban-md config set` (or directly in
+`config.yml`) to override the automatic trigger — the board goes narrow below
+that terminal width. Use `0` for automatic behavior or `1` to effectively
+disable narrow mode.
 
 ### Mouse mode
 

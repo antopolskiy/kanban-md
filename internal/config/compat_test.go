@@ -634,6 +634,34 @@ func TestCompatV9ConfigMigratesToV10(t *testing.T) {
 	}
 }
 
+func TestCompatV10ConfigMigratesToV11(t *testing.T) {
+	const wantVersion = 11
+	if CurrentVersion != wantVersion {
+		t.Fatalf("CurrentVersion = %d, want %d for narrow_threshold schema", CurrentVersion, wantVersion)
+	}
+
+	tmp := t.TempDir()
+	fixture := filepath.Join("testdata", "compat", "v10")
+	copyDir(t, fixture, tmp)
+
+	cfg, err := Load(tmp)
+	if err != nil {
+		t.Fatalf("Load() v10 fixture: %v", err)
+	}
+	if cfg.Version != wantVersion {
+		t.Errorf("Version = %d, want %d (after migration)", cfg.Version, wantVersion)
+	}
+	if cfg.Board.Name != "Test Project v10" {
+		t.Errorf("Board.Name = %q, want %q", cfg.Board.Name, "Test Project v10")
+	}
+	if !cfg.TUI.HideEmptyColumns {
+		t.Error("TUI.HideEmptyColumns = false, want preserved true")
+	}
+	if cfg.TUI.NarrowThreshold != 0 {
+		t.Errorf("TUI.NarrowThreshold = %d, want automatic default 0", cfg.TUI.NarrowThreshold)
+	}
+}
+
 func TestCompatV1TasksReadable(t *testing.T) {
 	// This test verifies that the current task reader can parse v1 task files.
 	// We only check that files exist and are well-formed here; detailed task

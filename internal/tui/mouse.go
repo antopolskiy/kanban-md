@@ -65,7 +65,10 @@ type layoutSnapshot struct {
 	view       view
 	cards      []cardTarget
 	columns    []columnTarget
-	back       *backTarget
+	// tabs are the narrow-mode tab-strip hit targets; tapping one switches
+	// the active column.
+	tabs []columnTarget
+	back *backTarget
 }
 
 type pointerTargetKind int
@@ -143,6 +146,58 @@ func (b *Board) captureBoardLayout(colWidth, targetHeight int, targets [][]cardT
 	}
 }
 
+// captureNarrowBoardLayout records hit-test rects for narrow (single-column)
+// mode: tab-strip targets on row 0, the active column below it, and its card
+// targets translated past the tab bar. With one column in the layout,
+// drag-to-move degrades to click semantics; switching happens via the tabs.
+func (b *Board) captureNarrowBoardLayout(targetHeight int, targets []cardTarget, tabs []columnTarget) {
+	if !b.mouseEnabled || b.view != viewBoard || b.width <= 0 || targetHeight <= 0 {
+		return
+	}
+
+	screen := rect{x0: 0, y0: 0, x1: b.width, y1: min(targetHeight, b.height)}
+	if screen.empty() {
+		return
+	}
+
+	const tabBarHeight = 1
+	for _, tab := range tabs {
+		tab.rect = tab.rect.intersect(screen)
+		if !tab.rect.empty() {
+			b.layout.tabs = append(b.layout.tabs, tab)
+		}
+	}
+
+	colRect := rect{x0: 0, y0: tabBarHeight, x1: b.width, y1: targetHeight}.intersect(screen)
+	if colRect.empty() {
+		return
+	}
+	b.layout.columns = append(b.layout.columns, columnTarget{
+		col:    b.activeCol,
+		status: b.columns[b.activeCol].status,
+		rect:   colRect,
+	})
+	for _, target := range targets {
+		target.rect = target.rect.translate(0, tabBarHeight).intersect(screen)
+		if !target.rect.empty() {
+			b.layout.cards = append(b.layout.cards, target)
+		}
+	}
+}
+
+// tabAt returns the narrow-mode tab target at the given position, if any.
+func (b *Board) tabAt(x, y int) *columnTarget {
+	if b.layout.generation != b.layoutGeneration || b.layout.view != viewBoard {
+		return nil
+	}
+	for i := range b.layout.tabs {
+		if b.layout.tabs[i].rect.contains(x, y) {
+			return &b.layout.tabs[i]
+		}
+	}
+	return nil
+}
+
 func (b *Board) handleMouse(msg tea.MouseEvent) (tea.Model, tea.Cmd) {
 	if !b.mouseEnabled || msg.Shift || msg.Alt || msg.Ctrl {
 		b.clearGesture()
@@ -178,6 +233,14 @@ func (b *Board) handleBoardMouse(msg tea.MouseEvent) (tea.Model, tea.Cmd) {
 		if msg.Button != tea.MouseButtonLeft {
 			b.clearGesture()
 			b.clearPendingClick()
+			return b, nil
+		}
+		if tab := b.tabAt(msg.X, msg.Y); tab != nil {
+			b.clearGesture()
+			b.clearPendingClick()
+			b.activeCol = tab.col
+			b.clampRow()
+			b.ensureVisible()
 			return b, nil
 		}
 		if target := b.cardAt(msg.X, msg.Y); target != nil {

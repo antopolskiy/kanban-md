@@ -4,6 +4,7 @@
 │                                                                             │
 │  ←/h           Move to left column                                          │
 │  →/l           Move to right column                                         │
+│  tab           Next column (shift+tab: previous)                            │
 │  ↓/j           Move cursor down                                             │
 │  ↑/k           Move cursor up                                               │
 │  enter         Show task detail                                             │

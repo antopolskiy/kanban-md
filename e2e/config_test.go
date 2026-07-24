@@ -20,7 +20,8 @@ func TestConfigShowAll(t *testing.T) {
 		"version", "board.name", "board.description", "tasks_dir",
 		"statuses", "priorities", "defaults.status", "defaults.priority", "defaults.class",
 		"wip_limits", "claim_timeout", "classes",
-		"tui.title_lines", "tui.hide_empty_columns", "tui.age_thresholds", "next_id",
+		"tui.title_lines", "tui.hide_empty_columns", "tui.narrow_threshold",
+		"tui.age_thresholds", "next_id",
 	}
 	for _, key := range expectedKeys {
 		if _, ok := cfg[key]; !ok {
@@ -117,6 +118,31 @@ func TestConfigSetTUIHideEmptyColumns(t *testing.T) {
 	runKanbanJSON(t, kanbanDir, &val, "config", "get", "tui.hide_empty_columns")
 	if !val {
 		t.Error("tui.hide_empty_columns = false, want true")
+	}
+}
+
+func TestConfigSetTUINarrowThreshold(t *testing.T) {
+	kanbanDir := initBoard(t)
+
+	runKanban(t, kanbanDir, "--json", "config", "set", "tui.narrow_threshold", "200")
+
+	var val int
+	runKanbanJSON(t, kanbanDir, &val, "config", "get", "tui.narrow_threshold")
+	if val != 200 {
+		t.Errorf("tui.narrow_threshold = %d, want 200", val)
+	}
+}
+
+func TestConfigSetTUINarrowThresholdInvalid(t *testing.T) {
+	kanbanDir := initBoard(t)
+
+	errResp := runKanbanJSONError(t, kanbanDir,
+		"config", "set", "tui.narrow_threshold", "not-a-number")
+	if errResp.Code != codeInvalidInput {
+		t.Errorf("code = %q, want INVALID_INPUT", errResp.Code)
+	}
+	if !strings.Contains(errResp.Error, "narrow_threshold") {
+		t.Errorf("error = %q, want 'narrow_threshold'", errResp.Error)
 	}
 }
 
