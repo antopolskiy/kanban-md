@@ -84,6 +84,10 @@ type Board struct {
 	// hideEmptyColumns controls whether status columns with zero visible tasks
 	// are removed from the board view.
 	hideEmptyColumns bool
+	// narrowThreshold is the width below which the board renders a single
+	// column at a time (<= 0 = automatic); forceNarrow is the --narrow flag.
+	narrowThreshold  int
+	forceNarrow      bool
 	now              func() time.Time // clock for duration display; defaults to time.Now
 	mouseEnabled     bool
 	mouseNow         func() time.Time
@@ -168,6 +172,38 @@ func (b *Board) SetHideEmptyColumns(v bool) {
 	b.hideEmptyColumns = v
 	b.invalidatePointerState()
 	b.loadTasks()
+}
+
+// SetNarrowThreshold sets the terminal width below which the board renders in
+// narrow (single-column) mode. Values <= 0 fall back to the default.
+func (b *Board) SetNarrowThreshold(v int) {
+	b.narrowThreshold = v
+}
+
+// SetForceNarrow forces narrow (single-column) rendering at any width.
+func (b *Board) SetForceNarrow(v bool) {
+	b.forceNarrow = v
+}
+
+// minUsableColumnWidth is the narrowest a column can get before the
+// multi-column board stops being readable.
+const minUsableColumnWidth = 14
+
+// narrow reports whether the board should render in single-column mode:
+// when the terminal cannot give every visible column a usable width, or the
+// configured threshold says so.
+func (b *Board) narrow() bool {
+	if b.forceNarrow {
+		return true
+	}
+	if b.width <= 0 || len(b.columns) == 0 {
+		return false
+	}
+	threshold := b.narrowThreshold
+	if threshold <= 0 {
+		threshold = minUsableColumnWidth * len(b.columns)
+	}
+	return b.width < threshold
 }
 
 // Init implements tea.Model.
@@ -273,6 +309,10 @@ func (b *Board) handleBoardKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		b.view = viewHelp
 	case "h", keyLeft, "l", keyRight, "j", keyDown, "k", keyUp:
 		b.handleNavigation(msg.String())
+	case "tab":
+		b.handleNavigation("l")
+	case "shift+tab":
+		b.handleNavigation("h")
 	case keyEnter:
 		b.handleEnter()
 	case "n":
@@ -1023,6 +1063,10 @@ func (b *Board) visibleCardsForColumn(col *column, width int) int {
 
 	// Always need 1 line for column header.
 	avail := budget - 1
+	// Narrow mode adds a one-line tab strip above the column.
+	if b.narrow() {
+		avail--
+	}
 
 	// Check if up indicator is needed.
 	if col.scrollOff > 0 {
@@ -1057,7 +1101,12 @@ func (b *Board) ensureVisible() {
 	if col == nil {
 		return
 	}
+	// Use the width the active column actually renders at — full terminal
+	// width in narrow mode — or scroll math disagrees with the render.
 	w := b.columnWidth()
+	if b.narrow() {
+		w = b.width
+	}
 
 	for range len(col.tasks) + 1 {
 		maxVis := b.visibleCardsForColumn(col, w)
@@ -1357,6 +1406,16 @@ var (
 
 	dimStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
 
+	// Narrow-mode tab strip styles (no padding — tab hit rects are computed
+	// from rendered label widths).
+	narrowTabStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("250")).
+			Background(lipgloss.Color("238"))
+	activeNarrowTabStyle = lipgloss.NewStyle().
+				Bold(true).
+				Foreground(lipgloss.Color("230")).
+				Background(lipgloss.Color("62"))
+
 	claimStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("44")).Bold(true)
 
 	detailLabelStyle = lipgloss.NewStyle().Bold(true).Width(14) //nolint:mnd // label column width
@@ -1391,6 +1450,10 @@ func (b *Board) viewBoard() string {
 		return "No statuses configured."
 	}
 
+	if b.narrow() {
+		return b.viewBoardNarrow()
+	}
+
 	// Calculate column width.
 	colWidth := b.columnWidth()
 
@@ -1403,27 +1466,177 @@ func (b *Board) viewBoard() string {
 
 	boardView := lipgloss.JoinHorizontal(lipgloss.Top, renderedCols...)
 
-	// Ensure the board view fits within the available height. At very small
-	// terminal sizes, a single card can exceed the budget. Clamp from the
-	// bottom (keeping headers at the top) and pad if needed.
 	targetHeight := b.height - b.chromeHeight()
-	if targetHeight > 0 {
-		actual := strings.Count(boardView, "\n") + 1
-		if actual > targetHeight {
-			viewLines := strings.SplitN(boardView, "\n", targetHeight+1)
-			boardView = strings.Join(viewLines[:targetHeight], "\n")
-		} else if actual < targetHeight {
-			boardView += strings.Repeat("\n", targetHeight-actual)
-		}
-	}
+	boardView = fitToHeight(boardView, targetHeight)
 	b.captureBoardLayout(colWidth, targetHeight, renderedTargets)
 
+	return b.withStatusBar(boardView)
+}
+
+// fitToHeight clamps boardView to targetHeight lines, trimming from the
+// bottom (keeping headers at the top) or padding to fill. A non-positive
+// targetHeight leaves the view unchanged.
+func fitToHeight(boardView string, targetHeight int) string {
+	if targetHeight <= 0 {
+		return boardView
+	}
+	actual := strings.Count(boardView, "\n") + 1
+	switch {
+	case actual > targetHeight:
+		viewLines := strings.SplitN(boardView, "\n", targetHeight+1)
+		return strings.Join(viewLines[:targetHeight], "\n")
+	case actual < targetHeight:
+		return boardView + strings.Repeat("\n", targetHeight-actual)
+	default:
+		return boardView
+	}
+}
+
+// withStatusBar appends the status bar (or the search input while searching)
+// below boardView, separated by a blank line.
+func (b *Board) withStatusBar(boardView string) string {
 	bottom := b.renderStatusBar()
 	if b.view == viewSearch {
 		bottom = b.renderSearchBar()
 	}
-
 	return lipgloss.JoinVertical(lipgloss.Left, boardView, "", bottom)
+}
+
+// viewBoardNarrow renders the active column at full width under a tab strip
+// of all columns — used when the terminal is too narrow for the multi-column
+// board. Navigation keys are unchanged; with --mouse, tabs are tappable.
+func (b *Board) viewBoardNarrow() string {
+	if b.activeCol >= len(b.columns) {
+		b.activeCol = len(b.columns) - 1
+	}
+
+	tabBar, tabTargets := b.renderNarrowTabBar()
+
+	col := b.columns[b.activeCol]
+	rendered, targets := b.renderColumn(b.activeCol, col, b.width)
+	// The strip abbreviates names as needed; the active column keeps its full
+	// header on its own line below.
+	boardView := lipgloss.JoinVertical(lipgloss.Left, tabBar, rendered)
+
+	targetHeight := b.height - b.chromeHeight()
+	boardView = fitToHeight(boardView, targetHeight)
+	b.captureNarrowBoardLayout(targetHeight, targets, tabTargets)
+
+	return b.withStatusBar(boardView)
+}
+
+// renderNarrowTabBar renders the one-line column tab strip shown above the
+// active column in narrow mode, and returns per-tab hit rects (row 0) for
+// mouse taps. Names trim longest-first (no ellipsis) when the strip doesn't
+// fit; at extreme widths it falls back to the compact ◂/▸ indicator.
+func (b *Board) renderNarrowTabBar() (string, []columnTarget) {
+	type tab struct {
+		name  string
+		count string
+	}
+	tabs := make([]tab, len(b.columns))
+	for i, col := range b.columns {
+		count := strconv.Itoa(len(col.tasks))
+		if i == b.activeCol {
+			if wip := b.cfg.WIPLimit(col.status); wip > 0 {
+				count = fmt.Sprintf("%d/%d", len(col.tasks), wip)
+			}
+		}
+		tabs[i] = tab{name: col.status, count: count}
+	}
+
+	const chipPad = 2 // each chip renders as " name count"; gap separates chips
+	const gap = 1
+	width := func() int {
+		w := gap * (len(tabs) - 1)
+		for _, t := range tabs {
+			w += lipgloss.Width(t.name) + len(t.count) + chipPad
+		}
+		return w
+	}
+
+	// Trim the longest names first so only the names that must shrink do.
+	const minNameWidth = 3
+	for width() > b.width {
+		longest, longestW := -1, minNameWidth
+		for i, t := range tabs {
+			if w := lipgloss.Width(t.name); w > longestW {
+				longest, longestW = i, w
+			}
+		}
+		if longest < 0 {
+			// Everything is at minimum and it still doesn't fit.
+			return b.renderNarrowCompactBar()
+		}
+		// Trim by display cells, not runes — a trailing wide rune spans two.
+		runes := []rune(tabs[longest].name)
+		target := lipgloss.Width(tabs[longest].name) - 1
+		for len(runes) > 0 && lipgloss.Width(string(runes)) > target {
+			runes = runes[:len(runes)-1]
+		}
+		tabs[longest].name = string(runes)
+	}
+
+	var sb strings.Builder
+	targets := make([]columnTarget, 0, len(tabs))
+	x := 0
+	for i, t := range tabs {
+		if i > 0 {
+			sb.WriteString(strings.Repeat(" ", gap))
+			x += gap
+		}
+		label := " " + t.name + " " + t.count
+		w := lipgloss.Width(label)
+		if i == b.activeCol {
+			sb.WriteString(activeNarrowTabStyle.Render(label))
+		} else {
+			sb.WriteString(narrowTabStyle.Render(label))
+		}
+		targets = append(targets, columnTarget{
+			col:    i,
+			status: b.columns[i].status,
+			rect:   rect{x0: x, y0: 0, x1: x + w, y1: 1},
+		})
+		x += w
+	}
+	return sb.String(), targets
+}
+
+// renderNarrowCompactBar is the tab strip's fallback for terminals too narrow
+// to fit even abbreviated tabs: "◂ in-progress (3) ▸  4/6". The returned hit
+// targets split the bar into prev (left half) and next (right half) tap zones.
+func (b *Board) renderNarrowCompactBar() (string, []columnTarget) {
+	col := b.columns[b.activeCol]
+	headerText := fmt.Sprintf("%s (%d)", col.status, len(col.tasks))
+	left, right := "◂ ", " ▸"
+	if b.activeCol == 0 {
+		left = "  "
+	}
+	if b.activeCol == len(b.columns)-1 {
+		right = "  "
+	}
+	position := fmt.Sprintf("  %d/%d", b.activeCol+1, len(b.columns))
+	const barPad = 2 // header style pads 1 cell each side
+	line := truncate(left+headerText+right+position, b.width-barPad)
+	rendered := activeColumnHeaderStyle.Width(b.width).Render(line)
+
+	var targets []columnTarget
+	half := b.width / 2 //nolint:mnd // two tap zones: left half = prev, right half = next
+	if b.activeCol > 0 {
+		targets = append(targets, columnTarget{
+			col:    b.activeCol - 1,
+			status: b.columns[b.activeCol-1].status,
+			rect:   rect{x0: 0, y0: 0, x1: half, y1: 1},
+		})
+	}
+	if b.activeCol < len(b.columns)-1 {
+		targets = append(targets, columnTarget{
+			col:    b.activeCol + 1,
+			status: b.columns[b.activeCol+1].status,
+			rect:   rect{x0: half, y0: 0, x1: b.width, y1: 1},
+		})
+	}
+	return rendered, targets
 }
 
 // renderSearchBar renders the live title-filter input line shown while the
@@ -2201,6 +2414,7 @@ func (b *Board) viewHelp() string {
 	help := []struct{ key, desc string }{
 		{"←/h", "Move to left column"},
 		{"→/l", "Move to right column"},
+		{"tab", "Next column (shift+tab: previous)"},
 		{"↓/j", "Move cursor down"},
 		{"↑/k", "Move cursor up"},
 		{"enter", "Show task detail"},
