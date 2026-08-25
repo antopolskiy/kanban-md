@@ -1,190 +1,38 @@
 # Guidelines
 
-> **Note:** `CODEX.md` and `CLAUDE.md` are symlinks to `AGENTS.md`. Only edit `AGENTS.md` — both files are always in sync.
+> **Note:** `CODEX.md` and `CLAUDE.md` are symlinks to `AGENTS.md`. Only edit
+> `AGENTS.md`; both files stay in sync.
 
-- Use semantic commit format, e.g.
+## Universal rules
 
-```
-feat: <short description>
+- Use semantic commit messages:
 
-Detailed description of the changes, that can be multiline, but do not artificially create line breaks, as commit messages are automatically wrapped.
-- Use bullet points
-- When needed
-```
+  ```text
+  feat: <short description>
 
-- When making changes that affect user-facing behavior (new commands, new flags, changed defaults, new installation methods, etc.), update `README.md` to reflect those changes.
-
-- Whenever any research is done (including by the subagents), it should be documented as a report in docs/research/YYYY-MM-DD-<description>.md. In case of subagents, the need to be instructed to create the report file and on completion return only the path to the report, so that the main agent can read and analyze it.
-
-- For releases, tags, publishing, or release-note work, use the project-local
-  `release-kanban-md` skill. Keep the operational release procedure in that
-  skill rather than duplicating it here.
-
-## Backward Compatibility
-
-When modifying `config.yml` schema or task file frontmatter, you must ensure backward compatibility:
-
-### Config design principles
-
-- **Collocate column settings with column definitions.** New or migrated
-  per-column configuration (for example `show_duration`, `require_claim`, and
-  WIP limits) belongs inside the corresponding `statuses` entry. The existing
-  top-level `wip_limits` map is a legacy compatibility shape, not a pattern for
-  new settings; migrate it when that schema is intentionally revised.
-
-### Config changes
-
-1. **Bump `CurrentVersion`** in `internal/config/defaults.go`.
-2. **Add a migration function** in `internal/config/migrate.go` that transforms the old format to the new one. Register it in the `migrations` map. The migration must increment `cfg.Version`.
-3. **Create a new fixture directory** at `internal/config/testdata/compat/vN/` (where N is the OLD version number) with a representative `config.yml` and sample task files. Copy from the previous version's fixtures before making changes.
-4. **Add a compat test** in `internal/config/compat_test.go` that loads the old fixture with the current code and verifies all fields parse correctly after migration.
-
-### Task file changes
-
-- **Adding new optional fields** with `omitempty` is always safe -- old files without the field parse correctly (zero value).
-- **Never rename or remove existing fields.** If a field must change, keep the old YAML tag and add the new one, or handle it in a migration.
-- When adding new task fields, add a fixture file in `internal/task/testdata/compat/v1/tasks/` that exercises the field (or create a new version directory if the format changes).
-- Add a compat test in `internal/task/compat_test.go` verifying the field parses correctly from fixtures.
-
-### Testing
-
-- Run `go test -run Compat ./internal/config/ ./internal/task/` to verify backward compatibility.
-- Compat tests must pass for ALL previous fixture versions, not just the latest.
-
-## Output Format Design
-
-The default output is **table**. TTY auto-detection was intentionally removed — agents run in non-TTY environments and were getting verbose JSON by default, wasting tokens and context window.
-
-Three formats are available:
-- **table** (default): Human-readable padded columns. Best for interactive terminal use.
-- **compact** (`--compact`/`--oneline` or `KANBAN_OUTPUT=compact`): One-line-per-record format modeled after `git log --oneline`. Avoids repeated JSON keys and other formatting overhead; designed for AI agent consumption.
-- **json** (`--json` or `KANBAN_OUTPUT=json`): Full structured JSON. Use for scripting and piping to `jq`.
-
-This is a deliberate design decision. Do not revert to TTY auto-detection without understanding the agent token cost implications. See `docs/research/2026-08-25-kanban-md-design-principles-orientation.md` for the current product and output-contract context.
-
-## Fixing Bugs (Test-Driven Development)
-
-When fixing bugs, use test-driven development: write a failing test that reproduces the bug first, then implement the fix.
-
-### Process
-
-1. **Read the bug description** and identify which package is affected (CLI command or TUI).
-2. **Study existing test patterns** in the relevant package to match style and helpers.
-3. **Write a failing test** that reproduces the exact bug behavior. Run it to confirm it fails.
-4. **Implement the fix** in the production code.
-5. **Run the failing test** to confirm it now passes.
-6. **Run the full test suite** to check for regressions.
-7. **Run lint** (`golangci-lint run ./...`) and fix any issues.
-8. **Update golden files** if snapshot tests are affected (`go test ./... -run TestSnapshot -update`).
-
-### Where to look for test patterns
-
-**CLI bugs** (`cmd/` package):
-- Unit tests: `cmd/*_test.go` — test individual command logic
-- E2E tests: `e2e/*_test.go` — run the compiled binary against complete command workflows
-- Test helpers: `runKanban`, `runKanbanEnv`, and related helpers in `e2e/helpers_test.go`
-
-**TUI bugs** (`internal/tui/` package):
-- Behavioral tests: `internal/tui/board_test.go` — simulate keypresses and check View() output
-- Snapshot tests: `internal/tui/snapshot_test.go` — compare View() output against golden files in `testdata/`
-- Test helpers:
-  - `setupTestBoard(t)` — creates a temp board with 4 tasks across statuses, 120x40 terminal
-  - `setupManyTasksBoard(t)` — creates 18 tasks for scroll testing, 100x30 terminal
-  - `sendKey(b, "j")` — simulates a keypress and returns the updated Board
-  - `sendSpecialKey(b, tea.KeyEsc)` — simulates special keys (esc, enter, etc.)
-  - `assertGolden(t, "name", output)` — compares against `testdata/name.golden`
-  - `containsStr(haystack, needle)` — substring check without ANSI codes
-  - `addLongBodyToTask(t, cfg, taskID, lineCount)` — modifies a task to have a multi-line body
-
-**Internal packages** (`internal/output/`, `internal/task/`, etc.):
-- Each package has `*_test.go` files with table-driven tests
-- Use `strings.Builder` for testing output renderers
-- Use `t.TempDir()` for file system tests
-
-### Tips
-
-- For TUI bugs, the key insight is that `View()` returns the raw string — check line counts, substring presence, and line widths to verify correct behavior.
-- For bugs that only manifest at specific terminal sizes, use `b.Update(tea.WindowSizeMsg{Width: W, Height: H})` to set the size.
-- When a fix changes golden file output, update them with `-update` flag: `go test ./internal/tui/ -run TestSnapshot -update`.
-- Verify golden file contents look correct after updating — don't blindly accept changes.
-
-## Using the Kanban Board
-
-This project uses its own kanban board (in `kanban/`) to track work. **All work must be tracked on the board.** If a task doesn't exist for what you're about to do, create one first. Use the kanban-based development skill workflow for the full loop.
-
-### Mandatory workflow (claim → worktree → merge → done)
-
-Every task follows this lifecycle. The board is shared — multiple agents may work concurrently. **Claims expose ownership and reduce duplicate work when agents follow the protocol.**
-
-```bash
-# 1. Generate a unique agent name at session start
-go run ./cmd/kanban-md agent-name
-
-# 2. Pick and claim in one command (tries todo first, then backlog)
-go run ./cmd/kanban-md pick --claim <agent> --status todo --move in-progress
-
-# 3. Create a worktree, implement, test, commit
-# pick prints the full task, including its body, by default.
-git worktree add ../kanban-md-task-<ID> -b task/<ID>-<kebab-description>
-# ... work in worktree ...
-
-# 4. Merge back to main from board home
-git switch main && git merge task/<ID>-<kebab-description>
-
-# 5. Release claim and mark done (only after merge + green tests)
-go run ./cmd/kanban-md edit <ID> --release
-go run ./cmd/kanban-md move <ID> done
-
-# 6. Clean up
-git worktree remove --force ../kanban-md-task-<ID>
-git branch -d task/<ID>-<kebab-description>
-```
-
-**Key rules:**
-- **Always use a worktree.** Never commit directly to `main`. All development work must happen in a git worktree on a feature branch, then merge back to `main` after tests pass.
-- **Claim before any work.** Never edit code without claiming the task first.
-- **One active task per agent.** Finish or park before picking another.
-- **Never steal claims.** If a task is claimed by someone else, pick a different one.
-- **Park in `review` if blocked.** Leave a handoff note (what's done, what's left, branch name), release the claim, and pick the next task.
-
-### Creating tasks
-
-When starting work that isn't already tracked, create a task first:
-
-```
-go run ./cmd/kanban-md create "Short descriptive title" --priority <low|medium|high|critical> --tags <layer-N>
-go run ./cmd/kanban-md edit <ID> --body "Description of what needs to be done."
-```
-
-When a task is blocked or no longer needed:
-```
-go run ./cmd/kanban-md move <ID> backlog
-go run ./cmd/kanban-md delete <ID> --yes
-```
-
-### "Add ticket" requests
-
-When the user says "add ticket" or "add a ticket", create the task on the board (with research to include useful details in the body) but do **not** start working on it. The intent is to capture the idea for later, not to implement it immediately.
-
-### Conventions
-
-- **Tags**: Use `layer-N` tags (e.g. `layer-3`, `layer-4`) to group tasks by roadmap layer.
-- **Priorities**: Use `high` for tasks the user explicitly requested, `medium` for planned work, `low` for nice-to-haves.
-- **Statuses**: `backlog` → `todo` → `in-progress` → `review` → `done`. Skip statuses when appropriate (e.g. `backlog` → `in-progress` is fine).
-- **Task titles**: Short, imperative form (e.g. "Add WIP limits per column", not "WIP limits were added").
-- Keep the board current -- move tasks as you work, don't let them go stale.
-
-### Tracking Issues and Ideas
-
-When you encounter problems or have ideas while using the tool, create tasks for them:
-
-- **Bugs**: Something that doesn't work as expected.
+  Explain the change in natural paragraphs without artificial line wrapping.
+  - Use bullets when they improve readability.
   ```
-  go run ./cmd/kanban-md create "Fix: <description of bug>" --priority high --tags bug
-  ```
-- **Ideas**: Usability improvements, missing features, or things that feel awkward.
-  ```
-  go run ./cmd/kanban-md create "<description of improvement>" --priority low --tags idea
-  ```
-- Always add a `--body` explaining what happened, what you expected, and (for bugs) how to reproduce.
-- These tasks help us dogfood the tool and build a backlog of real-world improvements.
+
+- Update `README.md` whenever user-facing behavior changes, including commands,
+  flags, defaults, installation methods, or workflows.
+- Document research in `docs/research/YYYY-MM-DD-<description>.md`. When
+  delegating research, require the subagent to create the report and return only
+  its path so the primary agent can read the source directly.
+
+## Workflow routing
+
+- For repository implementation work, use `kanban-based-development`. Board
+  tracking and an isolated worktree are the defaults unless the user explicitly
+  overrides them.
+- For task capture, board changes, triage, or status reporting, use `kanban-md`.
+  "Add ticket" means capture a task for later without starting implementation.
+  Use `layer-N` roadmap tags, imperative titles, `high` priority for explicit
+  user requests and bugs, `medium` for planned work, and `low` for ideas.
+- For tests, bug fixes, snapshots, lint, or verification strategy, use
+  `test-kanban-md`.
+- For `config.yml` schema, task frontmatter, migrations, or compatibility
+  fixtures, use `evolve-kanban-md-formats`.
+- For table, compact, JSON, output-selection, or renderer changes, use
+  `design-kanban-md-output`.
+- For releases, tags, publishing, or release notes, use `release-kanban-md`.

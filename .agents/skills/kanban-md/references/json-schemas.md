@@ -4,7 +4,8 @@ Reference for parsing `show --json` output and error responses.
 
 ## Task Object
 
-Returned by: `show --json` (also by other commands when `--json` is passed).
+Returned by task commands such as `create`, `edit`, `move`, and `pick` when
+`--json` is passed. `show --json` adds the `children` field documented below.
 
 ```json
 {
@@ -24,6 +25,9 @@ Returned by: `show --json` (also by other commands when `--json` is passed).
   "depends_on": [3, 4],
   "blocked": true,
   "block_reason": "Waiting on API keys",
+  "claimed_by": "agent-1",
+  "claimed_at": "2026-02-07T11:05:00Z",
+  "class": "standard",
   "body": "Markdown body text",
   "file": "kanban/tasks/001-task-title.md"
 }
@@ -31,7 +35,28 @@ Returned by: `show --json` (also by other commands when `--json` is passed).
 
 Fields with `omitempty` (absent when zero/null): started, completed,
 assignee, tags, due, estimate, parent, depends_on, blocked, block_reason,
-body, file.
+claimed_by, claimed_at, class, body, file.
+
+## Show Task Object
+
+`show --json` returns the task fields plus an always-present `children` array.
+Only direct children are included; archived children require `show --archived
+--json`.
+
+```json
+{
+  "id": 1,
+  "title": "Parent task",
+  "status": "in-progress",
+  "priority": "high",
+  "created": "2026-02-07T10:30:00Z",
+  "updated": "2026-02-07T11:00:00Z",
+  "children": [
+    {"id": 2, "title": "First child", "status": "done"},
+    {"id": 3, "title": "Second child", "status": "review"}
+  ]
+}
+```
 
 ## Error Response
 
@@ -48,7 +73,9 @@ Returned on errors when `--json` is active:
 Error codes: TASK_NOT_FOUND, BOARD_NOT_FOUND, BOARD_ALREADY_EXISTS,
 INVALID_INPUT, INVALID_STATUS, INVALID_PRIORITY, INVALID_DATE,
 INVALID_TASK_ID, WIP_LIMIT_EXCEEDED, DEPENDENCY_NOT_FOUND,
-SELF_REFERENCE, NO_CHANGES, BOUNDARY_ERROR, STATUS_CONFLICT,
-CONFIRMATION_REQUIRED, INTERNAL_ERROR.
+SELF_REFERENCE, CIRCULAR_REFERENCE, NO_CHANGES, BOUNDARY_ERROR,
+STATUS_CONFLICT, CONFIRMATION_REQUIRED, TASK_CLAIMED, INVALID_CLASS,
+CLASS_WIP_EXCEEDED, CLAIM_REQUIRED, NOTHING_TO_PICK, INVALID_GROUP_BY,
+INTERNAL_ERROR.
 
 Exit codes: 1 for user errors, 2 for internal errors.
