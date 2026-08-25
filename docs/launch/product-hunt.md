@@ -10,7 +10,7 @@ File-based Kanban for AI coding agents and humans
 
 ## Short description
 
-kanban-md is a CLI/TUI Kanban board where tasks are Markdown files in your repo. It is built for multi-agent coding workflows with atomic `pick --claim`, compact output, classes of service, and no server setup.
+kanban-md is a CLI/TUI Kanban board where tasks are Markdown files in your repo. It is built for multi-agent coding workflows with cooperative `pick --claim`, compact output, classes of service, and no server setup.
 
 ## Full description
 
@@ -20,12 +20,13 @@ Instead of a remote API/database, every task is a Markdown file with YAML frontm
 
 It is designed for parallel agent execution:
 
-- Atomic `pick --claim` to avoid two agents grabbing the same task
+- A single `pick --claim` operation to reduce duplicate task selection
 - Claim expiry so stale claims do not block progress
 - Compact output mode for token-efficient agent loops
 - Classes of service + WIP limits for predictable flow control
 
-You can use it entirely from CLI, and there is also a separate TUI binary (`kanban-md-tui`) for interactive board navigation.
+You can use it entirely from the CLI or open the built-in interactive board with
+`kanban-md tui`.
 
 ## First comment draft (maker comment)
 

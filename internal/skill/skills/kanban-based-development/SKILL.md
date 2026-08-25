@@ -18,7 +18,8 @@ allowed-tools:
 # Kanban-Based Development
 
 Autonomous, parallel-safe development using `kanban-md` to coordinate work on a shared board.
-Claims prevent duplicate work; `review` is the waiting room (handoff, user action, merge, decisions).
+Claims expose task ownership and reduce duplicate work when participants follow
+the protocol; `review` is the waiting room (handoff, user action, merge, decisions).
 
 ## Multi-Agent Environment
 
@@ -27,7 +28,11 @@ Claims prevent duplicate work; `review` is the waiting room (handoff, user actio
 - Another agent may claim a task between the time you list it and try to pick it.
 - Tasks you saw as available a moment ago may no longer be available.
 
-The **claim** mechanic is the coordination primitive. It prevents two agents from working on the same task. **You MUST claim a task before starting any work on it, and you MUST only pick unclaimed tasks.** Violating this causes duplicate work, merge conflicts, and wasted effort.
+The **claim** mechanic is the coordination primitive. It lets cooperating agents
+exclude work already owned by someone else. **You MUST claim a task before
+starting any work on it, and you MUST only pick unclaimed tasks.** Claims are
+leases rather than a security or distributed-transaction boundary; ignoring the
+protocol can still cause duplicate work and merge conflicts.
 
 ## Non-Negotiables
 
@@ -95,7 +100,7 @@ git switch main
 git status
 ```
 
-### 1) Pick and claim (atomically)
+### 1) Pick and claim in one command
 
 From board home:
 
@@ -111,13 +116,9 @@ If `todo` is empty:
 kanban-md pick --claim <agent> --status backlog --move in-progress
 ```
 
-This is atomic — if another agent claims the task between your list and claim, `pick` handles it safely. No need to list/choose/claim manually.
-
-After picking, read the full task:
-
-```bash
-kanban-md show <ID>
-```
+This replaces a separate list → choose → claim sequence and records ownership
+immediately. By default, `pick` also prints the full task details, including the
+body, so a follow-up `show` is unnecessary.
 
 ### 2) Create a worktree (default)
 

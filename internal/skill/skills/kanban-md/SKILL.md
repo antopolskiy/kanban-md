@@ -32,7 +32,7 @@ Each task is a `.md` file in `kanban/tasks/`. The CLI is `kanban-md`
 - Dates use `YYYY-MM-DD` format.
 - Statuses and priorities are board-specific. Check the board state above or run
   `kanban-md board` to discover valid values before using them.
-- Default statuses: backlog, todo, in-progress, review, done.
+- Default statuses: backlog, todo, in-progress, review, done, archived.
 - Default priorities: low, medium, high, critical.
 
 ## Decision Tree
@@ -49,14 +49,14 @@ Each task is a `.md` file in `kanban/tasks/`. The CLI is `kanban-md`
 | Filter a selected scalar property       | `kanban-md list --compact --property kind=chapter`              |
 | Group by a selected property            | `kanban-md list --group-by property:kind`                        |
 | List blocked tasks                      | `kanban-md list --compact --blocked`                             |
-| List ready-to-start tasks               | `kanban-md list --compact --not-blocked --status todo`           |
+| List ready-to-start tasks               | `kanban-md list --compact --not-blocked --unblocked --status todo` |
 | List tasks with resolved deps           | `kanban-md list --compact --unblocked`                           |
 | Find a specific task                    | `kanban-md show ID`                                              |
 | Claim next available task               | `kanban-md pick --claim <agent> --status todo --move in-progress`|
 | Create a task                           | `kanban-md create "TITLE" --priority P --tags T`                 |
 | Create a task with body                 | `kanban-md create "TITLE" --body "DESC"`                         |
 | Create and immediately claim a task     | `kanban-md create "TITLE" --priority P --claim <agent>`          |
-| Start working on a task                 | `kanban-md move ID in-progress`                                  |
+| Start working on a task                 | `kanban-md move ID in-progress --claim <agent>`                  |
 | Advance to next status                  | `kanban-md move ID --next`                                       |
 | Move a task back                        | `kanban-md move ID --prev`                                       |
 | Complete a task                         | `kanban-md move ID done`                                         |
@@ -70,7 +70,8 @@ Each task is a `.md` file in `kanban/tasks/`. The CLI is `kanban-md`
 | Set a parent task                       | `kanban-md edit ID --parent PARENT_ID`                           |
 | Append a note to task body              | `kanban-md edit ID --append-body "note" --timestamp`             |
 | Hand off a task to review               | `kanban-md handoff ID --claim <agent> --note "…" --release`      |
-| Delete a task                           | `kanban-md delete ID --yes`                                      |
+| Soft-delete with confirmation semantics | `kanban-md delete ID --yes`                                      |
+| Archive a task explicitly               | `kanban-md archive ID`                                           |
 | See flow metrics                        | `kanban-md metrics --compact`                                    |
 | See activity log                        | `kanban-md log --compact --limit 20`                             |
 | See recent activity for a task          | `kanban-md log --compact --task ID`                              |
@@ -84,8 +85,9 @@ Each task is a `.md` file in `kanban/tasks/`. The CLI is `kanban-md`
 ```bash
 kanban-md list [--status S] [--priority P] [--assignee A] [--tag T] \
   [--sort FIELD] [-r] [-n LIMIT] [--blocked] [--not-blocked] \
-  [--parent ID] [--unblocked] [--property KEY=LITERAL] \
-  [--show-property KEY] [--group-by property:KEY]
+  [--parent ID] [--unblocked] [--unclaimed] [--claimed-by AGENT] \
+  [--class C] [--archived] [--property KEY=LITERAL] \
+  [--show-property KEY] [--group-by FIELD|property:KEY]
 ```
 
 Sort fields: id, title, status, priority, created, updated, due. `-r` reverses.
@@ -96,7 +98,8 @@ Sort fields: id, title, status, priority, created, updated, due. `-r` reverses.
 ```bash
 kanban-md create "TITLE" [--status S] [--priority P] [--assignee A] \
   [--tags T1,T2] [--due YYYY-MM-DD] [--estimate E] [--body "TEXT"] \
-  [--parent ID] [--depends-on ID1,ID2] [--claim AGENT] [--set-property KEY=LITERAL]
+  [--parent ID] [--depends-on ID1,ID2] [--class C] [--claim AGENT] \
+  [--set-property KEY=LITERAL]
 ```
 
 Prints the created task ID and summary. `--claim` immediately claims the task for an agent,
@@ -106,6 +109,7 @@ combining creation and claiming in one step.
 
 ```bash
 kanban-md show ID
+kanban-md show ID --archived  # include archived direct children
 kanban-md show ID --json   # only when piping to another tool
 ```
 
@@ -132,7 +136,7 @@ kanban-md edit ID[,ID,...] [--title T] [--status S] [--priority P] [--assignee A
   [--estimate E] [--body "TEXT"] [-a "TEXT"] [--started YYYY-MM-DD] [--clear-started] \
   [--completed YYYY-MM-DD] [--clear-completed] [--parent ID] \
   [--clear-parent] [--add-dep ID] [--remove-dep ID] \
-  [--block "REASON"] [--unblock] \
+  [--block "REASON"] [--unblock] [--class C] \
   [--claim AGENT] [--release] [-t] \
   [--set-property KEY=LITERAL] [--clear-property KEY]
 ```
@@ -195,12 +199,16 @@ resuming a parked task).
 ### pick
 
 ```bash
-kanban-md pick --claim AGENT [--status S] [--move STATUS] [--tags T1,T2]
+kanban-md pick --claim AGENT [--status S] [--move STATUS] [--tags T1,T2] \
+  [--parent ID] [--no-body]
 ```
 
-Atomically finds the highest-priority unclaimed, unblocked task and claims it. Use `--status` to
-restrict which column to pick from. Use `--move` to simultaneously move the task to a new status.
-Replaces the slower list → claim → move sequence.
+Finds the highest-priority unclaimed, unblocked task and claims it in the same
+command. Use `--status` to restrict which column to pick from. Use `--move` to
+move the task in that operation. This replaces the slower list → claim → move
+sequence. Claims are cooperative leases rather than a distributed transaction.
+By default the result includes full task details;
+use `--no-body` when the one-line confirmation is enough.
 
 ### handoff
 
@@ -227,7 +235,17 @@ Generates a markdown board summary suitable for embedding in `CLAUDE.md` or `AGE
 kanban-md delete ID --yes
 ```
 
-Always pass `--yes` (non-interactive context requires it).
+Moves the task to `archived`; the task file remains on disk. Always pass `--yes`
+because non-interactive contexts cannot answer the confirmation prompt.
+
+### archive
+
+```bash
+kanban-md archive ID[,ID,...] [--claim AGENT]
+```
+
+Moves tasks to `archived` without a confirmation prompt. Pass the current claim
+name when archiving an actively claimed task.
 
 ### board
 
@@ -254,7 +272,8 @@ kanban-md log [--since YYYY-MM-DD] [--limit N] [--action TYPE] \
   [--task ID]
 ```
 
-Action types: create, move, edit, delete, block, unblock.
+Common action types: create, edit, move, delete, block, unblock, claim, release,
+handoff, and priority.
 
 ### Global Flags
 
@@ -275,7 +294,7 @@ All commands accept: `--json`, `--table`, `--compact` (alias `--oneline`), `--di
 1. `kanban-md list --compact --status backlog --sort priority` — review backlog
 2. For items to promote: `kanban-md move ID todo`
 3. For new items: `kanban-md create "TITLE" --priority P --tags T`
-4. For stale items: `kanban-md delete ID --yes`
+4. For stale items: `kanban-md archive ID`
 
 ### Sprint Planning
 
@@ -300,7 +319,7 @@ All commands accept: `--json`, `--table`, `--compact` (alias `--oneline`), `--di
 1. Create parent: `kanban-md create "Epic title"`
 2. Create subtask: `kanban-md create "Subtask" --parent PARENT_ID`
 3. Or add dependency: `kanban-md create "Task B" --depends-on TASK_A_ID`
-4. List unresolved: `kanban-md list --compact --blocked`
+4. List tasks ready after dependencies resolve: `kanban-md list --compact --unblocked`
 
 ## Agent Cheatsheet
 
@@ -314,7 +333,7 @@ kanban-md agent-name                             # generate a unique claim name;
 kanban-md board --compact                        # orient: what's active, blocked, overdue
 ```
 
-### Claim next task (atomic pick + move)
+### Claim next task (single-step pick + move)
 
 ```bash
 # Pick highest-priority unclaimed task from todo and move it to in-progress in one step
@@ -323,9 +342,10 @@ kanban-md pick --claim <agent> --status todo --move in-progress
 # If todo is empty, pick from backlog
 kanban-md pick --claim <agent> --status backlog --move in-progress
 
-# Read the full task after picking
-kanban-md show <ID>
 ```
+
+Pick already prints full task details; add `--no-body` only when they are
+unnecessary.
 
 ### Create and claim in one shot
 
@@ -394,8 +414,11 @@ kanban-md list --compact --status in-progress,review   # all active/parked work
 
 - **DO** use `--compact` for listing, board, metrics, and log commands — it is the most token-efficient format.
 - **DO** use `kanban-md show ID` (default format) to read task details — it is readable and includes the full body.
-- **DO** pass `--yes` on delete. Without it, the command hangs waiting for stdin.
-- **DO** use `pick --claim <agent> --status todo --move in-progress` rather than list → edit → move — it's atomic and prevents claim races.
+- **DO** pass `--yes` on delete. Without it, a non-interactive command exits with
+  a confirmation-required error.
+- **DO** use `pick --claim <agent> --status todo --move in-progress` rather than
+  list → edit → move — one operation minimizes the coordination window and
+  records ownership immediately.
 - **DO** use `-a` / `--append-body` with `--claim <agent>` when adding progress notes — this renews the claim and appends without overwriting the body.
 - **DO NOT** use `--json` unless you are piping output to another tool or parsing fields programmatically. Default and `--compact` formats are sufficient for reading.
 - **DO NOT** hardcode status or priority values. Read them from `kanban-md board --compact`.

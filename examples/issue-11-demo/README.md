@@ -5,7 +5,7 @@ This self-contained board demonstrates direct child visibility for GitHub issue
 in-progress, review, done, and archived states. Task `#7` is a grandchild and
 demonstrates that the detail roll-up is intentionally one level deep.
 
-From the repository root on the prototype branch:
+From the repository root:
 
 ```bash
 # Human-readable detail: 1/4 active children are terminal.

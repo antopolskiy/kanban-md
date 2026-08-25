@@ -20,7 +20,7 @@ import (
 var deleteCmd = &cobra.Command{
 	Use:     "delete ID[,ID,...]",
 	Aliases: []string{"rm"},
-	Short:   "Delete a task",
+	Short:   "Soft-delete a task",
 	Long: `Soft-deletes a task by moving it to archived status. Prompts for confirmation in interactive mode.
 Multiple IDs can be provided as a comma-separated list (requires --yes).`,
 	Args: cobra.ExactArgs(1),

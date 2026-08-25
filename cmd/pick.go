@@ -16,8 +16,8 @@ import (
 var pickCmd = &cobra.Command{
 	Use:   "pick",
 	Short: "Pick the next available task",
-	Long: `Atomically finds the highest-priority unclaimed, unblocked task and claims it.
-Replaces the multi-step list/edit/move pattern with a single command.`,
+	Long: `Finds the highest-priority unclaimed, unblocked task and claims it in one command.
+Claims are cooperative leases; this replaces the manual list/edit/move sequence.`,
 	RunE: runPick,
 }
 

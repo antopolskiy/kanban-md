@@ -45,10 +45,12 @@ If the workflow fails:
    gh run view <RUN_ID> --log-failed
    ```
 2. Fix the underlying issue in `main` (code/tests/lint/goreleaser config, etc.).
-3. Re-run the release by tagging a new version and pushing tags (preferred), or rerun the failed run only if it was clearly transient:
+3. Re-run the release by choosing a new, higher semver (normally the next patch
+   version) and pushing that tag (preferred). Never reuse a tag that was already
+   pushed. Rerun the failed workflow only if the failure was clearly transient:
    - Preferred:
      ```
-     git tag vX.Y.Z+1
+     git tag vX.Y.Z
      git push origin main --tags
      ```
    - Transient-only rerun:
@@ -116,7 +118,11 @@ When modifying `config.yml` schema or task file frontmatter, you must ensure bac
 
 ### Config design principles
 
-- **Collocate column settings with column definitions.** Any configuration that is per-column (e.g. `show_duration`, `require_claim`, WIP limits) must live inside the status/column entry in the `statuses` list — never as a separate top-level list or map. This keeps related settings together and avoids drift between column names and their config.
+- **Collocate column settings with column definitions.** New or migrated
+  per-column configuration (for example `show_duration`, `require_claim`, and
+  WIP limits) belongs inside the corresponding `statuses` entry. The existing
+  top-level `wip_limits` map is a legacy compatibility shape, not a pattern for
+  new settings; migrate it when that schema is intentionally revised.
 
 ### Config changes
 
@@ -143,10 +149,10 @@ The default output is **table**. TTY auto-detection was intentionally removed �
 
 Three formats are available:
 - **table** (default): Human-readable padded columns. Best for interactive terminal use.
-- **compact** (`--compact`/`--oneline` or `KANBAN_OUTPUT=compact`): One-line-per-record format modeled after `git log --oneline`. ~70% fewer tokens than JSON. Designed for AI agent consumption.
+- **compact** (`--compact`/`--oneline` or `KANBAN_OUTPUT=compact`): One-line-per-record format modeled after `git log --oneline`. Avoids repeated JSON keys and other formatting overhead; designed for AI agent consumption.
 - **json** (`--json` or `KANBAN_OUTPUT=json`): Full structured JSON. Use for scripting and piping to `jq`.
 
-This is a deliberate design decision. Do not revert to TTY auto-detection without understanding the agent token cost implications. See `docs/research/2026-02-08-token-efficient-output-formats.md` for the research behind this choice.
+This is a deliberate design decision. Do not revert to TTY auto-detection without understanding the agent token cost implications. See `docs/research/2026-08-25-kanban-md-design-principles-orientation.md` for the current product and output-contract context.
 
 ## Fixing Bugs (Test-Driven Development)
 
@@ -167,8 +173,8 @@ When fixing bugs, use test-driven development: write a failing test that reprodu
 
 **CLI bugs** (`cmd/` package):
 - Unit tests: `cmd/*_test.go` — test individual command logic
-- E2E tests: `e2e/cli_test.go` — run the compiled binary with `runKanban(t, ...)` helper
-- Test helpers: `runKanban`, `runKanbanEnv`, `setupProject` in `e2e/cli_test.go`
+- E2E tests: `e2e/*_test.go` — run the compiled binary against complete command workflows
+- Test helpers: `runKanban`, `runKanbanEnv`, and related helpers in `e2e/helpers_test.go`
 
 **TUI bugs** (`internal/tui/` package):
 - Behavioral tests: `internal/tui/board_test.go` — simulate keypresses and check View() output
@@ -200,30 +206,28 @@ This project uses its own kanban board (in `kanban/`) to track work. **All work 
 
 ### Mandatory workflow (claim → worktree → merge → done)
 
-Every task follows this lifecycle. The board is shared — multiple agents may work concurrently. **Claims prevent duplicate work.**
+Every task follows this lifecycle. The board is shared — multiple agents may work concurrently. **Claims expose ownership and reduce duplicate work when agents follow the protocol.**
 
 ```bash
 # 1. Generate a unique agent name at session start
 go run ./cmd/kanban-md agent-name
 
-# 2. Pick and claim atomically (tries todo first, then backlog)
+# 2. Pick and claim in one command (tries todo first, then backlog)
 go run ./cmd/kanban-md pick --claim <agent> --status todo --move in-progress
 
-# 3. Read the full task
-go run ./cmd/kanban-md show <ID>
-
-# 4. Create a worktree, implement, test, commit
+# 3. Create a worktree, implement, test, commit
+# pick prints the full task, including its body, by default.
 git worktree add ../kanban-md-task-<ID> -b task/<ID>-<kebab-description>
 # ... work in worktree ...
 
-# 5. Merge back to main from board home
+# 4. Merge back to main from board home
 git switch main && git merge task/<ID>-<kebab-description>
 
-# 6. Release claim and mark done (only after merge + green tests)
+# 5. Release claim and mark done (only after merge + green tests)
 go run ./cmd/kanban-md edit <ID> --release
 go run ./cmd/kanban-md move <ID> done
 
-# 7. Clean up
+# 6. Clean up
 git worktree remove --force ../kanban-md-task-<ID>
 git branch -d task/<ID>-<kebab-description>
 ```
@@ -247,7 +251,7 @@ go run ./cmd/kanban-md edit <ID> --body "Description of what needs to be done."
 When a task is blocked or no longer needed:
 ```
 go run ./cmd/kanban-md move <ID> backlog
-go run ./cmd/kanban-md delete <ID>
+go run ./cmd/kanban-md delete <ID> --yes
 ```
 
 ### "Add ticket" requests

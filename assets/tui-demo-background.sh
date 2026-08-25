@@ -19,12 +19,12 @@ sleep 2.5
 # --- Phase 1: agents claim tasks and start working ---
 #
 # Three agents use three different (all valid) workflows:
-#   frost-maple: `pick` — atomic find + claim + move (recommended)
+#   frost-maple: `pick` — find + claim + move in one operation (recommended)
 #   amber-swift: two-step claim-in-place then move
 #   coral-dusk:  single-step move with --claim
 
 # frost-maple picks the highest-priority unclaimed task (the critical
-# security fix) and moves it to in-progress in one atomic step.
+# security fix) and moves it to in-progress in one step.
 $K pick --claim frost-maple --status todo --move in-progress $D >/dev/null 2>&1
 sleep 1.5
 

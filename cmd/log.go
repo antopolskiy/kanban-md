@@ -14,14 +14,15 @@ import (
 var logCmd = &cobra.Command{
 	Use:   "log",
 	Short: "Show activity log",
-	Long:  `Displays the activity log of board mutations (create, move, edit, delete, block, unblock).`,
-	RunE:  runLog,
+	Long: `Displays the activity log of board mutations, including create, edit, move,
+delete, block, unblock, claim, release, handoff, and TUI priority changes.`,
+	RunE: runLog,
 }
 
 func init() {
 	logCmd.Flags().String("since", "", "show entries after this date (YYYY-MM-DD)")
 	logCmd.Flags().Int("limit", 0, "maximum number of entries to show (most recent)")
-	logCmd.Flags().String("action", "", "filter by action type (create, move, edit, delete, block, unblock)")
+	logCmd.Flags().String("action", "", "filter by exact action name")
 	logCmd.Flags().Int("task", 0, "filter by task ID")
 	rootCmd.AddCommand(logCmd)
 }

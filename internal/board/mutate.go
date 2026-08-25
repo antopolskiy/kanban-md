@@ -526,7 +526,7 @@ type HandoffParams struct {
 
 // Handoff executes the handoff workflow for a task.
 //
-//nolint:gocyclo // Handoff coordinates validation, mutation, persistence, and audit logging atomically.
+//nolint:gocyclo // Handoff coordinates validation, mutation, persistence, and audit logging in one operation.
 func Handoff(cfg *config.Config, params HandoffParams, now time.Time) (*task.Task, error) {
 	if params.Claimant == "" {
 		return nil, clierr.New(clierr.InvalidInput, "claim name is required")
@@ -633,8 +633,9 @@ type PickAndClaimParams struct {
 	Parent       *int
 }
 
-// PickAndClaim finds the highest-priority task and atomically claims it. Any
-// warnings from reading malformed task files are returned so the caller can
+// PickAndClaim finds the highest-priority task and claims it in one operation.
+// Claims are cooperative leases; concurrent callers are not serialized here.
+// Any warnings from reading malformed task files are returned so the caller can
 // surface them.
 func PickAndClaim(cfg *config.Config, params PickAndClaimParams, now time.Time) (*task.Task, string, []task.ReadWarning, error) {
 	if params.Claimant == "" {

@@ -1,12 +1,15 @@
 package e2e_test
 
 import (
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
 	"testing"
+
+	"github.com/antopolskiy/kanban-md/internal/config"
 )
 
 // ---------------------------------------------------------------------------
@@ -200,6 +203,7 @@ func TestTableFlagOutputMetrics(t *testing.T) {
 	}
 }
 
+//nolint:goconst // Command and flag names intentionally mirror literal README text.
 func TestREADMEDocumentsAllCommands(t *testing.T) {
 	readmePath := filepath.Join("..", "README.md")
 	data, err := os.ReadFile(readmePath) //nolint:gosec // test file
@@ -208,33 +212,54 @@ func TestREADMEDocumentsAllCommands(t *testing.T) {
 	}
 	readme := string(data)
 
-	// Every user-facing command must have a ### `command` section.
-	commands := []string{
-		"init", "create", "list", "show", "edit", "move", "delete",
-		"board", "pick", "metrics", "log", "config", "context",
+	// Every user-facing command must have a dedicated README section.
+	commandSections := map[string]string{
+		"init":       "### `init`",
+		"create":     "### `create`",
+		"list":       "### `list`",
+		"show":       "### `show`",
+		"edit":       "### `edit`",
+		"move":       "### `move`",
+		"handoff":    "### `handoff`",
+		"delete":     "### `delete`",
+		"archive":    "### `archive`",
+		"board":      "### `board`",
+		"pick":       "### `pick`",
+		"agent-name": "### `agent-name`",
+		"metrics":    "### `metrics`",
+		"log":        "### `log`",
+		"config":     "### `config`",
+		"context":    "### `context`",
+		"tui":        "## Interactive TUI",
+		"completion": "## Shell completions",
+		"skill":      "## Agent skills",
 	}
-	for _, cmd := range commands {
-		heading := "### `" + cmd + "`"
+	for command, heading := range commandSections {
 		if !strings.Contains(readme, heading) {
-			t.Errorf("README missing command section: %s", heading)
+			t.Errorf("README missing section %q for command %s", heading, command)
 		}
 	}
 
 	// Key flags that must be documented somewhere in the README.
 	requiredFlags := map[string][]string{
 		"init":   {"--wip-limit"},
-		"create": {"--parent", "--depends-on"},
+		"create": {"--parent", "--depends-on", "--claim", "--class"},
+		"show":   {"--archived"},
 		"edit": {
 			"--started", "--clear-started", "--completed", "--clear-completed",
 			"--parent", "--clear-parent", "--add-dep", "--remove-dep",
 			"--block", "--unblock", "--claim", "--release", "--class",
 		},
 		"move":    {"--claim"},
+		"handoff": {"--claim", "--note", "--block", "--release", "--timestamp"},
+		"delete":  {"--yes"},
+		"archive": {"--claim"},
 		"list":    {"--blocked", "--not-blocked", "--parent", "--unblocked", "--unclaimed", "--claimed-by", "--class", "--group-by"},
 		"board":   {"--group-by"},
-		"pick":    {"--claim", "--status", "--move", "--tags", "--no-body"},
+		"pick":    {"--claim", "--status", "--move", "--tags", "--parent", "--no-body"},
 		"metrics": {"--since"},
 		"log":     {"--since", "--limit", "--action", "--task"},
+		"tui":     {"--hide-empty-columns", "--show-empty-columns", "--mouse", "--narrow"},
 	}
 	for cmd, flags := range requiredFlags {
 		for _, flag := range flags {
@@ -245,20 +270,17 @@ func TestREADMEDocumentsAllCommands(t *testing.T) {
 		}
 	}
 
-	// Config example must show current schema version.
-	if !strings.Contains(readme, "version: 3") {
-		t.Error("README config example still shows old version (should be version: 3)")
+	// Config example must show the schema version implemented by this binary.
+	wantVersion := fmt.Sprintf("version: %d", config.CurrentVersion)
+	if !strings.Contains(readme, wantVersion) {
+		t.Errorf("README config example missing current schema version %q", wantVersion)
 	}
 
-	// Config example must mention wip_limits.
+	// The README must document the supported per-status WIP limit key.
 	if !strings.Contains(readme, "wip_limits") {
-		t.Error("README config example missing wip_limits field")
+		t.Error("README missing wip_limits field")
 	}
 }
-
-// ---------------------------------------------------------------------------
-// Compact output format tests
-// ---------------------------------------------------------------------------
 
 // ---------------------------------------------------------------------------
 // Compact output format tests

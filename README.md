@@ -9,38 +9,44 @@
 [![Go Report Card](https://goreportcard.com/badge/github.com/antopolskiy/kanban-md)](https://goreportcard.com/report/github.com/antopolskiy/kanban-md)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-An agents-first file-based Kanban. Built for multi-agent workflows to allow AI agents work in parallel without clashing. Ultra-fast single binary CLI. Agent skills included. Lean and future-proof: no database, no server, no SaaS — just files.
+An agent-first, file-based Kanban board for coordinating AI coding agents and
+human supervisors. It runs locally as a single binary: no database, server,
+account, or SaaS dependency.
 
 ![Demo](assets/demo.gif)
 
 ## How to use it
 
-`kanban-md` is a flexible tool, and you can use it in many ways. Here is one of the ways I use it in my own projects:
+`kanban-md` is flexible, but a typical agent-driven setup looks like this:
 
-1. Install the tool
+1. Install the tool.
+
 ```bash
 brew install antopolskiy/tap/kanban-md
 ```
 
-2. Go to your project directory and create a board there
+2. Go to your project directory and create a board.
 
 ```bash
 kanban-md init
 ```
 
-This will create a `kanban/` directory and a `config.yml` file. I also usually add it to .gitignore.
+This creates `kanban/config.yml` and `kanban/tasks/`. The interactive setup
+offers to add `kanban/` to `.gitignore`; keep it tracked instead if the board
+should travel with the repository.
 
+3. Install the bundled skills for your agents.
 
-3. Install skills for your agents
 ```bash
-# install skills locally in this project -- I prefer this
-kanban-md skill install 
+# Install skills locally in this project
+kanban-md skill install
 
-# install skills globally (home directory)
+# Or install them globally
 kanban-md skill install --global
 ```
 
-4. Create tickets manually, or ask your agents do it for you
+4. Create tasks manually, or ask an agent to capture them.
+
 ```bash
 kanban-md add "Set up CI pipeline" --priority high
 kanban-md add "Fix login bug" --priority critical
@@ -48,23 +54,34 @@ kanban-md add "Fix login bug" --priority critical
 claude "add ticket: there is a bug on the login page when the user enters an invalid email address"
 ```
 
-5. Kick off `/kanban-based-development` skill in a single agent and observe how it behaves. It should claim a task, create a worktree, implement, test, commit, release the claim and mark the task as done. When confident, kick off the skill in multiple agents -- they will work in parallel without clashing. You should see the progress in the TUI.
+5. Start the `kanban-based-development` skill with one agent. It will claim a
+   task, create an isolated worktree, implement and verify the change, merge it,
+   release the claim, and mark the task done. Once the workflow fits your
+   project, run more agents and supervise their progress in the TUI.
 
 ```bash
 kanban-md tui
 ```
 
-6. Adjust the local skill / AGENTS.md to steer the agents in a way that would make sense for this project.
+6. Adapt the local skill or `AGENTS.md` to the repository's own build, review,
+   and release rules.
 
 ## Why kanban-md?
 
 Project management tools are designed for humans clicking buttons. kanban-md is designed for AI agents running commands and human supervision.
 
-- **Agents-first.** Token-efficient output formats (`--compact`), atomic claim-and-move operations (`pick --claim`), and installable agent skills that teach agents how to use the board — out of the box.
-- **Multi-agent safe.** Claims provide cooperative locking so multiple agents can work the same board without stepping on each other. Claims expire automatically, and the `pick` command atomically finds, claims, and moves the next available task.
+- **Agent-first.** Token-efficient output (`--compact`), a single-step
+  pick/claim/move workflow, structured JSON, and installable skills make the
+  board practical inside non-interactive agent loops.
+- **Cooperative multi-agent coordination.** Claims reduce duplicate work, can be
+  required by selected columns, and expire automatically when an agent stops
+  renewing them. Claims are coordination leases, not a security or distributed-
+  transaction boundary.
 - **Self-healing task IDs.** Commands automatically detect duplicate IDs, filename/frontmatter ID mismatches, and `next_id` drift, then repair them before proceeding.
-- **Plain files.** Every task is a Markdown file. Agents, humans, scripts, and `grep` all work equally well. No API tokens, no authentication, no rate limits.
-- **Zero dependencies at runtime.** A single static binary. No database, no server, no config service.
+- **Plain files.** Every task is a Markdown file. Agents, humans, scripts, Git,
+  and `grep` can inspect the same source of truth without API credentials.
+- **No service dependency.** A single binary owns the local workflow; there is
+  no database server, background daemon, or remote configuration service.
 - **Skills included.** Pre-written skills for using the CLI tool and a multi-agent development workflow. Installable via `kanban-md skill install`.
 - **TUI for observation.** A full interactive terminal board with keyboard navigation. It auto-refreshes when task files change on disk.
 
@@ -96,7 +113,8 @@ Pre-built binaries for macOS, Linux, and Windows are available on the [Releases]
 
 ## Quick start
 
-Note: normally, you wouldn't run the CLI commands directly. Your agents will do that for you.
+Agents can run these commands for you, but the same interface is useful for
+manual work and scripting.
 
 ```bash
 # Initialize a board in the current directory
@@ -126,7 +144,7 @@ kanban-md show 1
 # Done with a task
 kanban-md move 1 done
 
-# Or delete it
+# Or soft-delete it by moving it to archived
 kanban-md delete 3 --yes
 ```
 
@@ -181,30 +199,36 @@ kanban-md reserializes its own fields after an update. It does not guarantee
 comments, indentation, quote style, original key placement, or byte-for-byte
 formatting.
 
-The `config.yml` tracks board settings:
+The `config.yml` tracks board settings. A newly initialized board currently
+uses schema version 12:
 
 ```yaml
-version: 3
+version: 12
 board:
   name: My Project
 tasks_dir: tasks
 statuses:
-  - backlog
-  - todo
+  - name: backlog
+    show_duration: false
+  - name: todo
   - name: in-progress
     require_claim: true
   - name: review
     require_claim: true
-  - done
-  - archived
+  - name: done
+    show_duration: false
+  - name: archived
+    show_duration: false
 priorities:
   - low
   - medium
   - high
   - critical
-wip_limits:
-  in-progress: 3
-  review: 2
+defaults:
+  status: backlog
+  priority: medium
+  class: standard
+claim_timeout: 1h
 classes:
   - name: expedite
     wip_limit: 1
@@ -212,13 +236,27 @@ classes:
   - name: fixed-date
   - name: standard
   - name: intangible
-claim_timeout: 1h
-defaults:
-  status: backlog
-  priority: medium
-  class: standard
-next_id: 4
+tui:
+  title_lines: 2
+  age_thresholds:
+    - after: 0s
+      color: "242"
+    - after: 1h
+      color: "34"
+    - after: 24h
+      color: "226"
+    - after: 72h
+      color: "208"
+    - after: 168h
+      color: "196"
+next_id: 1
 ```
+
+`config.yml` and `tasks/*.md` are authoritative. `activity.jsonl` is a
+best-effort, bounded audit log, and `.lock` is a transient coordination file
+used by operations that must serialize access. Neither is a hidden database.
+Direct task-file edits remain supported, but commands are the claim-aware
+mutation path while a task is actively claimed.
 
 ## Commands
 
@@ -236,7 +274,8 @@ kanban-md init [--name NAME] [--statuses s1,s2,s3] [--wip-limit status:N]
 | `--statuses` | Comma-separated status list (default: backlog,todo,in-progress,review,done,archived) |
 | `--wip-limit` | WIP limit per status (format: `status:N`, repeatable) |
 
-After creating a board, kanban-md prompts to add the board directory (for example, `kanban/`) to `.gitignore`:
+After creating a board interactively, kanban-md offers to add the board
+directory (for example, `kanban/`) to `.gitignore`:
 
 - If `.gitignore` exists in the board directory parent, the entry is appended.
 - If `.gitignore` does not exist, it is created with the board directory entry.
@@ -253,13 +292,13 @@ kanban-md create --title "My task" --description "Details here" [FLAGS]
 | Flag | Default | Description |
 |------|---------|-------------|
 | `--title` | | Task title (alternative to positional argument) |
-| `--status` | backlog | Initial status |
-| `--priority` | medium | Priority level |
+| `--status` | config default | Initial status |
+| `--priority` | config default | Priority level |
 | `--assignee` | | Person assigned |
 | `--tags` | | Comma-separated tags |
 | `--due` | | Due date (YYYY-MM-DD) |
 | `--estimate` | | Time estimate (e.g. 4h, 2d) |
-| `--class` | standard | Class of service (expedite, fixed-date, standard, intangible) |
+| `--class` | config default | Configured class of service |
 | `--parent` | | Parent task ID |
 | `--depends-on` | | Dependency task IDs (comma-separated) |
 | `--body` | | Task description (alias: `--description`) |
@@ -413,18 +452,23 @@ kanban-md handoff ID --claim NAME [--note TEXT] [--block REASON] [-t] [--release
 
 ### `delete`
 
-Delete a task. Aliases: `rm`.
+Soft-delete a task by moving it to `archived`. Aliases: `rm`.
 
 ```bash
 kanban-md delete ID [--yes]
 kanban-md delete 1,2,3 --yes       # batch delete
 ```
 
-Prompts for confirmation in interactive terminals. Use `--yes` (`-y`) to skip the prompt (required in non-interactive contexts like scripts). Batch delete always requires `--yes`.
+Prompts for confirmation in interactive terminals. Use `--yes` (`-y`) to skip
+the prompt; it is required in non-interactive contexts and for batch deletion.
+The task file remains on disk and can still be listed with `--archived`.
 
 ### `archive`
 
-Soft-delete a task by moving it to the `archived` status. Archived tasks are hidden from all normal commands (`list`, `board`, `metrics`, `context`, TUI) but remain on disk.
+Move a task explicitly to the `archived` status without a confirmation prompt.
+Archived tasks are hidden from normal commands (`list`, `board`, `metrics`,
+`context`, TUI) but remain on disk. Use `--claim` when archiving a task with an
+active claim.
 
 ```bash
 kanban-md archive ID
@@ -455,7 +499,8 @@ kanban-md board --watch    # live-update on file changes
 
 ### `pick`
 
-Atomically find and claim the next available task. Designed for multi-agent workflows where agents need exclusive task assignment.
+Find and claim the next available task in one operation. Designed for
+cooperative multi-agent workflows where ownership needs to be visible.
 
 ```bash
 kanban-md pick --claim agent-1
@@ -468,7 +513,7 @@ kanban-md pick --claim agent-1 --no-body
 | Flag | Default | Description |
 |------|---------|-------------|
 | `--claim` | (required) | Agent name to claim the task for |
-| `--status` | all non-terminal | Source status(es) to pick from (comma-separated) |
+| `--status` | all non-terminal | One source status to pick from |
 | `--move` | | Also move picked task to this status |
 | `--tags` | | Only pick tasks matching at least one tag |
 | `--parent` | | Only pick tasks that are children of this parent task ID |
@@ -503,7 +548,9 @@ kanban-md metrics [--since YYYY-MM-DD]
 
 ### `log`
 
-Show the activity log of board mutations (create, move, edit, delete, block, unblock).
+Show the activity log of board mutations. Emitted actions include `create`,
+`edit`, `move`, `delete`, `block`, `unblock`, `claim`, `release`, `handoff`, and
+TUI priority changes.
 
 ```bash
 kanban-md log [FLAGS]
@@ -513,7 +560,7 @@ kanban-md log [FLAGS]
 |------|---------|-------------|
 | `--since` | | Show entries after this date (YYYY-MM-DD) |
 | `--limit` | 0 | Maximum number of entries (most recent) |
-| `--action` | | Filter by action type (create, move, edit, delete, block, unblock) |
+| `--action` | | Filter by exact action name |
 | `--task` | | Filter by task ID |
 
 ### `config`
@@ -582,6 +629,13 @@ kanban-md tui --show-empty-columns  # override config and show empty columns
 kanban-md tui --mouse      # opt in to mouse navigation
 kanban-md tui --narrow     # force the single-column layout at any width
 ```
+
+| Flag | Description |
+|------|-------------|
+| `--hide-empty-columns` | Hide empty columns for this run, overriding config |
+| `--show-empty-columns` | Show empty columns for this run, overriding config |
+| `--mouse` | Enable mouse navigation and drag-and-drop |
+| `--narrow` | Force the single-column layout at any terminal width |
 
 Set `tui.hide_empty_columns` in `config.yml` to control the default behavior.
 
@@ -700,7 +754,7 @@ terminal-dependent; use the terminal's normal selection shortcut or omit
 | `E` | Open the selected task's Markdown file in `$VISUAL`, then `$EDITOR`, then `vi` when available |
 | `m` | Move task to a different status (picker dialog) |
 | `n` / `p` | Move task to next / previous status |
-| `d` | Delete task (with confirmation) |
+| `d` | Soft-delete (archive) task with confirmation |
 | `s` | Cycle the sort field (priority → created → updated → title) |
 | `S` | Reverse the sort direction |
 | `/` | Search/filter tasks live. Matches a case-insensitive substring of the title or any individual tag, not the body. Start with `#` for ticket IDs: `#12` prefix-matches IDs, `#12 ` exact-matches #12, and bare `#` matches all. `Enter` keeps the filter, `Esc` clears it |
@@ -920,19 +974,23 @@ kanban-md skill check
 # Update skills to match current CLI version
 kanban-md skill update
 
-# Preview skill contents
-kanban-md skill show
+# Preview one skill
+kanban-md skill show --skill kanban-md
 ```
 
 Skills are versioned to match the CLI. When you upgrade kanban-md, `skill check` tells you if your installed skills are outdated, and `skill update` brings them in sync.
 
 ## Multi-agent workflow
 
-kanban-md is designed for concurrent work by multiple agents (AI or human) through claims and classes of service.
+kanban-md coordinates concurrent work by multiple agents and humans through
+cooperative claims and classes of service.
 
 ### Claims
 
-Claims provide cooperative locking — an agent claims a task before working on it, preventing other agents from picking the same task. Claims expire after the configured timeout (default: 1 hour).
+Claims are cooperative leases: an agent claims a task before working on it, and
+well-behaved agents exclude tasks with active claims from selection. Claims
+expire after the configured timeout (default: 1 hour). They reduce collisions,
+but they are not a security boundary or a transactional distributed lock.
 
 On Unix-like systems, kanban-md also makes actively claimed task files read-only. Commands from the current claimant temporarily unlock the file while updating it, then restore read-only permissions; releasing or expiring the claim makes the file writable again. This protects against accidental direct edits by another process running as the same user, but it is not a security boundary: that user can still change permissions, rename, or delete the file.
 
@@ -982,13 +1040,26 @@ kanban-md list --group-by priority      # priority distribution
 
 ## Design principles
 
-**Agent-first, human-friendly.** Every feature is designed to work in non-interactive, piped, multi-agent contexts first. Humans get a TUI and table output; agents get `--compact` (70% fewer tokens than JSON) and atomic operations like `pick --claim`.
+**Agent-first, human-supervised.** Non-interactive commands, compact output,
+structured errors, and claims support autonomous agents; table output and the
+TUI keep the same work legible and controllable by humans.
 
-**Files are the API.** The CLI is a convenience layer over a simple file format. You can always fall back to editing files directly — the tool will pick up changes.
+**Local, inspectable truth.** Board configuration and task state live in plain
+files. Coordination and audit files may exist, but they are local, explainable,
+and never become an opaque second source of truth.
 
-**No hidden state.** Everything is in `config.yml` and the task files. There's no database, no cache, no lock file. Two agents can work on the same board by editing different files and merging via git.
+**One semantic core, multiple interfaces.** CLI and TUI operations share the
+same board-level mutation rules. Invariants belong at that common boundary,
+while each interface presents them for its own consumer.
 
-**Minimal by default.** The core CLI does one thing — manage task files — and stays out of the way. The interactive TUI is built in (`kanban-md tui`). The tool doesn't sync, notify, or integrate with external services. Git handles collaboration; file watchers handle live updates.
+**Stable contracts, explicit evolution.** Task frontmatter, config schemas,
+JSON, compact output, and defaults are user-facing contracts. Schema changes use
+migrations and compatibility fixtures; stricter policy is normally opt-in and
+prospective.
+
+**Bounded local scope.** Features should strengthen local task orchestration
+without requiring a hosted service, external control plane, or automatic
+ownership of workflow decisions that users can make explicitly.
 
 ## Development
 

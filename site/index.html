@@ -4,9 +4,9 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>kanban-md — File-based Kanban for AI agents and humans</title>
-  <meta name="description" content="A file-based Kanban CLI built for multi-agent workflows. Plain Markdown files, atomic claim operations, token-efficient output. No database, no server.">
+  <meta name="description" content="A file-based Kanban CLI built for multi-agent workflows. Plain Markdown files, cooperative claims, token-efficient output. No database, no server.">
   <meta property="og:title" content="kanban-md — File-based Kanban for AI agents and humans">
-  <meta property="og:description" content="A file-based Kanban CLI built for multi-agent workflows. Plain Markdown files, atomic claim operations, token-efficient output.">
+  <meta property="og:description" content="A file-based Kanban CLI built for multi-agent workflows. Plain Markdown files, cooperative claims, token-efficient output.">
   <meta property="og:type" content="website">
   <meta property="og:image" content="https://raw.githubusercontent.com/antopolskiy/kanban-md/main/assets/demo.gif">
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -32,8 +32,8 @@
 
   <section class="hero">
     <p class="hero-badge">Open source &middot; MIT License</p>
-    <h1>One board.<br>Multiple agents.<br>No conflicts.</h1>
-    <p class="hero-sub">A file-based Kanban CLI for <strong>multi-agent workflows</strong>. AI agents coordinate through atomic claims, Markdown task files, and token-efficient output. No database, no server &mdash; just a single binary.</p>
+    <h1>One board.<br>Multiple agents.<br>Clear ownership.</h1>
+    <p class="hero-sub">A file-based Kanban CLI for <strong>multi-agent workflows</strong>. AI agents coordinate through cooperative claims, Markdown task files, and token-efficient output. No database, no server &mdash; just a single binary.</p>
     <div class="hero-install">
       <div class="hero-cmd" data-copy="brew install antopolskiy/tap/kanban-md">
         <span class="prompt">$</span> brew install antopolskiy/tap/kanban-md
@@ -92,8 +92,8 @@
 
   <section class="pillars">
     <div class="pillar">
-      <h3>Multi-agent safe</h3>
-      <p>The <code>pick --claim</code> command atomically finds, claims, and moves the next task. No two agents work on the same thing.</p>
+      <h3>Multi-agent coordination</h3>
+      <p>The <code>pick --claim</code> command finds, claims, and optionally moves the next task in one operation. Expiring cooperative claims make ownership visible and reduce duplicate work.</p>
     </div>
     <div class="pillar">
       <h3>Plain Markdown</h3>
@@ -101,7 +101,7 @@
     </div>
     <div class="pillar">
       <h3>Token-efficient</h3>
-      <p>The <code>--compact</code> format uses 70% fewer tokens than JSON. Designed for agent context windows.</p>
+      <p>The <code>--compact</code> format avoids repeated JSON keys and formatting overhead. It is designed for agent context windows.</p>
     </div>
   </section>
 
@@ -120,7 +120,7 @@
 <span class="prompt">$</span> kanban-md create <span class="s">"Set up CI pipeline"</span> --priority high
 <span class="prompt">$</span> kanban-md create <span class="s">"Fix login bug"</span> --priority critical
 
-<span class="c"># Agent claims the next task atomically</span>
+<span class="c"># Agent claims the next task in one operation</span>
 <span class="prompt">$</span> kanban-md pick --claim agent-1 --move in-progress
 
 <span class="c"># Token-efficient output</span>
