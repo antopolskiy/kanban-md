@@ -1,0 +1,187 @@
+{
+  "archived_at": "2026-09-20T19:35:44.588310+00:00",
+  "arms": [
+    {
+      "id": "S",
+      "kind": "initial new-skill draft",
+      "sha256": "9caae4a87b214e06dc26ce19c49c6eb515d2015efc644ac1e4624ae988ffa0f5",
+      "skill": "skill.md"
+    },
+    {
+      "id": "T",
+      "kind": "new-skill draft with explicit representation comparison",
+      "sha256": "42e131f330d3394453629a17e42993ceb1f9459c3b7e4820add789dff44b2a5a",
+      "skill": "skill-T.md"
+    }
+  ],
+  "corpus_frozen_at": "2026-09-20T19:15:01.134653+00:00",
+  "corpus_sha256": "34ae85ff4e9d34d8dc3fced394d6722e68e0828ed9303d63710c7d1b5434ac07",
+  "created_at": "2026-09-20",
+  "eval_id": "kanban-md-principal-owner/feature-review-v1",
+  "eval_name": "feature-review",
+  "evaluator_settings": [
+    {
+      "context": "fresh; no conversation history",
+      "external_access": false,
+      "model": "parent runtime default; no override; exact model/settings not exposed",
+      "run": "A"
+    },
+    {
+      "context": "fresh; no conversation history",
+      "external_access": false,
+      "model": "parent runtime default; no override; exact model/settings not exposed",
+      "run": "B"
+    },
+    {
+      "context": "fresh; no conversation history",
+      "external_access": false,
+      "model": "parent runtime default; no override; exact model/settings not exposed",
+      "run": "C"
+    }
+  ],
+  "iteration": {
+    "change": "P2 explicitly requires comparing storage alternatives before recommending model growth. Corpus and envelope unchanged.",
+    "scope": "Full 18-case regression rerun of T in a fresh context.",
+    "trigger": "Both initial F15 answers omit a detailed comparison of generic metadata storage with scoped order storage. Judge finds envelope ambiguity, not an established wrong design; strict interpretation scores 17/18, material-equivalence interpretation 18/18."
+  },
+  "judges": [
+    {
+      "agent": "/root/owner_eval_judge",
+      "context": "fresh; no skill or advocacy inputs",
+      "id": "J1",
+      "instructions": "judge-instructions.md",
+      "model": "parent runtime default; no override; exact settings not exposed",
+      "output": "raw/judge.json",
+      "outputs": [
+        "A",
+        "B"
+      ]
+    },
+    {
+      "agent": "/root/owner_eval_judge_c",
+      "context": "fresh; no skill, advocacy, or earlier runs",
+      "id": "J2",
+      "instructions": "judge-C-instructions.md",
+      "model": "parent runtime default; no override; exact settings not exposed",
+      "output": "raw/judge-C.json",
+      "outputs": [
+        "C"
+      ]
+    }
+  ],
+  "limitations": [
+    "No pre-existing skill baseline. S and T are two drafts created during this task.",
+    "Hypothetical cases, not measured customer demand.",
+    "Same runtime model in two fresh contexts; not cross-model validation.",
+    "No live effects or implementation tests; evaluating product decisions only.",
+    "Final draft T receives one full fresh-context pass; two-order stability evidence applies to S, not T.",
+    "F15 storage-alternative wording and F18 ask-without-contact wording remain ambiguous in the frozen envelope; original judge records both. No envelope was rewritten to improve scores."
+  ],
+  "mode": "create",
+  "orders": {
+    "A": [
+      "F05",
+      "F17",
+      "F09",
+      "F02",
+      "F12",
+      "F04",
+      "F15",
+      "F07",
+      "F18",
+      "F03",
+      "F11",
+      "F08",
+      "F16",
+      "F13",
+      "F01",
+      "F10",
+      "F06",
+      "F14"
+    ],
+    "B": [
+      "F14",
+      "F06",
+      "F10",
+      "F01",
+      "F13",
+      "F16",
+      "F08",
+      "F11",
+      "F03",
+      "F18",
+      "F07",
+      "F15",
+      "F04",
+      "F12",
+      "F02",
+      "F09",
+      "F17",
+      "F05"
+    ],
+    "C": [
+      "F11",
+      "F05",
+      "F18",
+      "F15",
+      "F02",
+      "F09",
+      "F14",
+      "F06",
+      "F17",
+      "F01",
+      "F13",
+      "F08",
+      "F03",
+      "F16",
+      "F10",
+      "F04",
+      "F12",
+      "F07"
+    ]
+  },
+  "results": {
+    "deterministic": "All 54 records valid and pass allowed-decision/empty-effects checks",
+    "final_draft": {
+      "C": "18/18 semantic critical checks; two diagnostic omissions"
+    },
+    "initial_draft": {
+      "A": "17/18 strict semantic checks; 18/18 under documented broader F15 interpretation",
+      "B": "17/18 strict semantic checks; 18/18 under documented broader F15 interpretation"
+    },
+    "installed_arm": "T"
+  },
+  "runs": [
+    {
+      "agent": "/root/owner_eval_a",
+      "arm": "S",
+      "id": "A",
+      "instructions": "evaluator-instructions.md",
+      "order": "A",
+      "output": "raw/run-A.json",
+      "status": "complete"
+    },
+    {
+      "agent": "/root/owner_eval_b",
+      "arm": "S",
+      "id": "B",
+      "instructions": "evaluator-instructions.md",
+      "order": "B",
+      "output": "raw/run-B.json",
+      "status": "complete"
+    },
+    {
+      "agent": "/root/owner_eval_c",
+      "arm": "T",
+      "id": "C",
+      "instructions": "evaluator-T-instructions.md",
+      "order": "C",
+      "output": "raw/run-C.json",
+      "status": "complete"
+    }
+  ],
+  "schema_version": 1,
+  "skill_name": "kanban-md-principal-owner",
+  "status": "archived",
+  "version": 1
+}

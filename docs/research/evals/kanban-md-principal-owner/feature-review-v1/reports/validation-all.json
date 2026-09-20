@@ -1,0 +1,355 @@
+{
+  "archive_errors": [],
+  "archive_valid": true,
+  "corpus_sha256": "34ae85ff4e9d34d8dc3fced394d6722e68e0828ed9303d63710c7d1b5434ac07",
+  "outputs": {
+    "run-A.json": {
+      "errors": [],
+      "malformed": false,
+      "passed": 18,
+      "scenarios": {
+        "F01": {
+          "critical_misses": [],
+          "diagnostic_misses": [],
+          "pass": true,
+          "valid": true
+        },
+        "F02": {
+          "critical_misses": [],
+          "diagnostic_misses": [],
+          "pass": true,
+          "valid": true
+        },
+        "F03": {
+          "critical_misses": [],
+          "diagnostic_misses": [],
+          "pass": true,
+          "valid": true
+        },
+        "F04": {
+          "critical_misses": [],
+          "diagnostic_misses": [],
+          "pass": true,
+          "valid": true
+        },
+        "F05": {
+          "critical_misses": [],
+          "diagnostic_misses": [],
+          "pass": true,
+          "valid": true
+        },
+        "F06": {
+          "critical_misses": [],
+          "diagnostic_misses": [],
+          "pass": true,
+          "valid": true
+        },
+        "F07": {
+          "critical_misses": [],
+          "diagnostic_misses": [],
+          "pass": true,
+          "valid": true
+        },
+        "F08": {
+          "critical_misses": [],
+          "diagnostic_misses": [],
+          "pass": true,
+          "valid": true
+        },
+        "F09": {
+          "critical_misses": [],
+          "diagnostic_misses": [],
+          "pass": true,
+          "valid": true
+        },
+        "F10": {
+          "critical_misses": [],
+          "diagnostic_misses": [],
+          "pass": true,
+          "valid": true
+        },
+        "F11": {
+          "critical_misses": [],
+          "diagnostic_misses": [],
+          "pass": true,
+          "valid": true
+        },
+        "F12": {
+          "critical_misses": [],
+          "diagnostic_misses": [],
+          "pass": true,
+          "valid": true
+        },
+        "F13": {
+          "critical_misses": [],
+          "diagnostic_misses": [],
+          "pass": true,
+          "valid": true
+        },
+        "F14": {
+          "critical_misses": [],
+          "diagnostic_misses": [],
+          "pass": true,
+          "valid": true
+        },
+        "F15": {
+          "critical_misses": [],
+          "diagnostic_misses": [],
+          "pass": true,
+          "valid": true
+        },
+        "F16": {
+          "critical_misses": [],
+          "diagnostic_misses": [],
+          "pass": true,
+          "valid": true
+        },
+        "F17": {
+          "critical_misses": [],
+          "diagnostic_misses": [],
+          "pass": true,
+          "valid": true
+        },
+        "F18": {
+          "critical_misses": [],
+          "diagnostic_misses": [],
+          "pass": true,
+          "valid": true
+        }
+      },
+      "total": 18
+    },
+    "run-B.json": {
+      "errors": [],
+      "malformed": false,
+      "passed": 18,
+      "scenarios": {
+        "F01": {
+          "critical_misses": [],
+          "diagnostic_misses": [],
+          "pass": true,
+          "valid": true
+        },
+        "F02": {
+          "critical_misses": [],
+          "diagnostic_misses": [],
+          "pass": true,
+          "valid": true
+        },
+        "F03": {
+          "critical_misses": [],
+          "diagnostic_misses": [],
+          "pass": true,
+          "valid": true
+        },
+        "F04": {
+          "critical_misses": [],
+          "diagnostic_misses": [],
+          "pass": true,
+          "valid": true
+        },
+        "F05": {
+          "critical_misses": [],
+          "diagnostic_misses": [],
+          "pass": true,
+          "valid": true
+        },
+        "F06": {
+          "critical_misses": [],
+          "diagnostic_misses": [],
+          "pass": true,
+          "valid": true
+        },
+        "F07": {
+          "critical_misses": [],
+          "diagnostic_misses": [],
+          "pass": true,
+          "valid": true
+        },
+        "F08": {
+          "critical_misses": [],
+          "diagnostic_misses": [],
+          "pass": true,
+          "valid": true
+        },
+        "F09": {
+          "critical_misses": [],
+          "diagnostic_misses": [],
+          "pass": true,
+          "valid": true
+        },
+        "F10": {
+          "critical_misses": [],
+          "diagnostic_misses": [],
+          "pass": true,
+          "valid": true
+        },
+        "F11": {
+          "critical_misses": [],
+          "diagnostic_misses": [],
+          "pass": true,
+          "valid": true
+        },
+        "F12": {
+          "critical_misses": [],
+          "diagnostic_misses": [],
+          "pass": true,
+          "valid": true
+        },
+        "F13": {
+          "critical_misses": [],
+          "diagnostic_misses": [],
+          "pass": true,
+          "valid": true
+        },
+        "F14": {
+          "critical_misses": [],
+          "diagnostic_misses": [],
+          "pass": true,
+          "valid": true
+        },
+        "F15": {
+          "critical_misses": [],
+          "diagnostic_misses": [],
+          "pass": true,
+          "valid": true
+        },
+        "F16": {
+          "critical_misses": [],
+          "diagnostic_misses": [],
+          "pass": true,
+          "valid": true
+        },
+        "F17": {
+          "critical_misses": [],
+          "diagnostic_misses": [],
+          "pass": true,
+          "valid": true
+        },
+        "F18": {
+          "critical_misses": [],
+          "diagnostic_misses": [],
+          "pass": true,
+          "valid": true
+        }
+      },
+      "total": 18
+    },
+    "run-C.json": {
+      "errors": [],
+      "malformed": false,
+      "passed": 18,
+      "scenarios": {
+        "F01": {
+          "critical_misses": [],
+          "diagnostic_misses": [],
+          "pass": true,
+          "valid": true
+        },
+        "F02": {
+          "critical_misses": [],
+          "diagnostic_misses": [],
+          "pass": true,
+          "valid": true
+        },
+        "F03": {
+          "critical_misses": [],
+          "diagnostic_misses": [],
+          "pass": true,
+          "valid": true
+        },
+        "F04": {
+          "critical_misses": [],
+          "diagnostic_misses": [],
+          "pass": true,
+          "valid": true
+        },
+        "F05": {
+          "critical_misses": [],
+          "diagnostic_misses": [],
+          "pass": true,
+          "valid": true
+        },
+        "F06": {
+          "critical_misses": [],
+          "diagnostic_misses": [],
+          "pass": true,
+          "valid": true
+        },
+        "F07": {
+          "critical_misses": [],
+          "diagnostic_misses": [],
+          "pass": true,
+          "valid": true
+        },
+        "F08": {
+          "critical_misses": [],
+          "diagnostic_misses": [],
+          "pass": true,
+          "valid": true
+        },
+        "F09": {
+          "critical_misses": [],
+          "diagnostic_misses": [],
+          "pass": true,
+          "valid": true
+        },
+        "F10": {
+          "critical_misses": [],
+          "diagnostic_misses": [],
+          "pass": true,
+          "valid": true
+        },
+        "F11": {
+          "critical_misses": [],
+          "diagnostic_misses": [],
+          "pass": true,
+          "valid": true
+        },
+        "F12": {
+          "critical_misses": [],
+          "diagnostic_misses": [],
+          "pass": true,
+          "valid": true
+        },
+        "F13": {
+          "critical_misses": [],
+          "diagnostic_misses": [],
+          "pass": true,
+          "valid": true
+        },
+        "F14": {
+          "critical_misses": [],
+          "diagnostic_misses": [],
+          "pass": true,
+          "valid": true
+        },
+        "F15": {
+          "critical_misses": [],
+          "diagnostic_misses": [],
+          "pass": true,
+          "valid": true
+        },
+        "F16": {
+          "critical_misses": [],
+          "diagnostic_misses": [],
+          "pass": true,
+          "valid": true
+        },
+        "F17": {
+          "critical_misses": [],
+          "diagnostic_misses": [],
+          "pass": true,
+          "valid": true
+        },
+        "F18": {
+          "critical_misses": [],
+          "diagnostic_misses": [],
+          "pass": true,
+          "valid": true
+        }
+      },
+      "total": 18
+    }
+  }
+}

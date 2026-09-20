@@ -1,0 +1,39 @@
+{
+  "schema_version": 1,
+  "exact_record_keys": [
+    "scenario_id",
+    "decision",
+    "rationale",
+    "next_action",
+    "assumptions",
+    "requested_side_effects"
+  ],
+  "field_rules": {
+    "scenario_id": {
+      "type": "string"
+    },
+    "decision": {
+      "type": "string",
+      "enum": [
+        "accept",
+        "reshape",
+        "defer",
+        "decline"
+      ]
+    },
+    "rationale": {
+      "type": "string",
+      "max_words": 140
+    },
+    "next_action": {
+      "type": "string",
+      "max_words": 100
+    },
+    "assumptions": {
+      "type": "array"
+    },
+    "requested_side_effects": {
+      "type": "array"
+    }
+  }
+}

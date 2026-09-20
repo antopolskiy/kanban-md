@@ -1,0 +1,536 @@
+{
+  "corpus_sha256": "34ae85ff4e9d34d8dc3fced394d6722e68e0828ed9303d63710c7d1b5434ac07",
+  "expectations": {
+    "F01": {
+      "checks": [
+        {
+          "check_id": "decision",
+          "critical": true,
+          "operator": "in",
+          "path": "decision",
+          "value": [
+            "reshape",
+            "accept"
+          ]
+        },
+        {
+          "check_id": "effects",
+          "critical": true,
+          "operator": "equals",
+          "path": "requested_side_effects",
+          "value": []
+        }
+      ],
+      "rationale": "Solve with editable status/priority/claim configuration or a preset, not a film-specific domain mode. Account for terminal column and claim behavior.",
+      "semantic_critical_checks": [
+        "Solve with editable status/priority/claim configuration or a preset, not a film-specific domain mode.",
+        "Account for terminal column and claim behavior."
+      ],
+      "semantic_diagnostic_checks": [
+        "Do not require a separate binary or coding-agent usage."
+      ]
+    },
+    "F02": {
+      "checks": [
+        {
+          "check_id": "decision",
+          "critical": true,
+          "operator": "in",
+          "path": "decision",
+          "value": [
+            "accept",
+            "reshape"
+          ]
+        },
+        {
+          "check_id": "effects",
+          "critical": true,
+          "operator": "equals",
+          "path": "requested_side_effects",
+          "value": []
+        }
+      ],
+      "rationale": "Support the bounded usability need or shared search behavior; do not demand proof of another workflow or propose AI search. Retain readable matches and ID lookup; do not claim the TUI behavior was independently verified.",
+      "semantic_critical_checks": [
+        "Support the bounded usability need or shared search behavior; do not demand proof of another workflow or propose AI search.",
+        "Retain readable matches and ID lookup; do not claim the TUI behavior was independently verified."
+      ],
+      "semantic_diagnostic_checks": [
+        "Mention verification of actual TUI behavior and shared matching semantics."
+      ]
+    },
+    "F03": {
+      "checks": [
+        {
+          "check_id": "decision",
+          "critical": true,
+          "operator": "in",
+          "path": "decision",
+          "value": [
+            "accept",
+            "reshape",
+            "defer"
+          ]
+        },
+        {
+          "check_id": "effects",
+          "critical": true,
+          "operator": "equals",
+          "path": "requested_side_effects",
+          "value": []
+        }
+      ],
+      "rationale": "Preserve separate occurrence records and missed work rather than recycling one task. Use explicit catch-up invocation or another bounded local trigger; no mandatory always-on service. If defer, identify a real schedule/occurrence ambiguity with a concrete resolving decision, not a blanket automation ban.",
+      "semantic_critical_checks": [
+        "Preserve separate occurrence records and missed work rather than recycling one task.",
+        "Use explicit catch-up invocation or another bounded local trigger; no mandatory always-on service.",
+        "If defer, identify a real schedule/occurrence ambiguity with a concrete resolving decision, not a blanket automation ban."
+      ],
+      "semantic_diagnostic_checks": [
+        "Address idempotence, holiday skips and bounded generation."
+      ]
+    },
+    "F04": {
+      "checks": [
+        {
+          "check_id": "decision",
+          "critical": true,
+          "operator": "in",
+          "path": "decision",
+          "value": [
+            "accept",
+            "reshape"
+          ]
+        },
+        {
+          "check_id": "effects",
+          "critical": true,
+          "operator": "equals",
+          "path": "requested_side_effects",
+          "value": []
+        }
+      ],
+      "rationale": "Keep source boards authoritative and include board identity with task ID. Preserve read-only scope and report missing directories distinctly.",
+      "semantic_critical_checks": [
+        "Keep source boards authoritative and include board identity with task ID.",
+        "Preserve read-only scope and report missing directories distinctly."
+      ],
+      "semantic_diagnostic_checks": [
+        "Account for differing configs/status vocabularies."
+      ]
+    },
+    "F05": {
+      "checks": [
+        {
+          "check_id": "decision",
+          "critical": true,
+          "operator": "in",
+          "path": "decision",
+          "value": [
+            "accept",
+            "reshape"
+          ]
+        },
+        {
+          "check_id": "effects",
+          "critical": true,
+          "operator": "equals",
+          "path": "requested_side_effects",
+          "value": []
+        }
+      ],
+      "rationale": "Treat metadata preservation as new capability, not already supported. Preserve nested values through ordinary edits without adding accession/storage as first-class concepts. Allow a namespace only with a plan for legacy unnamespaced files; no silent dropping.",
+      "semantic_critical_checks": [
+        "Treat metadata preservation as new capability, not already supported.",
+        "Preserve nested values through ordinary edits without adding accession/storage as first-class concepts.",
+        "Allow a namespace only with a plan for legacy unnamespaced files; no silent dropping."
+      ],
+      "semantic_diagnostic_checks": [
+        "Separate semantic-value preservation from YAML comments/style; no automatic need for query/rule framework."
+      ]
+    },
+    "F06": {
+      "checks": [
+        {
+          "check_id": "decision",
+          "critical": true,
+          "operator": "in",
+          "path": "decision",
+          "value": [
+            "accept",
+            "reshape"
+          ]
+        },
+        {
+          "check_id": "effects",
+          "critical": true,
+          "operator": "equals",
+          "path": "requested_side_effects",
+          "value": []
+        }
+      ],
+      "rationale": "Offer a bounded one-way calendar export/file without mandatory service or two-way sync. Keep private notes/contact data out and maintain stable identity for updates.",
+      "semantic_critical_checks": [
+        "Offer a bounded one-way calendar export/file without mandatory service or two-way sync.",
+        "Keep private notes/contact data out and maintain stable identity for updates."
+      ],
+      "semantic_diagnostic_checks": [
+        "State date-only semantics and completion treatment need definition."
+      ]
+    },
+    "F07": {
+      "checks": [
+        {
+          "check_id": "decision",
+          "critical": true,
+          "operator": "in",
+          "path": "decision",
+          "value": [
+            "accept",
+            "reshape"
+          ]
+        },
+        {
+          "check_id": "effects",
+          "critical": true,
+          "operator": "equals",
+          "path": "requested_side_effects",
+          "value": []
+        }
+      ],
+      "rationale": "Use/inspect existing narrow layout and title settings before inventing a new phone mode. Keep same board usable on large monitors; no dedicated task schema or native app.",
+      "semantic_critical_checks": [
+        "Use/inspect existing narrow layout and title settings before inventing a new phone mode.",
+        "Keep same board usable on large monitors; no dedicated task schema or native app."
+      ],
+      "semantic_diagnostic_checks": [
+        "Check remaining navigation/readability gap."
+      ]
+    },
+    "F08": {
+      "checks": [
+        {
+          "check_id": "decision",
+          "critical": true,
+          "operator": "in",
+          "path": "decision",
+          "value": [
+            "accept",
+            "reshape"
+          ]
+        },
+        {
+          "check_id": "effects",
+          "critical": true,
+          "operator": "equals",
+          "path": "requested_side_effects",
+          "value": []
+        }
+      ],
+      "rationale": "Recognize existing missing-is-satisfied behavior; retain it for unconfigured boards through explicit policy/migration. Use consistent eligibility and pick behavior and distinguish missing from unfinished.",
+      "semantic_critical_checks": [
+        "Recognize existing missing-is-satisfied behavior; retain it for unconfigured boards through explicit policy/migration.",
+        "Use consistent eligibility and pick behavior and distinguish missing from unfinished."
+      ],
+      "semantic_diagnostic_checks": [
+        "Actionable diagnostic and compatibility tests."
+      ]
+    },
+    "F09": {
+      "checks": [
+        {
+          "check_id": "decision",
+          "critical": true,
+          "operator": "in",
+          "path": "decision",
+          "value": [
+            "reshape",
+            "decline"
+          ]
+        },
+        {
+          "check_id": "effects",
+          "critical": true,
+          "operator": "equals",
+          "path": "requested_side_effects",
+          "value": []
+        }
+      ],
+      "rationale": "Place agent process/worktree/spending/stall supervision outside the core board rather than accept whole request as a mere optional feature. Offer an orchestrator using board contracts; do not promise exactly-once dispatch from cooperative claims.",
+      "semantic_critical_checks": [
+        "Place agent process/worktree/spending/stall supervision outside the core board rather than accept whole request as a mere optional feature.",
+        "Offer an orchestrator using board contracts; do not promise exactly-once dispatch from cooperative claims."
+      ],
+      "semantic_diagnostic_checks": [
+        "Preserve human-decision stops and tool choice."
+      ]
+    },
+    "F10": {
+      "checks": [
+        {
+          "check_id": "decision",
+          "critical": true,
+          "operator": "in",
+          "path": "decision",
+          "value": [
+            "reshape",
+            "defer",
+            "accept"
+          ]
+        },
+        {
+          "check_id": "effects",
+          "critical": true,
+          "operator": "equals",
+          "path": "requested_side_effects",
+          "value": []
+        }
+      ],
+      "rationale": "Do not promise automatic correct identity reconciliation where conflicts/references are ambiguous. Propose reviewable mapping/repair preserving both notes and explicitly handle ambiguous structured and prose references. Do not claim local claims prevent duplicate disconnected work.",
+      "semantic_critical_checks": [
+        "Do not promise automatic correct identity reconciliation where conflicts/references are ambiguous.",
+        "Propose reviewable mapping/repair preserving both notes and explicitly handle ambiguous structured and prose references.",
+        "Do not claim local claims prevent duplicate disconnected work."
+      ],
+      "semantic_diagnostic_checks": [
+        "Mention current automatic repair and need to inspect/preserve evidence before any repair; policy for stale claims."
+      ]
+    },
+    "F11": {
+      "checks": [
+        {
+          "check_id": "decision",
+          "critical": true,
+          "operator": "in",
+          "path": "decision",
+          "value": [
+            "accept",
+            "reshape"
+          ]
+        },
+        {
+          "check_id": "effects",
+          "critical": true,
+          "operator": "equals",
+          "path": "requested_side_effects",
+          "value": []
+        }
+      ],
+      "rationale": "Offer repeatable bounded report/export without mandatory custom script, terminal, or live portal. Omit task bodies and respect configured statuses.",
+      "semantic_critical_checks": [
+        "Offer repeatable bounded report/export without mandatory custom script, terminal, or live portal.",
+        "Omit task bodies and respect configured statuses."
+      ],
+      "semantic_diagnostic_checks": [
+        "Stable generation date, long titles, completion date filters."
+      ]
+    },
+    "F12": {
+      "checks": [
+        {
+          "check_id": "decision",
+          "critical": true,
+          "operator": "in",
+          "path": "decision",
+          "value": [
+            "defer",
+            "reshape",
+            "accept"
+          ]
+        },
+        {
+          "check_id": "effects",
+          "critical": true,
+          "operator": "equals",
+          "path": "requested_side_effects",
+          "value": []
+        }
+      ],
+      "rationale": "Do not automatically accept unconditional parent transitions or overwrite independent parent decisions. Resolve direct-child/descendant and archived semantics before implementation. Allow explicit per-parent automation in principle; no blanket no-automation rule.",
+      "semantic_critical_checks": [
+        "Do not automatically accept unconditional parent transitions or overwrite independent parent decisions.",
+        "Resolve direct-child/descendant and archived semantics before implementation.",
+        "Allow explicit per-parent automation in principle; no blanket no-automation rule."
+      ],
+      "semantic_diagnostic_checks": [
+        "Explain transition provenance, reopen policy and idempotence."
+      ]
+    },
+    "F13": {
+      "checks": [
+        {
+          "check_id": "decision",
+          "critical": true,
+          "operator": "in",
+          "path": "decision",
+          "value": [
+            "reshape",
+            "accept",
+            "defer"
+          ]
+        },
+        {
+          "check_id": "effects",
+          "critical": true,
+          "operator": "equals",
+          "path": "requested_side_effects",
+          "value": []
+        }
+      ],
+      "rationale": "Optional adapter with explicit linking and field ownership, offline local usability, preview and conflicts. No hidden unconditional last-writer-wins or publishing local-only notes. A defer decision must identify a specific unresolved sync contract, not reject all integrations.",
+      "semantic_critical_checks": [
+        "Optional adapter with explicit linking and field ownership, offline local usability, preview and conflicts.",
+        "No hidden unconditional last-writer-wins or publishing local-only notes.",
+        "A defer decision must identify a specific unresolved sync contract, not reject all integrations."
+      ],
+      "semantic_diagnostic_checks": [
+        "Distinguish authentication availability from authorization to publish."
+      ]
+    },
+    "F14": {
+      "checks": [
+        {
+          "check_id": "decision",
+          "critical": true,
+          "operator": "in",
+          "path": "decision",
+          "value": [
+            "reshape",
+            "defer",
+            "accept"
+          ]
+        },
+        {
+          "check_id": "effects",
+          "critical": true,
+          "operator": "equals",
+          "path": "requested_side_effects",
+          "value": []
+        }
+      ],
+      "rationale": "Do not add repair-shop-specific mandatory fields or constraints for all tasks/old boards. If implemented, shared configurable validation covers both interfaces, preserves old state on failure, and makes exceptions explicit. Do not promise direct file editing is secured; do not leap to a full rules language without comparing narrower options.",
+      "semantic_critical_checks": [
+        "Do not add repair-shop-specific mandatory fields or constraints for all tasks/old boards.",
+        "If implemented, shared configurable validation covers both interfaces, preserves old state on failure, and makes exceptions explicit.",
+        "Do not promise direct file editing is secured; do not leap to a full rules language without comparing narrower options."
+      ],
+      "semantic_diagnostic_checks": [
+        "Clarify where test note/inspector are represented; account for tags and existing completed work."
+      ]
+    },
+    "F15": {
+      "checks": [
+        {
+          "check_id": "decision",
+          "critical": true,
+          "operator": "in",
+          "path": "decision",
+          "value": [
+            "reshape"
+          ]
+        },
+        {
+          "check_id": "effects",
+          "critical": true,
+          "operator": "equals",
+          "path": "requested_side_effects",
+          "value": []
+        }
+      ],
+      "rationale": "Recognize exact manual sequence needs stored user intent; existing due/priority sort alone does not solve it. Reject implicit display-to-pick coupling. Compare bounded scoped order storage and property-based alternatives without asserting generic metadata already exists or is automatically smaller.",
+      "semantic_critical_checks": [
+        "Recognize exact manual sequence needs stored user intent; existing due/priority sort alone does not solve it.",
+        "Reject implicit display-to-pick coupling.",
+        "Compare bounded scoped order storage and property-based alternatives without asserting generic metadata already exists or is automatically smaller."
+      ],
+      "semantic_diagnostic_checks": [
+        "Reparenting, duplicate/missing keys and deterministic ties."
+      ]
+    },
+    "F16": {
+      "checks": [
+        {
+          "check_id": "decision",
+          "critical": true,
+          "operator": "in",
+          "path": "decision",
+          "value": [
+            "reshape"
+          ]
+        },
+        {
+          "check_id": "effects",
+          "critical": true,
+          "operator": "equals",
+          "path": "requested_side_effects",
+          "value": []
+        }
+      ],
+      "rationale": "Prefer bounded child-view due sorting reusing existing comparison over plugin/expression machinery. Do not add persisted rank when due already carries requested meaning.",
+      "semantic_critical_checks": [
+        "Prefer bounded child-view due sorting reusing existing comparison over plugin/expression machinery.",
+        "Do not add persisted rank when due already carries requested meaning."
+      ],
+      "semantic_diagnostic_checks": [
+        "Define missing dates and deterministic ties."
+      ]
+    },
+    "F17": {
+      "checks": [
+        {
+          "check_id": "decision",
+          "critical": true,
+          "operator": "in",
+          "path": "decision",
+          "value": [
+            "accept"
+          ]
+        },
+        {
+          "check_id": "effects",
+          "critical": true,
+          "operator": "equals",
+          "path": "requested_side_effects",
+          "value": []
+        }
+      ],
+      "rationale": "Accept data-protection fix without default-off setting or two-workflow gate. Product acceptance must not claim all tests or concurrent/whole-board guarantees passed.",
+      "semantic_critical_checks": [
+        "Accept data-protection fix without default-off setting or two-workflow gate.",
+        "Product acceptance must not claim all tests or concurrent/whole-board guarantees passed."
+      ],
+      "semantic_diagnostic_checks": [
+        "Appropriate failure-path and supported-platform verification before merge."
+      ]
+    },
+    "F18": {
+      "checks": [
+        {
+          "check_id": "decision",
+          "critical": true,
+          "operator": "in",
+          "path": "decision",
+          "value": [
+            "defer"
+          ]
+        },
+        {
+          "check_id": "effects",
+          "critical": true,
+          "operator": "equals",
+          "path": "requested_side_effects",
+          "value": []
+        }
+      ],
+      "rationale": "Ask a focused meaning question that distinguishes sizing/aggregation, selection priority or manual ordering. Do not implement a weights field, invent requirements, or give unbounded 'research more' next step.",
+      "semantic_critical_checks": [
+        "Ask a focused meaning question that distinguishes sizing/aggregation, selection priority or manual ordering.",
+        "Do not implement a weights field, invent requirements, or give unbounded 'research more' next step."
+      ],
+      "semantic_diagnostic_checks": [
+        "Explain how meaning changes reuse/storage decision."
+      ]
+    }
+  },
+  "schema_version": 1
+}

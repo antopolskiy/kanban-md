@@ -1040,26 +1040,27 @@ kanban-md list --group-by priority      # priority distribution
 
 ## Design principles
 
-**Agent-first, human-supervised.** Non-interactive commands, compact output,
-structured errors, and claims support autonomous agents; table output and the
-TUI keep the same work legible and controllable by humans.
+kanban-md provides orthogonal, composable workflow primitives. Development is
+one use, not the definition of its domain. These principles guide new features
+and reviews; they are not a claim that every existing implementation meets them.
 
-**Local, inspectable truth.** Board configuration and task state live in plain
-files. Coordination and audit files may exist, but they are local, explainable,
-and never become an opaque second source of truth.
+1. Compose workflows; make new domain concepts earn their place. Prefer shared
+   capabilities over built-in concepts named after one workflow.
+2. Choose the smallest capability that actually solves the need. Count user
+   effort and maintenance cost; a generic framework is not automatically simpler.
+3. Keep the basic board complete; make workflow policy optional. Extras should
+   impose no required setup or default clutter. Usability and data protection
+   still deserve sensible defaults.
+4. Give each value and action one explicit meaning. Separate task data, relations,
+   views, and policy. Display order must not silently become execution order.
+5. Keep local files authoritative and the core independently useful. Optional
+   integrations must not make ordinary board use depend on accounts or services.
+6. Preserve contracts across interfaces, upgrades, and writers. Keep mutations
+   consistent, agent commands non-interactive, and existing boards compatible.
 
-**One semantic core, multiple interfaces.** CLI and TUI operations share the
-same board-level mutation rules. Invariants belong at that common boundary,
-while each interface presents them for its own consumer.
-
-**Stable contracts, explicit evolution.** Task frontmatter, config schemas,
-JSON, compact output, and defaults are user-facing contracts. Schema changes use
-migrations and compatibility fixtures; stricter policy is normally opt-in and
-prospective.
-
-**Bounded local scope.** Features should strengthen local task orchestration
-without requiring a hosted service, external control plane, or automatic
-ownership of workflow decisions that users can make explicitly.
+The project-local [principal-owner skill](.agents/skills/kanban-md-principal-owner/SKILL.md)
+contains the review criteria, tradeoffs, and decision format. It is contributor
+guidance, not one of the workflow skills installed into users' projects.
 
 ## Development
 

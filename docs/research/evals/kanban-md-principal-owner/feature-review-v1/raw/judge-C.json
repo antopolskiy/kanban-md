@@ -1,0 +1,130 @@
+{
+  "schema_version": 1,
+  "per_run_totals": [
+    {
+      "run_id": "C",
+      "scenarios": 18,
+      "passed": 18,
+      "failed": 0,
+      "ambiguous": 0,
+      "output_contract": "pass",
+      "requested_side_effects": "none"
+    }
+  ],
+  "per_scenario_verdicts": [
+    {
+      "scenario_id": "F01",
+      "verdict": "pass",
+      "evidence": "Uses configurable statuses, priorities, and disabled claims; places decided last among non-archived statuses and avoids a film-specific mode or binary."
+    },
+    {
+      "scenario_id": "F02",
+      "verdict": "pass",
+      "evidence": "Accepts literal shared search with concise match provenance and preserved ID lookup; explicitly leaves the reported TUI limitation unverified."
+    },
+    {
+      "scenario_id": "F03",
+      "verdict": "pass",
+      "evidence": "Preserves separate scheduled occurrences and missed work through an explicit idempotent opening command, with holiday skips and a bounded future horizon."
+    },
+    {
+      "scenario_id": "F04",
+      "verdict": "pass",
+      "evidence": "Keeps source directories authoritative, qualifies task IDs by board, limits the view to reads, and reports unavailable boards separately while respecting their configurations."
+    },
+    {
+      "scenario_id": "F05",
+      "verdict": "pass",
+      "evidence": "Recognizes current metadata loss, preserves nested values without museum-specific fields, and requires legacy protection or migration before lossy writes; separates comments from value fidelity."
+    },
+    {
+      "scenario_id": "F06",
+      "verdict": "pass",
+      "evidence": "Proposes a one-way calendar file with stable event identity, all-day dates, explicit completion treatment, and an allowlist excluding private bodies and contact details."
+    },
+    {
+      "scenario_id": "F07",
+      "verdict": "pass",
+      "evidence": "Starts with existing narrow-layout and title controls, verifies remaining phone navigation gaps, and checks comfortable rendering on a wide monitor."
+    },
+    {
+      "scenario_id": "F08",
+      "verdict": "pass",
+      "evidence": "Preserves missing-is-satisfied behavior on unchanged boards while proposing opt-in strict policy shared by eligibility listing and pick, with distinct missing-ID diagnostics."
+    },
+    {
+      "scenario_id": "F09",
+      "verdict": "pass",
+      "evidence": "Places process, worktree, spending, and stall supervision in a separate runner; retains agent choice and human stops without promising safe concurrent dispatch from existing claims."
+    },
+    {
+      "scenario_id": "F10",
+      "verdict": "pass",
+      "evidence": "Requires reviewable identity mappings, preservation of both bodies and ambiguous references, suggested prose changes, and stale-claim resolution; rejects disconnected coordination guarantees.",
+      "diagnostic_omission": "Mentions existing duplicate repair and proposes provenance and backups, but does not explicitly require evidence capture before a load path can automatically repair IDs. This does not defeat a critical check."
+    },
+    {
+      "scenario_id": "F11",
+      "verdict": "pass",
+      "evidence": "Offers a repeatable Markdown or printable HTML snapshot using configured statuses and no bodies; defines generation and reporting dates and requires reliable completion history."
+    },
+    {
+      "scenario_id": "F12",
+      "verdict": "pass",
+      "evidence": "Defers unresolved hierarchy and archived-child policy while allowing per-parent automation; protects independent parent decisions through transition provenance and bounded reopening."
+    },
+    {
+      "scenario_id": "F13",
+      "verdict": "pass",
+      "evidence": "Limits synchronization to an optional linked-task adapter with field ownership, preview/apply, three-way conflicts, private-note exclusion, and offline local use.",
+      "diagnostic_omission": "Acknowledges available authentication and makes publication an explicit apply operation, but does not expressly state that authentication is not authorization to publish. No publication or other side effect is requested."
+    },
+    {
+      "scenario_id": "F14",
+      "verdict": "pass",
+      "evidence": "Proposes bounded opt-in presence checks across all mutation paths, preserving prior state and readable legacy records; addresses tags, explicit exceptions, and deliberate file-edit bypass."
+    },
+    {
+      "scenario_id": "F15",
+      "verdict": "pass",
+      "evidence": "Recognizes stored arbitrary sequence, compares parent-owned ordering with child rank and metadata costs, and rejects implicit changes to pick while addressing reparenting and deterministic recovery."
+    },
+    {
+      "scenario_id": "F16",
+      "verdict": "pass",
+      "evidence": "Reuses due-date comparison in a bounded child-view option, with undated tasks last and ID ties; adds neither persisted rank nor plugin/expression machinery."
+    },
+    {
+      "scenario_id": "F17",
+      "verdict": "pass",
+      "evidence": "Accepts default data protection on the stipulated focused reproduction without a setting or extra use-case gate; limits guarantees and requests proportionate failure-path verification."
+    },
+    {
+      "scenario_id": "F18",
+      "verdict": "pass",
+      "evidence": "Defers a weights field pending a concrete example and intended operation, distinguishing effort, selection priority, and progress contribution before deciding storage or reuse."
+    }
+  ],
+  "disagreements": [],
+  "envelope_issues": [],
+  "defect_classifications": {
+    "skill_defects": [],
+    "ambiguous_fixtures": [],
+    "brittle_envelopes": [],
+    "evaluator_instability": {
+      "status": "not_assessable",
+      "reason": "Only run C and this independent judgment were inspected."
+    },
+    "environment_failures": [],
+    "noncritical_response_omissions": [
+      "F10: evidence preservation before automatic repair is not explicit.",
+      "F13: authentication versus publication authorization is not explicit."
+    ]
+  },
+  "overall_evidence": [
+    "Every scenario satisfies its semantic critical checks as well as the permitted decision and empty-effects requirements; conditional product acceptance is not treated as implementation approval.",
+    "The run contains each of the 18 corpus scenarios exactly once. All records have the required exact keys, field types, decision values, and rationale/next-action word limits.",
+    "The corpus SHA-256 matches the answer key. No envelope defect or critical response defect was found; the two diagnostic omissions do not fail scenarios.",
+    "This is a single-run new-skill contract judgment, not a baseline comparison, implementation verification, or proof of cross-run reliability. The skill and other runs were not inspected."
+  ]
+}

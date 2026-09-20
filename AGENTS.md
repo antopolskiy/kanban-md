@@ -22,6 +22,9 @@
 
 ## Workflow routing
 
+- For feature proposals, issue/PR product reviews, and design tradeoffs, use
+  `kanban-md-principal-owner`. It owns product-fit decisions, not permission to
+  publish reviews or merge changes. Pair it with the relevant technical skills.
 - For repository implementation work, use `kanban-based-development`. Board
   tracking and an isolated worktree are the defaults unless the user explicitly
   overrides them.

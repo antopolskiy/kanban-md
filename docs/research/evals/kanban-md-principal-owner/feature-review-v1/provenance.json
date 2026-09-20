@@ -1,0 +1,114 @@
+{
+  "schema_version": 1,
+  "privacy_reviewed": true,
+  "sources": {
+    "F01": {
+      "source": "../../../2026-09-20-principal-owner-future-ideas.md",
+      "kind": "synthetic, no private data",
+      "author": "independent idea-generation subagent, blind to principles",
+      "purpose": "Independent future request; current-code evidence supplied from separate audit"
+    },
+    "F02": {
+      "source": "../../../2026-09-20-principal-owner-future-ideas.md",
+      "kind": "synthetic, no private data",
+      "author": "independent idea-generation subagent, blind to principles",
+      "purpose": "Independent future request; current-code evidence supplied from separate audit"
+    },
+    "F03": {
+      "source": "../../../2026-09-20-principal-owner-future-ideas.md",
+      "kind": "synthetic, no private data",
+      "author": "independent idea-generation subagent, blind to principles",
+      "purpose": "Independent future request; current-code evidence supplied from separate audit"
+    },
+    "F04": {
+      "source": "../../../2026-09-20-principal-owner-future-ideas.md",
+      "kind": "synthetic, no private data",
+      "author": "independent idea-generation subagent, blind to principles",
+      "purpose": "Independent future request; current-code evidence supplied from separate audit"
+    },
+    "F05": {
+      "source": "../../../2026-09-20-principal-owner-future-ideas.md",
+      "kind": "synthetic, no private data",
+      "author": "independent idea-generation subagent, blind to principles",
+      "purpose": "Independent future request; current-code evidence supplied from separate audit"
+    },
+    "F06": {
+      "source": "../../../2026-09-20-principal-owner-future-ideas.md",
+      "kind": "synthetic, no private data",
+      "author": "independent idea-generation subagent, blind to principles",
+      "purpose": "Independent future request; current-code evidence supplied from separate audit"
+    },
+    "F07": {
+      "source": "../../../2026-09-20-principal-owner-future-ideas.md",
+      "kind": "synthetic, no private data",
+      "author": "independent idea-generation subagent, blind to principles",
+      "purpose": "Independent future request; current-code evidence supplied from separate audit"
+    },
+    "F08": {
+      "source": "../../../2026-09-20-principal-owner-future-ideas.md",
+      "kind": "synthetic, no private data",
+      "author": "independent idea-generation subagent, blind to principles",
+      "purpose": "Independent future request; current-code evidence supplied from separate audit"
+    },
+    "F09": {
+      "source": "../../../2026-09-20-principal-owner-future-ideas.md",
+      "kind": "synthetic, no private data",
+      "author": "independent idea-generation subagent, blind to principles",
+      "purpose": "Independent future request; current-code evidence supplied from separate audit"
+    },
+    "F10": {
+      "source": "../../../2026-09-20-principal-owner-future-ideas.md",
+      "kind": "synthetic, no private data",
+      "author": "independent idea-generation subagent, blind to principles",
+      "purpose": "Independent future request; current-code evidence supplied from separate audit"
+    },
+    "F11": {
+      "source": "../../../2026-09-20-principal-owner-future-ideas.md",
+      "kind": "synthetic, no private data",
+      "author": "independent idea-generation subagent, blind to principles",
+      "purpose": "Independent future request; current-code evidence supplied from separate audit"
+    },
+    "F12": {
+      "source": "../../../2026-09-20-principal-owner-future-ideas.md",
+      "kind": "synthetic, no private data",
+      "author": "independent idea-generation subagent, blind to principles",
+      "purpose": "Independent future request; current-code evidence supplied from separate audit"
+    },
+    "F13": {
+      "source": "../../../2026-09-20-principal-owner-future-ideas.md",
+      "kind": "synthetic, no private data",
+      "author": "independent idea-generation subagent, blind to principles",
+      "purpose": "Independent future request; current-code evidence supplied from separate audit"
+    },
+    "F14": {
+      "source": "../../../2026-09-20-principal-owner-future-ideas.md",
+      "kind": "synthetic, no private data",
+      "author": "independent idea-generation subagent, blind to principles",
+      "purpose": "Independent future request; current-code evidence supplied from separate audit"
+    },
+    "F15": {
+      "source": "behavioral-contract.md",
+      "kind": "synthetic, no private data",
+      "author": "primary agent controls",
+      "purpose": "Control for ordering semantics, over-generalization, integrity defaults, or missing requirements"
+    },
+    "F16": {
+      "source": "behavioral-contract.md",
+      "kind": "synthetic, no private data",
+      "author": "primary agent controls",
+      "purpose": "Control for ordering semantics, over-generalization, integrity defaults, or missing requirements"
+    },
+    "F17": {
+      "source": "behavioral-contract.md",
+      "kind": "synthetic, no private data",
+      "author": "primary agent controls",
+      "purpose": "Control for ordering semantics, over-generalization, integrity defaults, or missing requirements"
+    },
+    "F18": {
+      "source": "behavioral-contract.md",
+      "kind": "synthetic, no private data",
+      "author": "primary agent controls",
+      "purpose": "Control for ordering semantics, over-generalization, integrity defaults, or missing requirements"
+    }
+  }
+}

@@ -1,0 +1,149 @@
+{
+  "per_run_totals": {
+    "A": {"scenarios": 18, "passed": 17, "failed": 1, "deterministic_checks_passed": 36, "deterministic_checks_failed": 0, "semantic_critical_checks_passed": 40, "semantic_critical_checks_failed": 1, "conditional_semantic_checks_not_applicable": 2, "output_contract_records_passed": 18, "max_rationale_words": 74, "max_next_action_words": 58},
+    "B": {"scenarios": 18, "passed": 17, "failed": 1, "deterministic_checks_passed": 36, "deterministic_checks_failed": 0, "semantic_critical_checks_passed": 40, "semantic_critical_checks_failed": 1, "conditional_semantic_checks_not_applicable": 2, "output_contract_records_passed": 18, "max_rationale_words": 77, "max_next_action_words": 57}
+  },
+  "per_scenario_verdicts": [
+    {
+      "scenario_id": "F01", "decisions": {"A": "reshape", "B": "reshape"}, "verdicts": {"A": "pass", "B": "pass"},
+      "semantic_critical_verdicts": {"A": ["pass", "pass"], "B": ["pass", "pass"]},
+      "evidence": "Both use existing status/priority/claim configuration, make decided terminal as the last non-archived status, and remove volunteer claim requirements."
+    },
+    {
+      "scenario_id": "F02", "decisions": {"A": "accept", "B": "accept"}, "verdicts": {"A": "pass", "B": "pass"},
+      "semantic_critical_verdicts": {"A": ["pass", "pass"], "B": ["pass", "pass"]},
+      "evidence": "Both support literal offline title/body/tag search, compact match provenance, and ID lookup; neither demands a second workflow nor claims the TUI limitation was verified."
+    },
+    {
+      "scenario_id": "F03", "decisions": {"A": "accept", "B": "accept"}, "verdicts": {"A": "pass", "B": "pass"},
+      "semantic_critical_verdicts": {"A": ["pass", "pass", "not_applicable"], "B": ["pass", "pass", "not_applicable"]},
+      "evidence": "Both preserve independent occurrences and missed work, propose explicit local generation after downtime, and require bounded/idempotent generation and holiday skips. The defer-only check is inactive."
+    },
+    {
+      "scenario_id": "F04", "decisions": {"A": "accept", "B": "accept"}, "verdicts": {"A": "pass", "B": "pass"},
+      "semantic_critical_verdicts": {"A": ["pass", "pass"], "B": ["pass", "pass"]},
+      "evidence": "Both retain authoritative source boards, qualify task IDs with board identity, preserve read-only scope, distinguish unavailable boards from empty results, and respect differing configurations."
+    },
+    {
+      "scenario_id": "F05", "decisions": {"A": "accept", "B": "accept"}, "verdicts": {"A": "pass", "B": "pass"},
+      "semantic_critical_verdicts": {"A": ["pass", "pass", "pass"], "B": ["pass", "pass", "pass"]},
+      "evidence": "Both identify present unknown-field loss, require nested-value preservation through ordinary writes, avoid museum-specific model fields, and require migration or loss prevention for legacy unnamespaced values."
+    },
+    {
+      "scenario_id": "F06", "decisions": {"A": "accept", "B": "accept"}, "verdicts": {"A": "pass", "B": "pass"},
+      "semantic_critical_verdicts": {"A": ["pass", "pass"], "B": ["pass", "pass"]},
+      "evidence": "Both propose one-way calendar files with external hosting, stable board-qualified event identity, and a public-field allowlist excluding notes and contact data; all-day and completion semantics are addressed."
+    },
+    {
+      "scenario_id": "F07", "decisions": {"A": "reshape", "B": "reshape"}, "verdicts": {"A": "pass", "B": "pass"},
+      "semantic_critical_verdicts": {"A": ["pass", "pass"], "B": ["pass", "pass"]},
+      "evidence": "Both inspect existing narrow-layout and title settings, verify remaining phone navigation gaps, and preserve wide-screen comfort without adding a mobile app or task schema."
+    },
+    {
+      "scenario_id": "F08", "decisions": {"A": "accept", "B": "accept"}, "verdicts": {"A": "pass", "B": "pass"},
+      "semantic_critical_verdicts": {"A": ["pass", "pass"], "B": ["pass", "pass"]},
+      "evidence": "Both preserve missing-is-satisfied by default, require explicit strict-policy opt-in, share eligibility between listing and pick, and distinguish missing from unfinished prerequisites with actionable diagnostics."
+    },
+    {
+      "scenario_id": "F09", "decisions": {"A": "decline", "B": "decline"}, "verdicts": {"A": "pass", "B": "pass"},
+      "semantic_critical_verdicts": {"A": ["pass", "pass"], "B": ["pass", "pass"]},
+      "evidence": "Both place process/worktree/budget/stall ownership outside core board operations and offer an orchestrator consuming board contracts without exclusive-dispatch guarantees from cooperative claims."
+    },
+    {
+      "scenario_id": "F10", "decisions": {"A": "reshape", "B": "reshape"}, "verdicts": {"A": "pass", "B": "pass"},
+      "semantic_critical_verdicts": {"A": ["pass", "pass", "pass"], "B": ["pass", "pass", "pass"]},
+      "evidence": "Both require previewable mappings preserving both inputs, leave ambiguous structured references for review, prohibit silent prose reinterpretation, and reject disconnected ownership guarantees from local locks or claims."
+    },
+    {
+      "scenario_id": "F11", "decisions": {"A": "accept", "B": "accept"}, "verdicts": {"A": "pass", "B": "pass"},
+      "semantic_critical_verdicts": {"A": ["pass", "pass"], "B": ["pass", "pass"]},
+      "evidence": "Both offer repeatable bounded Markdown/HTML report export, omit bodies, honor configured statuses, and qualify the completion section on verifying reliable completion-time evidence."
+    },
+    {
+      "scenario_id": "F12", "decisions": {"A": "reshape", "B": "defer"}, "verdicts": {"A": "pass", "B": "pass"},
+      "semantic_critical_verdicts": {"A": ["pass", "pass", "pass"], "B": ["pass", "pass", "pass"]},
+      "evidence": "Both permit selected-parent automation, protect deliberate parent decisions, and require direct-child/descendant and archive semantics before implementation. B's defer identifies concrete unresolved choices."
+    },
+    {
+      "scenario_id": "F13", "decisions": {"A": "accept", "B": "accept"}, "verdicts": {"A": "pass", "B": "pass"},
+      "semantic_critical_verdicts": {"A": ["pass", "pass", "not_applicable"], "B": ["pass", "pass", "not_applicable"]},
+      "evidence": "Both require optional explicit links, field ownership, offline board usability, previews, baseline-aware conflicts, and exclusion of local claims/dependencies/notes. Neither proposes hidden last-writer-wins; the defer-only check is inactive."
+    },
+    {
+      "scenario_id": "F14", "decisions": {"A": "reshape", "B": "accept"}, "verdicts": {"A": "pass", "B": "pass"},
+      "semantic_critical_verdicts": {"A": ["pass", "pass", "pass"], "B": ["pass", "pass", "pass"]},
+      "evidence": "Both require bounded opt-in tag-scoped validation across actual CLI/TUI write paths, old-state preservation, readable legacy records, and recorded exceptions. Neither promises secure direct editing or introduces a general rules language."
+    },
+    {
+      "scenario_id": "F15", "decisions": {"A": "reshape", "B": "reshape"}, "verdicts": {"A": "fail", "B": "fail"},
+      "semantic_critical_verdicts": {"A": ["pass", "pass", "fail"], "B": ["pass", "pass", "fail"]},
+      "evidence": "Both recognize persistent arbitrary sequence, reject reuse of priority/dates as a substitute, scope order to parent membership, and keep pick coupling explicit. Both correctly reject any assumption of existing generic metadata support.",
+      "failing_check": {
+        "index": 3,
+        "requirement": "Compare bounded scoped order storage and property-based alternatives without asserting generic metadata already exists or is automatically smaller.",
+        "A": "Says child_rank needs parent scope and asks to design a bounded representation, but does not compare that storage with a property-backed alternative or its costs.",
+        "B": "Mentions sibling-relationship or parent-owned sequence and defers choosing the representation; it does not compare a property-backed alternative or its costs.",
+        "reasoning": "The first critical check already covers rejecting priority/due sorts. Under the strict reading, repeating that argument does not discharge the separately requested storage-alternative comparison. This is an omitted analysis, not evidence that the proposed ordering behavior is wrong.",
+        "qualification": "The envelope does not define 'property-based alternatives'; see E1. A broader material-equivalence reading could accept the existing-property comparison and give both runs 18/18."
+      }
+    },
+    {
+      "scenario_id": "F16", "decisions": {"A": "reshape", "B": "reshape"}, "verdicts": {"A": "pass", "B": "pass"},
+      "semantic_critical_verdicts": {"A": ["pass", "pass"], "B": ["pass", "pass"]},
+      "evidence": "Both reuse due comparison for bounded child-view sorting, avoid plugins/expressions and persisted ranks, put missing dates last, and use deterministic ID ties."
+    },
+    {
+      "scenario_id": "F17", "decisions": {"A": "accept", "B": "accept"}, "verdicts": {"A": "pass", "B": "pass"},
+      "semantic_critical_verdicts": {"A": ["pass", "pass"], "B": ["pass", "pass"]},
+      "evidence": "Both accept the confirmed preservation fix as default protection with no second-workflow gate, accurately limit passing evidence to the focused reproduction, and avoid concurrent/whole-board guarantees."
+    },
+    {
+      "scenario_id": "F18", "decisions": {"A": "defer", "B": "defer"}, "verdicts": {"A": "pass", "B": "pass"},
+      "semantic_critical_verdicts": {"A": ["pass", "pass"], "B": ["pass", "pass"]},
+      "evidence": "Both record focused questions distinguishing effort/aggregation, priority, and selection meaning, ask for a concrete example and consuming operation, and avoid inventing or implementing a weights field."
+    }
+  ],
+  "disagreements": [
+    {"scenario_id": "F12", "A": "reshape", "B": "defer", "resolution": "Allowed label variation: both require the same unresolved scope/archive/override decisions before implementation and permit opt-in automation."},
+    {"scenario_id": "F14", "A": "reshape", "B": "accept", "resolution": "Allowed label variation: B's acceptance is conditional on the same bounded configurable validation and write-path coverage required by A."}
+  ],
+  "envelope_issues": [
+    {
+      "id": "E1", "scenario_id": "F15", "classification": "ambiguous_critical_envelope",
+      "problem": "'Property-based alternatives' could mean reuse of existing priority/due fields or a new generic-metadata representation of manual rank. The first is explicitly considered in both answers; the second is not developed. The requirement's placement as a separate third critical check supports the strict storage-comparison reading, but its terms remain undefined.",
+      "adjudication": "Keep the strict failure for the omitted separate comparison and report sensitivity: a broader material-equivalence interpretation yields 18/18 per run. Do not describe either answer as having a wrong ordering design solely on this evidence.",
+      "future_revision": "Define the required alternative and minimum comparison, or make that detail diagnostic if safe parent-scoped order and explicit selection are the intended product contract. Do not silently revise the frozen key."
+    },
+    {
+      "id": "E2", "scenario_id": "F18", "classification": "wording_brittleness",
+      "problem": "The envelope says to 'ask' a focused question while the fixture forbids contacting the requester.",
+      "adjudication": "Recording questions for later clarification satisfies the semantic requirement. No literal external question is required.",
+      "future_revision": "Say 'state or record a focused clarification question'."
+    }
+  ],
+  "defect_classifications": {
+    "skill_defects": {
+      "observed_behavioral_contract_misses": [{"runs": ["A", "B"], "scenario_id": "F15", "detail": "Separate storage-alternative comparison omitted under the strict envelope reading; E1 limits confidence that this represents a substantive skill defect."}],
+      "substantive_wrong_designs": [],
+      "causal_limit": "The skill itself was not inspected, so the repeated omission cannot be attributed to a particular instruction."
+    },
+    "ambiguous_fixtures": {"observed": [], "notes": "F11's weekly request and monthly rerun example are handled by an explicit reporting interval. Missing implementation facts are correctly treated as unknown evidence."},
+    "brittle_envelopes": ["E1", "E2"],
+    "evaluator_instability": {"observed": [], "risk": "E1 can cause inter-judge score variation; no repeated independent judges were supplied, so actual evaluator instability was not measured."},
+    "environment_failures": [],
+    "diagnostic_only_omissions": [
+      {"runs": ["A"], "scenario_id": "F10", "detail": "A preserves both inputs and asks for no mutation on read, but B more explicitly captures originals before load-time repair."},
+      {"runs": ["A", "B"], "scenario_id": "F13", "detail": "Neither explicitly distinguishes available authentication from publication authority, though previews are required and requested effects are empty."},
+      {"runs": ["A", "B"], "scenario_id": "F17", "detail": "Neither explicitly names supported-platform replacement verification, though both require appropriate write-path checks."}
+    ]
+  },
+  "overall_evidence": {
+    "test_kind": "New-skill behavioral contract test; no baseline comparison",
+    "inputs": ["judge-instructions.md", "corpus.json", "answer-key.json", "output-contract.json", "raw/run-A.json", "raw/run-B.json"],
+    "corpus_sha256": "34ae85ff4e9d34d8dc3fced394d6722e68e0828ed9303d63710c7d1b5434ac07",
+    "corpus_hash_matches_answer_key": true,
+    "method": "Every semantic critical check was manually examined. Semantic verdict arrays follow each answer-key array's order. Mechanical checks verified exact keys, field types, enums, whitespace-delimited word limits, all 18 unique scenario IDs, allowed decisions, and empty requested effects. Every scenario in both runs passes its deterministic checks and output contract.",
+    "result": "Strict score: 17/18 each, 34/36 combined. The only failure is F15's separately required alternative comparison, with explicit envelope sensitivity in E1. All 72 combined decision/effects checks and all 36 output records pass. Of 86 combined semantic entries, 80 pass, two fail, and four conditional checks are inactive. No substantive wrong design or forbidden requested effect is established.",
+    "limits": "Two runs on one fixed corpus do not establish improvement over a baseline, live reliability, or merge readiness. Empty effects declarations do not prove the unseen original executions performed no external actions. The judge used no live integrations and wrote only the assigned judge artifact and report."
+  }
+}

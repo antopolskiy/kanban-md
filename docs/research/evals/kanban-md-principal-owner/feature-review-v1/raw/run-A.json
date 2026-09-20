@@ -1,0 +1,166 @@
+[
+  {
+    "scenario_id": "F05",
+    "decision": "accept",
+    "rationale": "P4 and P6 support a preservation contract for user-owned metadata without making accession or storage concepts part of the core model. The current fixed-struct round trip loses unknown values, so existing behavior does not satisfy this need. Nested mappings and lists must survive ordinary edits. A dedicated namespace can bound ownership and reserved-key conflicts, provided legacy unnamespaced values have an explicit upgrade path. YAML comment preservation is a separate, lower-priority concern.",
+    "next_action": "Specify the extension namespace, supported YAML values, reserved-key rules, and treatment of existing unknown fields. Provide a reviewable migration or loss-preventing diagnostic before rewriting legacy files. Verify title and status edits preserve nested values and unrelated content through every supported writer; do not add museum-specific validation or display semantics.",
+    "assumptions": [],
+    "requested_side_effects": []
+  },
+  {
+    "scenario_id": "F17",
+    "decision": "accept",
+    "rationale": "P3 makes data-integrity protection a normal default, and P6 calls for verification proportionate to write risk. This is a confirmed failure with a narrow fix, an unchanged public contract, and a passing regression reproduction. No optional setting, second workflow, or new abstraction is needed. Temporary sibling replacement supports this save-failure fix; it does not establish concurrent-writer safety or board-wide transactions. Product acceptance alone is not merge approval.",
+    "next_action": "Review the replacement and failure-cleanup paths and complete the repository checks appropriate to task-file writes. Retain the failing-before/passing-after test as evidence. Report the focused result accurately, without claiming broader production coverage or guarantees absent from the fixture.",
+    "assumptions": [],
+    "requested_side_effects": []
+  },
+  {
+    "scenario_id": "F09",
+    "decision": "decline",
+    "rationale": "P5 places agent process supervision, worktree lifecycle, stall recovery, spending limits, and overnight accounting with an external orchestrator. These responsibilities would materially expand a local task board even if the maintainer prefers one application. Existing commands and claims can support an adapter, but they are not a supervisor. In particular, nonserialized PickAndClaim cannot justify a promise that concurrent launches select distinct work safely.",
+    "next_action": "Outline a separate orchestrator that supports both agent CLIs and owns process limits, human-decision stops, recovery, and the morning report. Identify only demonstrated board gaps, such as safe coordinated acquisition and machine-readable handoff results, for separate bounded proposals. Preserve manual merge and deployment decisions.",
+    "assumptions": [],
+    "requested_side_effects": []
+  },
+  {
+    "scenario_id": "F02",
+    "decision": "accept",
+    "rationale": "P2 favors a bounded usability improvement, and P6 favors consistent search meaning across interfaces. The CLI already provides literal, case-insensitive title, body, and tag matching; matching that behavior in the TUI with concise match provenance solves the reported problem without introducing a semantic search service. A bug or usability improvement does not need a second workflow to justify it. The fixture has not independently verified the reported TUI limitation.",
+    "next_action": "Confirm the TUI's current matching and ID lookup, then extend only the missing behavior. Reuse common search semantics where practical and show a compact body or tag match indicator. Verify offline operation, case insensitivity, preserved ID lookup, and readable cards without dumping matching paragraphs.",
+    "assumptions": [
+      "The reported TUI limitation still requires confirmation before implementation."
+    ],
+    "requested_side_effects": []
+  },
+  {
+    "scenario_id": "F12",
+    "decision": "reshape",
+    "rationale": "P4 permits explicitly enabled automation but forbids treating child completion as universal parent acceptance or overwriting unrelated decisions. Restrict this to selected parents with a defined transition policy and an explanation of each change. Current direct-child summaries are display behavior, not an existing cascade contract. Archived material, nested descendants, and reopening require explicit semantics; waiting-for-publisher must not be replaced merely because a child changes.",
+    "next_action": "Settle direct-child versus descendant scope and whether archived children count before implementation. Specify completion and reopening triggers, eligible source statuses, repeat-run behavior, and provenance sufficient to distinguish an automatic transition from a deliberate user decision. Apply the policy through common mutations and test nested, archived, reopened, and manually overridden parents.",
+    "assumptions": [
+      "The requester has not selected the hierarchy scope; neither direct children nor all descendants can be treated as agreed."
+    ],
+    "requested_side_effects": []
+  },
+  {
+    "scenario_id": "F04",
+    "decision": "accept",
+    "rationale": "P2 supports removing a recurring eight-board inspection burden with a bounded read-only view, while P5 preserves each directory as authoritative. Board identity plus local task ID is necessary because numeric IDs collide. Different status names and configuration versions must retain their own board semantics. Unavailable or unsupported boards must produce distinguishable diagnostics rather than looking empty. No aggregate task store or cross-board mutation is needed.",
+    "next_action": "Define explicit directory inputs, unambiguous board-qualified task references, and navigation to the originating task. Load each board with its supported configuration semantics, report per-board failures, and preserve useful results from available boards. Verify duplicate numeric IDs, due-week boundaries, differing status names, moved paths, and unsupported versions without modifying source boards.",
+    "assumptions": [
+      "The exact navigation mechanism remains a design choice; no multi-board command is established as shipped."
+    ],
+    "requested_side_effects": []
+  },
+  {
+    "scenario_id": "F15",
+    "decision": "reshape",
+    "rationale": "P4 recognizes arbitrary manual sequence as legitimate stored intent; sorting priority, dates, or IDs cannot express 29, 11, 42 without changing other meanings. The order belongs to membership in a parent's child list, so a task-level child_rank needs explicit parent scope and reparenting semantics. Automatically changing pick because the display order changed would couple visual and work-selection intent without consent. Arbitrary metadata preservation cannot be assumed.",
+    "next_action": "Design a bounded parent-child ordering representation and explicit reorder operation. Define placement of new children, duplicate or missing positions, and removal or reparenting behavior. Keep pick's existing rules unless the user explicitly selects a separately specified manual-order selection mode, with dependency and claim eligibility still respected. Verify round trips and ordering compatibility.",
+    "assumptions": [],
+    "requested_side_effects": []
+  },
+  {
+    "scenario_id": "F07",
+    "decision": "reshape",
+    "rationale": "P2 requires starting from the existing automatic narrow layout, threshold, and title-line settings. A new phone mode is not yet justified when those mechanisms already address much of the need. The evidence does not establish full-width single-column behavior, usable column switching, or comfortable moves at 45 characters, so claiming the request is completely solved would be premature. The remaining work should be a focused usability gap, preserving comfortable wide-screen use.",
+    "next_action": "Evaluate the existing narrow layout at the stated width with long titles and arrow-key navigation. Document verified existing configuration and add only missing column switching, inspection, or move interactions. Check both phone and monitor layouts; do not invent unsupported flags or expand the request into a native mobile application.",
+    "assumptions": [
+      "The fixture does not establish which requested phone interactions are already supported."
+    ],
+    "requested_side_effects": []
+  },
+  {
+    "scenario_id": "F18",
+    "decision": "defer",
+    "rationale": "P1 and P4 require a concrete operation and an explicit meaning before adding a core value. Weight could mean effort, importance, parent-relative contribution, or work-selection preference; those interpretations imply different ownership and behavior. Existing priority or estimate might already address the need, but the issue supplies no basis for choosing either or inventing a calculation.",
+    "next_action": "Record the missing evidence: one concrete example, what weight measures, the operation or calculation that consumes it, and whether it belongs to the task or its relationship to a parent. Reassess whether an existing field, bounded relationship value, or external calculation is appropriate once those facts are supplied. Do not contact the requester during this evaluation.",
+    "assumptions": [],
+    "requested_side_effects": []
+  },
+  {
+    "scenario_id": "F03",
+    "decision": "accept",
+    "rationale": "P2 supports a bounded recurrence capability because repeated manual copying is the actual burden. P4 requires distinct occurrence records and explicit generation semantics: completing a check must not recycle its history, and missed checks must not disappear. A local, explicitly invoked generation operation can work when the computer is off overnight without adding a background supervisor. Recurrence needs stable occurrence identity, bounded materialization, and exceptions separate from the future pattern.",
+    "next_action": "Specify a recurrence definition and independent dated occurrences, with idempotent generation on completion or an explicit opening-time command. Define timezone and date handling, missed-run catch-up, a bounded future horizon, single-date holiday skips, and which checklist and assignee values copy forward. Test repeated runs, delayed completion, offline gaps, skipped dates, and preservation of overdue records.",
+    "assumptions": [
+      "No recurrence implementation or existing command is established by the fixture."
+    ],
+    "requested_side_effects": []
+  },
+  {
+    "scenario_id": "F11",
+    "decision": "accept",
+    "rationale": "P2 favors a repeatable, bounded report over requiring the administrator to maintain a script or repair terminal output every month. P5 allows an export that leaves the local board authoritative. A dated Markdown or HTML snapshot with selected fields satisfies the printing need without a portal. Omit bodies by design, preserve configured status names, and define time windows explicitly. The fixture does not establish whether reliable completion timestamps are available for the finished-this-week section.",
+    "next_action": "Specify a reusable report command with assignee grouping, overdue dates, readable titles, and generation date. Confirm completion-time evidence and interval semantics before promising the weekly completion section; do not substitute last modification time without justification. Verify the field allowlist, custom statuses, empty groups, long titles, and print-friendly output.",
+    "assumptions": [
+      "Completion timestamp availability and retention are not supplied."
+    ],
+    "requested_side_effects": []
+  },
+  {
+    "scenario_id": "F08",
+    "decision": "accept",
+    "rationale": "P3 and P6 support an opt-in missing-dependency policy because treating missing references as satisfied is an explicit existing contract used by other boards. This team's stricter eligibility requirement is a meaningful workflow variation. Apply the same decision to list --unblocked and pick, while distinguishing a missing prerequisite from an existing unfinished one. Enabling strict behavior must not quietly change unrelated boards or claim stronger synchronization guarantees.",
+    "next_action": "Define a board setting that preserves existing behavior by default and a diagnostic naming both the dependent task and missing ID. Provide a preflight reference check before opt-in. Verify shared eligibility in listing and selection, existing versus missing prerequisites, legacy configuration behavior, and actionable errors after an incomplete copy.",
+    "assumptions": [],
+    "requested_side_effects": []
+  },
+  {
+    "scenario_id": "F16",
+    "decision": "reshape",
+    "rationale": "P2 rejects the permanent plugin and expression-language cost for a single, already expressible comparator. The concrete need is direct-child due-date sorting in one view. Existing due dates and a comparator support a bounded extension; neither arbitrary computed values nor a general property framework is evidenced. Under P4 this remains display order and should not implicitly alter pick or introduce stored ranks.",
+    "next_action": "Add an explicit child-view sort choice using the existing due-date comparison, with missing dates last and a deterministic ID tie-break. Preserve the current ID ordering unless users select the new order, document the choice, and verify ties, undated children, and unchanged work-selection behavior.",
+    "assumptions": [],
+    "requested_side_effects": []
+  },
+  {
+    "scenario_id": "F13",
+    "decision": "accept",
+    "rationale": "P5 permits an optional adapter for explicitly linked tasks while the local board stays independently useful. The submitted scope is bounded to titles, descriptions, and open or closed state, with previews and visible conflicts. It needs explicit field ownership and mapping; syncing a whole task body would risk publishing internal handoff notes. P6 requires resumable, verified writes rather than treating two remote updates as an atomic transaction. No current sync capability can be assumed.",
+    "next_action": "Design the adapter boundary, explicit links, public-description boundary, and configurable state mapping. Keep a last-synchronized baseline for detecting changes on both sides, require conflict resolution, and offer a preview before publication. Specify retry, partial-failure, remote deletion, and offline behavior. Verify local-only claims, dependencies, and notes never leave the board and unlinked boards require no setup.",
+    "assumptions": [
+      "A description boundary must be defined before sharing content that may coexist with private handoff notes."
+    ],
+    "requested_side_effects": []
+  },
+  {
+    "scenario_id": "F01",
+    "decision": "reshape",
+    "rationale": "P1 favors a configuration recipe over a film-specific mode. Configurable statuses, priorities, and per-status claim requirements already cover the stated workflow. Ordering received, screening, shortlisted, and decided makes movement meaningful and makes decided terminal when it is the last non-archived status. Disabling claim requirements removes volunteers' need to supply claim names. The reserved archived status must retain its existing meaning.",
+    "next_action": "Document a standard-binary setup recipe with the four workflow statuses in the requested order, routine and urgent priorities, and claims disabled for the applicable statuses. Check the resulting TUI movement and terminal filtering. Do not introduce film-specific task types, fields, or an additional mode for behavior the configuration already expresses.",
+    "assumptions": [],
+    "requested_side_effects": []
+  },
+  {
+    "scenario_id": "F10",
+    "decision": "reshape",
+    "rationale": "P5 and P6 distinguish local repair from disconnected-writer coordination. Local locking and next_id cannot prevent independent laptops from allocating the same ID, and load-time duplicate repair alone does not prove references or both versions' notes are preserved. A bounded, explicit reconciliation workflow fits the stated acceptance of duplicate work. It must expose identity ambiguity and stale cooperative claims rather than imply distributed ownership or silently rewrite prose.",
+    "next_action": "Specify a previewable reconciliation plan preserving both inputs and recording old-to-new identities. Remap structured references only when their targets are unambiguous; surface ambiguous dependencies and prose references for review. Define stale-claim handling without automatic reassignment, recoverable application, partial-failure behavior, and repeat-run safety. Test colliding IDs, divergent notes, references, and interrupted reconciliation without mutation on read.",
+    "assumptions": [
+      "Conflict-file provenance sufficient to resolve every structured reference is not established; some references may require human decisions."
+    ],
+    "requested_side_effects": []
+  },
+  {
+    "scenario_id": "F06",
+    "decision": "accept",
+    "rationale": "P5 supports a bounded calendar export while leaving hosting and subscription delivery with the coordinator's existing website. A standard calendar file meets the cross-product, one-way requirement without accounts or a continuously running board service. Stable board-qualified event identities are needed so rescheduling updates the same item. The export should contain date-only events and a strict public field set, with explicit handling of completion and removal.",
+    "next_action": "Specify an iCalendar export with stable UIDs, all-day due dates, task identification, and only approved title and date information. Define how completed or removed tasks affect subscribers and how revisions are represented. Verify repeated exports and date changes do not duplicate events, private fields are excluded, and representative calendar importers handle the generated file.",
+    "assumptions": [
+      "The supplied website is responsible for publishing the generated subscription file."
+    ],
+    "requested_side_effects": []
+  },
+  {
+    "scenario_id": "F14",
+    "decision": "reshape",
+    "rationale": "P3 supports an opt-in inspection policy, while P6 requires consistent enforcement through CLI, TUI, and automation at the actual mutation boundary. Merely reusing an existing board function is insufficient given the supplied bypasses. Define observable required values and tag scope without hard-coding repair-workshop concepts or building an unrestricted rules language. Validate attempted transitions, preserve state on failure, and keep legacy completed tasks readable. Explicit, reasoned exceptions are part of the policy.",
+    "next_action": "Specify how the test note and inspector value are represented and checked, the tag-scoped trigger, and recorded supervisor exceptions. Trace every relevant write path, including direct status edits, and enforce the same invariant before persistence. Verify missing-value diagnostics, unchanged files on rejection, CLI/TUI parity, legacy reads, and exception provenance; direct Markdown bypass prevention is outside the stated need.",
+    "assumptions": [
+      "The fixture supplies no existing structured representation or validation contract for the required inspection values."
+    ],
+    "requested_side_effects": []
+  }
+]
