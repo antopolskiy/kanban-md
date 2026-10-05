@@ -47,6 +47,18 @@ var migrations = map[int]func(*Config) error{
 	8:  migrateV8ToV9,
 	9:  migrateV9ToV10,
 	10: migrateV10ToV11,
+	11: migrateV11ToV12,
+}
+
+func migrateV11ToV12(cfg *Config) error { //nolint:unparam // migration signature
+	if cfg.Display.CompactFields == nil {
+		cfg.Display.CompactFields = FieldList{"status", "priority"}
+	}
+	if cfg.TUI.CardFields == nil {
+		cfg.TUI.CardFields = FieldList{"priority"}
+	}
+	cfg.Version = 12
+	return nil
 }
 
 // migrateV1ToV2 adds the wip_limits field (defaults to nil/empty = unlimited).

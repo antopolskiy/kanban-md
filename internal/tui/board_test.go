@@ -1210,7 +1210,7 @@ func TestBoard_DetailShowsAllMetadata(t *testing.T) {
 		{"Due", "2026-03-15"},
 		{"Estimate", "2h"},
 		{"Class", "expedite"},
-		{"Parent", "↑ Parent  #42"},
+		{"Parent", "missing parent #42"},
 		{"DependsOn", "#10"},
 		{"DependsOn2", "#20"},
 		{"ClaimedBy", "agent-1"},
@@ -1277,7 +1277,7 @@ func TestBoard_DetailShowsResolvedParentAsUpwardRelation(t *testing.T) {
 	b = sendSpecialKey(b, tea.KeyEnter)
 	v := b.View()
 
-	if !containsStr(v, "↑ Parent  #1 [backlog] Epic Alpha") {
+	if !containsStr(v, "↑ #1 [backlog] Epic Alpha") {
 		t.Errorf("detail view missing resolved parent relation:\n%s", v)
 	}
 	if containsStr(v, "Parent:") {
@@ -1296,7 +1296,7 @@ func TestBoard_DetailCanResolveArchivedParent(t *testing.T) {
 	b = sendSpecialKey(b, tea.KeyEnter)
 	v := b.View()
 
-	if !containsStr(v, "↑ Parent  #4 [archived] Archived child") {
+	if !containsStr(v, "↑ #4 [archived] Archived child") {
 		t.Errorf("detail view should resolve an archived parent:\n%s", v)
 	}
 }

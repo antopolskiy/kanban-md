@@ -54,9 +54,6 @@ func (t *Task) UnmarshalYAML(value *yaml.Node) error {
 		extra.Content = append(extra.Content, key, mapping.Content[i+1])
 	}
 	t.extraProperties = extra
-	if t.preservationError == nil {
-		t.preservationError = validateRetainedAliases(extra)
-	}
 	return nil
 }
 
@@ -65,6 +62,11 @@ func (t *Task) UnmarshalYAML(value *yaml.Node) error {
 func (t Task) MarshalYAML() (any, error) {
 	if t.preservationError != nil {
 		return nil, t.preservationError
+	}
+	if t.extraProperties != nil {
+		if err := validateRetainedAliases(t.extraProperties); err != nil {
+			return nil, err
+		}
 	}
 	canonical, err := encodeCanonicalTask(&t)
 	if err != nil {

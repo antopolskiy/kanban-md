@@ -226,7 +226,7 @@ func TestMigrateV10ToV11(t *testing.T) {
 	cfg := NewDefault("Test")
 	cfg.Version = 10
 
-	if err := migrate(cfg); err != nil {
+	if err := migrateV10ToV11(cfg); err != nil {
 		t.Fatalf("migrate() v10→v11: %v", err)
 	}
 	if cfg.Version != wantVersion {

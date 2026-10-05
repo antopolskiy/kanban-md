@@ -1,9 +1,11 @@
 package board
 
 import (
+	"slices"
 	"sort"
 
 	"github.com/antopolskiy/kanban-md/internal/config"
+	"github.com/antopolskiy/kanban-md/internal/property"
 	"github.com/antopolskiy/kanban-md/internal/task"
 )
 
@@ -27,6 +29,9 @@ type GroupSummary struct {
 
 // GroupBy groups tasks by the specified field and returns summaries per group.
 func GroupBy(tasks []*task.Task, field string, cfg *config.Config) GroupedSummary {
+	if key, selected, err := property.SelectorKey(field); selected && err == nil {
+		return groupByProperty(tasks, key, field, cfg)
+	}
 	groups := make(map[string][]*task.Task)
 
 	for _, t := range tasks {
@@ -125,4 +130,10 @@ func groupStatusSummary(tasks []*task.Task, cfg *config.Config) []StatusSummary 
 // ValidGroupByFields returns the list of valid --group-by field names.
 func ValidGroupByFields() []string {
 	return []string{"assignee", "tag", "class", "priority", "status"}
+}
+
+// ValidGroupBy accepts an existing field or one literal property selector.
+func ValidGroupBy(field string) bool {
+	_, selected, err := property.SelectorKey(field)
+	return selected && err == nil || slices.Contains(ValidGroupByFields(), field)
 }

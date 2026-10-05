@@ -636,8 +636,9 @@ func TestCompatV9ConfigMigratesToV10(t *testing.T) {
 
 func TestCompatV10ConfigMigratesToV11(t *testing.T) {
 	const wantVersion = 11
-	if CurrentVersion != wantVersion {
-		t.Fatalf("CurrentVersion = %d, want %d for narrow_threshold schema", CurrentVersion, wantVersion)
+	step := &Config{Version: 10}
+	if err := migrateV10ToV11(step); err != nil || step.Version != wantVersion {
+		t.Fatalf("v10 migration = %d, %v; want %d", step.Version, err, wantVersion)
 	}
 
 	tmp := t.TempDir()
@@ -648,8 +649,8 @@ func TestCompatV10ConfigMigratesToV11(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Load() v10 fixture: %v", err)
 	}
-	if cfg.Version != wantVersion {
-		t.Errorf("Version = %d, want %d (after migration)", cfg.Version, wantVersion)
+	if cfg.Version != CurrentVersion {
+		t.Errorf("Version = %d, want %d (after migration)", cfg.Version, CurrentVersion)
 	}
 	if cfg.Board.Name != "Test Project v10" {
 		t.Errorf("Board.Name = %q, want %q", cfg.Board.Name, "Test Project v10")

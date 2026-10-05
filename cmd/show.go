@@ -20,11 +20,16 @@ var showCmd = &cobra.Command{
 }
 
 func init() {
+	showCmd.Flags().StringArray("show-property", nil, "include only this selected scalar property on task and children (KEY; repeatable)")
 	showCmd.Flags().Bool("archived", false, "include archived child tasks")
 	rootCmd.AddCommand(showCmd)
 }
 
 func runShow(cmd *cobra.Command, args []string) error {
+	keys, err := parsePropertyKeys(cmd, "show-property")
+	if err != nil {
+		return err
+	}
 	id, err := strconv.Atoi(args[0])
 	if err != nil {
 		return task.ValidateTaskID(args[0])
@@ -54,7 +59,7 @@ func runShow(cmd *cobra.Command, args []string) error {
 	includeArchived, _ := cmd.Flags().GetBool("archived")
 	parent := board.FindParent(allTasks, t)
 	children := board.SummarizeChildren(allTasks, t.ID, cfg, includeArchived)
-	return outputShownTaskDetail(t, parent, children)
+	return outputShownWithOptions(t, parent, children, allTasks, cfg, keys)
 }
 
 type shownTaskDetail struct {

@@ -26,7 +26,7 @@ Each task is a `.md` file in `kanban/tasks/`. The CLI is `kanban-md`
 - Use `--compact` for listing commands (`list`, `board`, `metrics`, `log`) to get
   token-efficient one-line output.
 - Use `kanban-md show ID` (default table format) to read task details — it includes
-  the full body and all fields in a human-readable layout. Only add `--json` when you
+  the full body and task-owned fields in a human-readable layout. Only add `--json` when you
   need to pipe the output to another tool or parse fields programmatically.
 - Always pass `--yes` when deleting (`kanban-md delete ID --yes`).
 - Dates use `YYYY-MM-DD` format.
@@ -46,6 +46,8 @@ Each task is a `.md` file in `kanban/tasks/`. The CLI is `kanban-md`
 | List tasks by priority                  | `kanban-md list --compact --priority high,critical`              |
 | List tasks by assignee                  | `kanban-md list --compact --assignee alice`                      |
 | List tasks by tag                       | `kanban-md list --compact --tag bug`                             |
+| Filter a selected scalar property       | `kanban-md list --compact --property kind=chapter`              |
+| Group by a selected property            | `kanban-md list --group-by property:kind`                        |
 | List blocked tasks                      | `kanban-md list --compact --blocked`                             |
 | List ready-to-start tasks               | `kanban-md list --compact --not-blocked --status todo`           |
 | List tasks with resolved deps           | `kanban-md list --compact --unblocked`                           |
@@ -59,6 +61,7 @@ Each task is a `.md` file in `kanban/tasks/`. The CLI is `kanban-md`
 | Move a task back                        | `kanban-md move ID --prev`                                       |
 | Complete a task                         | `kanban-md move ID done`                                         |
 | Edit task fields                        | `kanban-md edit ID --title "NEW" --priority P`                   |
+| Set/clear user properties               | `kanban-md edit ID --set-property kind=chapter --clear-property note` |
 | Add/remove tags                         | `kanban-md edit ID --add-tag T --remove-tag T`                   |
 | Set a due date                          | `kanban-md edit ID --due 2026-03-01`                             |
 | Block a task                            | `kanban-md edit ID --block "REASON"`                             |
@@ -81,7 +84,8 @@ Each task is a `.md` file in `kanban/tasks/`. The CLI is `kanban-md`
 ```bash
 kanban-md list [--status S] [--priority P] [--assignee A] [--tag T] \
   [--sort FIELD] [-r] [-n LIMIT] [--blocked] [--not-blocked] \
-  [--parent ID] [--unblocked]
+  [--parent ID] [--unblocked] [--property KEY=LITERAL] \
+  [--show-property KEY] [--group-by property:KEY]
 ```
 
 Sort fields: id, title, status, priority, created, updated, due. `-r` reverses.
@@ -92,7 +96,7 @@ Sort fields: id, title, status, priority, created, updated, due. `-r` reverses.
 ```bash
 kanban-md create "TITLE" [--status S] [--priority P] [--assignee A] \
   [--tags T1,T2] [--due YYYY-MM-DD] [--estimate E] [--body "TEXT"] \
-  [--parent ID] [--depends-on ID1,ID2] [--claim AGENT]
+  [--parent ID] [--depends-on ID1,ID2] [--claim AGENT] [--set-property KEY=LITERAL]
 ```
 
 Prints the created task ID and summary. `--claim` immediately claims the task for an agent,
@@ -105,7 +109,9 @@ kanban-md show ID
 kanban-md show ID --json   # only when piping to another tool
 ```
 
-Default format shows all fields including the body in a readable layout.
+Default format shows task-owned fields and the body in a readable layout.
+Direct children use ID order unless `children.detail_sort` selects a numeric
+property. That setting affects detail order only, not `list` or `pick`.
 Use `--json` only when you need to parse fields programmatically.
 For the JSON schema, see [references/json-schemas.md](references/json-schemas.md).
 
@@ -127,7 +133,8 @@ kanban-md edit ID[,ID,...] [--title T] [--status S] [--priority P] [--assignee A
   [--completed YYYY-MM-DD] [--clear-completed] [--parent ID] \
   [--clear-parent] [--add-dep ID] [--remove-dep ID] \
   [--block "REASON"] [--unblock] \
-  [--claim AGENT] [--release] [-t]
+  [--claim AGENT] [--release] [-t] \
+  [--set-property KEY=LITERAL] [--clear-property KEY]
 ```
 
 Only specified fields are changed. Prints a confirmation message.
@@ -136,6 +143,41 @@ Only specified fields are changed. Prints a confirmation message.
 `--claim` claims (or renews a claim on) the task for the agent.
 `--release` releases the claim on the task.
 Accepts comma-separated IDs for bulk edits.
+
+### Selected properties
+
+Unknown task frontmatter survives ordinary edits but stays out of default
+output. Select a simple top-level value explicitly when it serves the board:
+
+```bash
+kanban-md create "Draft chapter" --parent 1 --set-property kind=chapter --set-property reading_order=20
+kanban-md list --compact --property kind=chapter --show-property reading_order
+kanban-md show 1 --json --show-property kind --show-property reading_order
+kanban-md edit 2 --clear-parent --clear-property reading_order
+```
+
+The set/clear/filter/show flags are repeatable for distinct keys. Property keys
+are case-sensitive literal identifiers; dots do not traverse nested data.
+Task-owned names are reserved. CLI literals are bare or JSON-quoted strings,
+strict JSON numbers, lowercase booleans or null. For example, `reading_order=20`
+is numeric; `'reading_order="20"'` is a string. Null is not a missing key.
+Do not supply conflicting set/clear operations or duplicate keys.
+
+Property filters are exact, typed and ANDed. `list --group-by property:kind`
+shows aggregate counts; it cannot combine with `--show-property`. A configured
+group order is not an enum: typos remain visible unknown groups.
+
+Only ungrouped `list` and `show` accept `--show-property`. Requested JSON records
+add only selected supported scalars in `properties`; show projects the same keys
+on children. Missing values are omitted; null is retained; unsupported values
+are omitted with a warning. No wildcard or all-properties export exists. Nested
+objects, aliases and custom-tag values stay opaque. Configured badges and child
+order do not select JSON values.
+
+Property values survive reparenting and detaching. Explicitly clear an ordering
+hint in the same edit when resetting placement. Selected mutations use normal
+claim/write checks and may refuse if retained YAML bindings would become unsafe;
+do not strip unrelated metadata to force success.
 
 ### move
 

@@ -14,29 +14,39 @@ import (
 
 // TaskCompact renders a list of tasks in one-line-per-record compact format.
 func TaskCompact(w io.Writer, tasks []*task.Task) {
+	TaskCompactWithOptions(w, tasks, TaskViewOptions{})
+}
+
+// TaskCompactWithOptions renders selected fields with one task per line.
+func TaskCompactWithOptions(w io.Writer, tasks []*task.Task, opts TaskViewOptions) {
 	if len(tasks) == 0 {
 		fmt.Fprintln(os.Stderr, "No tasks found.")
 		return
 	}
 
 	for _, t := range tasks {
-		fmt.Fprintln(w, formatTaskLine(t))
+		fmt.Fprintln(w, formatTaskLineWithOptions(t, opts))
 	}
 }
 
 // TaskDetailCompact renders a single task with detail in compact format.
 func TaskDetailCompact(w io.Writer, t *task.Task) {
-	taskDetailCompact(w, t, board.ChildSummary{})
+	taskDetailCompact(w, t, board.ChildSummary{}, TaskViewOptions{})
 }
 
 // TaskDetailCompactWithChildren renders task detail with a child roll-up on
 // the first line. Tasks without children retain the existing compact output.
 func TaskDetailCompactWithChildren(w io.Writer, t *task.Task, children board.ChildSummary) {
-	taskDetailCompact(w, t, children)
+	taskDetailCompact(w, t, children, TaskViewOptions{})
 }
 
-func taskDetailCompact(w io.Writer, t *task.Task, children board.ChildSummary) {
-	line := formatTaskLine(t)
+// TaskDetailCompactWithOptions renders human selected fields on task detail.
+func TaskDetailCompactWithOptions(w io.Writer, t *task.Task, children board.ChildSummary, opts TaskViewOptions) {
+	taskDetailCompact(w, t, children, opts)
+}
+
+func taskDetailCompact(w io.Writer, t *task.Task, children board.ChildSummary, opts TaskViewOptions) {
+	line := formatTaskLineWithOptions(t, opts)
 	if t.Estimate != "" {
 		line += " est:" + t.Estimate
 	}
@@ -129,9 +139,9 @@ func ActivityLogCompact(w io.Writer, entries []board.LogEntry) {
 	}
 }
 
-// formatTaskLine builds the one-line representation of a task.
-func formatTaskLine(t *task.Task) string {
-	line := "#" + strconv.Itoa(t.ID) + " [" + t.Status + "/" + t.Priority + "] " + t.Title
+// formatTaskLineWithOptions builds a one-line representation of a task.
+func formatTaskLineWithOptions(t *task.Task, opts TaskViewOptions) string {
+	line := "#" + strconv.Itoa(t.ID) + " " + compactChip(t, opts.CompactFields) + " " + t.Title
 
 	if t.ClaimedBy != "" {
 		line += " @" + t.ClaimedBy
@@ -141,6 +151,9 @@ func formatTaskLine(t *task.Task) string {
 	}
 	if t.Due != nil {
 		line += " due:" + t.Due.String()
+	}
+	if tokens := extraPropertyTokens(t, opts); len(tokens) > 0 {
+		line += " " + strings.Join(tokens, " ")
 	}
 
 	return line

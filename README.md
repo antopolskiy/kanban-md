@@ -164,8 +164,9 @@ When kanban-md updates a task, it retains unrecognized YAML frontmatter
 properties, including exact numeric text, tags, lists, and maps with non-string
 keys. Anchors, aliases, and nested YAML merges are retained when their bindings
 stay entirely within these properties. This lets other tools keep their metadata
-through task edits. Additional properties remain file-only and do not appear in
-table, compact, or JSON output. kanban-md's own fields remain authoritative,
+through task edits. By default, additional properties do not appear in table,
+compact, or JSON output. You can explicitly select scalar values for the
+[property views below](#selected-task-properties). kanban-md's own fields remain authoritative,
 including fields you clear.
 
 An update refuses before changing the task file if an extra property aliases a
@@ -262,6 +263,7 @@ kanban-md create --title "My task" --description "Details here" [FLAGS]
 | `--parent` | | Parent task ID |
 | `--depends-on` | | Dependency task IDs (comma-separated) |
 | `--body` | | Task description (alias: `--description`) |
+| `--set-property KEY=LITERAL` | | Set a scalar property; repeat for multiple keys |
 
 ### `list`
 
@@ -286,7 +288,9 @@ kanban-md list [FLAGS]
 | `--claimed-by` | | Filter by claimant name |
 | `--class` | | Filter by class of service |
 | `--archived` | false | Show only archived tasks |
-| `--group-by` | | Group results by field (assignee, tag, class, priority, status) |
+| `--property KEY=LITERAL` | | Match one exact typed scalar value; repeat to combine with AND |
+| `--show-property KEY` | | Include a selected scalar in table, compact or JSON output; repeat for multiple keys |
+| `--group-by` | | Group counts by assignee, tag, class, priority, status, or `property:KEY` |
 | `--sort` | id | Sort by: id, title, status, priority, created, updated, due |
 | `-r`, `--reverse` | false | Reverse sort order |
 | `-n`, `--limit` | 0 | Max results (0 = unlimited) |
@@ -305,8 +309,13 @@ kanban-md show ID --archived  # include archived children in the roll-up
 | Flag | Description |
 |------|-------------|
 | `--archived` | Include archived direct children (hidden by default) |
+| `--show-property KEY` | Include a selected scalar on the task and its children; repeat for multiple keys |
 
-Children are ordered by task ID, matching the default `list --parent` order.
+Children are ordered by task ID by default, matching `list --parent`.
+Set `children.detail_sort: property:reading_order` to use a numeric property
+instead. Finite numbers sort ascending, ties use task ID, and missing or
+unsuitable values follow in ID order. This changes detail views only, not list,
+board or pick order. See [selected task properties](#selected-task-properties).
 Human-readable CLI and TUI detail views prefix them with `├─` and `└─` tree
 guides so the parent-child relationship remains visually clear.
 Tasks with a direct parent show an upward relation such as
@@ -366,6 +375,8 @@ kanban-md edit 1,2,3 --priority high  # batch edit
 | `--claim` | Claim task for an agent (set claimed_by) |
 | `--release` | Release claim on task |
 | `--class` | Set class of service |
+| `--set-property KEY=LITERAL` | Set or replace a scalar property; repeat for multiple keys |
+| `--clear-property KEY` | Remove a property, distinct from setting it to null |
 
 ### `move`
 
@@ -440,7 +451,7 @@ kanban-md board --watch    # live-update on file changes
 | Flag | Default | Description |
 |------|---------|-------------|
 | `-w`, `--watch` | false | Live-update the board on file changes (Ctrl+C to stop) |
-| `--group-by` | | Group by field (assignee, tag, class, priority, status) |
+| `--group-by` | | Group counts by assignee, tag, class, priority, status, or `property:KEY` |
 
 ### `pick`
 
@@ -532,6 +543,7 @@ Available keys:
 | `classes` | no | Class of service definitions |
 | `tui.title_lines` | yes | Number of title lines shown in TUI cards |
 | `tui.hide_empty_columns` | yes | Hide columns with zero tasks in TUI |
+| `tui.narrow_threshold` | yes | Terminal width below which the single-column view is used; 0 is automatic |
 | `tui.age_thresholds` | no | TUI age color thresholds |
 | `next_id` | no | Next task ID |
 | `version` | no | Config schema version |
@@ -577,10 +589,37 @@ Set `tui.hide_empty_columns` in `config.yml` to control the default behavior.
 
 In create/edit dialogs, text fields support cursor-based editing (`←/→`, `Home/End`, `Backspace`, `Delete`).
 
-Opening a task with direct children shows the same child list and roll-up as
-`show`. Archived children remain hidden in the TUI. A board search controls
-which cards are visible, but does not hide children from the selected parent's
-detail view.
+Opening a task shows its known ancestor path and the same direct-child list and
+roll-up as `show`. Archived ancestors remain visible as context but cannot be
+opened; archived children remain hidden. Search and level filters control cards,
+not which active relations you can open in details.
+
+### Explore task relations
+
+In details, `Tab` and `Shift+Tab` move the relation focus in reading order;
+`Enter` opens it. `Esc` or `Backspace` takes one step back, restoring your
+previous task, scroll position and relation focus. `q` closes the entire chain
+and returns to the board, keeping its search, level and sort settings. `j`/`k`,
+arrow keys and `g`/`G` still scroll the detail content.
+
+Ancestors appear root-first. On a milestone → epic → story path, the first
+`Tab` focuses the milestone; `Tab`, `Tab`, `Enter` opens the immediate epic.
+From that epic, `Tab`, `Enter` opens the milestone. Two `Esc` presses retrace
+those steps. Missing parent IDs and self/cycle markers remain visible rather
+than being repaired by navigation.
+
+### Focus one hierarchy level
+
+In board mode, `v` cycles all tasks → the numeric levels present among active
+tasks → unknown depth, if present → all. Root tasks are `L0`, their children
+`L1`, and so on. Boards with hierarchy show these text labels beside task IDs
+and the active `level[...]` in the status line. Flat boards keep their usual
+cards by default. While typing a search, `v` is ordinary text.
+
+Levels come from parent links, including archived ancestors, and are not task
+types or stored fields. Missing/self-parent links use an effective level-zero
+root; a multi-task cycle and tasks reaching it have `L?`. The level filter and
+title/tag/ID search combine with AND. Neither writes task data.
 
 Task bodies are rendered as Markdown using the terminal's default foreground
 for the main text, so they remain readable when a terminal switches between
@@ -624,7 +663,8 @@ kanban-md tui --mouse
 |--------------|--------|
 | Click a card | Select the card and synchronize keyboard navigation |
 | Double-click the same card within 500 ms | Open its detail view |
-| Click `Back` | Return to the board |
+| Click an active relation row in details | Open that task, including wrapped rows |
+| Click `Back` | Take one detail-history step, or return to the board when history is empty |
 | Wheel over a column | Activate that column and move its selection one card |
 | Wheel in a detail view | Scroll the task body three lines |
 | Hold a card, drag to another visible column, and release | Move the task to that status |
@@ -663,10 +703,15 @@ terminal-dependent; use the terminal's normal selection shortcut or omit
 | `d` | Delete task (with confirmation) |
 | `s` | Cycle the sort field (priority → created → updated → title) |
 | `S` | Reverse the sort direction |
-| `/` | Search/filter tasks live. By default matches a case-insensitive substring of the title. Start the query with `#` to search ticket IDs instead: `#12` matches every ID beginning with `12` (e.g. #12, #121), and a trailing space (`#12 `) requires an exact match (only #12). `Enter` keeps the filter, `Esc` clears it |
+| `/` | Search/filter tasks live. Matches a case-insensitive substring of the title or any individual tag, not the body. Start with `#` for ticket IDs: `#12` prefix-matches IDs, `#12 ` exact-matches #12, and bare `#` matches all. `Enter` keeps the filter, `Esc` clears it |
+| `v` | In board mode, cycle exact hierarchy levels; session-only |
+| `Tab` / `Shift+Tab` in details | Focus relations in reading order |
+| `Enter` in details | Open the focused relation |
+| `Esc` / `Backspace` in details | Go back one navigation step |
 | `r` | Refresh board |
 | `?` | Show help |
-| `q` / `Ctrl+C` | Quit |
+| `q` | Quit from the board; close the whole detail chain from details |
+| `Ctrl+C` | Quit |
 
 ## Global flags
 
@@ -735,6 +780,106 @@ defaults:
 
 Priority order runs from lowest to highest. `list --sort priority` shows the
 highest configured priority first by default; use `--reverse` for lowest first.
+
+### Selected task properties
+
+Use your own top-level scalar properties for categories, reading order or other
+workflow data, without adding a task type or rank to the core model:
+
+```bash
+kanban-md create "Draft chapter" --parent 1 \
+  --set-property kind=chapter --set-property reading_order=20
+kanban-md edit 2 --set-property reading_order=10
+kanban-md list --property kind=chapter --show-property reading_order
+kanban-md list --group-by property:kind
+kanban-md show 1 --json --show-property kind --show-property reading_order
+```
+
+Repeat `--set-property`, `--clear-property`, `--property` and `--show-property`
+for different keys. Keys are case-sensitive literal names matching
+`[A-Za-z_][A-Za-z0-9_.-]*`; a dot is part of the key, not a nested path.
+Task-owned names such as `status`, `priority`, `parent`, `body` and `file` are
+reserved: use their existing flags. Duplicate keys and simultaneous set/clear
+of the same key are errors. Multi-task edits retain the normal per-task batch
+behavior, not an all-or-nothing transaction.
+
+CLI literals support a bare string, a JSON-quoted string, a decimal/scientific
+number, lowercase `true`/`false`, or `null`. Shell quotes protect the argument;
+inner JSON quotes choose a string instead of a number or boolean:
+
+```bash
+kanban-md edit 2 --set-property reading_order=20      # number
+kanban-md edit 2 --set-property 'reading_order="20"'  # string, not a numeric order
+kanban-md edit 2 --set-property 'note=""'             # empty string
+kanban-md edit 2 --set-property note=null            # present null
+kanban-md edit 2 --clear-property note               # absent key
+```
+
+The authoring grammar does not evaluate YAML tags, aliases, arrays or maps.
+Use strict JSON numeric spelling on the CLI: quote `01`, `+20`, `.5`, `0x10`
+or `1_000` if you mean text. Reading existing YAML numeric forms is exact,
+including large values and base-prefixed integers; numeric-looking strings
+remain strings. Property equality is typed and exact. Repeated filters and
+ordinary filters combine with AND. Missing and unsupported values never match,
+including a filter for null.
+
+Edit these optional view settings directly in `config.yml`:
+
+```yaml
+group_orders:
+  property:kind: [milestone, chapter, story, bug]
+display:
+  compact_fields: [status, property:kind]
+tui:
+  card_fields: [property:kind]
+children:
+  detail_sort: property:reading_order
+```
+
+Omit them to retain `[status/priority]` compact chips, the TUI priority badge
+and ID-ordered children. Compact/card fields accept one or two distinct choices
+from `status`, `priority`, `class` or `property:KEY`; empty and null lists are
+invalid. Omit the field to use its defaults. Restart an open TUI after changing
+these config settings; its refresh command reloads tasks, not view settings.
+Compact fields apply to `list`, `show` and `pick`; other command confirmations
+keep their existing format.
+Child detail sort accepts `id` or one numeric property selector. Config version
+12 migration preserves the old effective defaults and does not rewrite tasks.
+
+Group order is a presentation preference, not an enum. Configured values appear
+first; other strings follow alphabetically, then numbers, booleans and null.
+Missing or unsupported values share the last `(unclassified)` group. Scalar
+group labels are quoted/typed to keep text `"20"` distinct from number `20`.
+For example, a typo such as `chapetr` remains visible in the grouped summary;
+correct it with `edit ID --set-property kind=chapter`. Grouped output contains
+counts, not task records, so it cannot be combined with `--show-property`.
+
+Only `list` and `show` accept `--show-property`. It adds selected columns/tokens
+to human output and a `properties` object to each JSON task or child record.
+Missing keys are omitted, explicit null is present as null, and unsupported
+values are omitted with a warning. Nested, alias, timestamp, binary,
+custom-tagged and non-finite values remain preserved but are not selected
+scalars. Unselected metadata never enters task JSON. Display and sort settings
+do not select JSON values; use `--show-property` explicitly.
+
+Human badges use `KEY=--` for missing, `KEY=?` for unsupported and `KEY=null`
+for null; strings are quoted. Control characters are escaped and long badge
+values are shortened. Details show the selected properties that explain the
+view; JSON keeps their complete supported values when explicitly requested.
+
+Child ordering never changes priority, pick, dependencies, claims or WIP.
+Zero, negative and fractional numbers are valid; sparse values such as 10, 20,
+30 leave room for inserts. Reparenting or clearing a parent retains the property.
+To reset placement when detaching, clear both in one edit:
+
+```bash
+kanban-md edit 2 --clear-parent --clear-property reading_order
+```
+
+An explicit property replacement/removal can still refuse if it would leave
+another retained YAML alias unsafe. The error leaves the task file unchanged
+and asks for manual frontmatter editing; unrelated values are not rewritten
+to make the edit succeed.
 
 ## Shell completions
 

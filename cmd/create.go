@@ -32,6 +32,7 @@ Body/description can be provided via --body or --description flag.`,
 }
 
 func init() {
+	createCmd.Flags().StringArray("set-property", nil, "set a scalar property (KEY=LITERAL; repeatable, use JSON quotes for strings)")
 	createCmd.Flags().String("title", "", "task title (alternative to positional argument)")
 	createCmd.Flags().String("status", "", "task status (default from config)")
 	createCmd.Flags().String("priority", "", "task priority (default from config)")
@@ -57,6 +58,9 @@ func init() {
 }
 
 func runCreate(cmd *cobra.Command, args []string) error {
+	if _, err := parsePropertyPlan(cmd); err != nil {
+		return err
+	}
 	// Acquire an exclusive lock to prevent concurrent creates from
 	// reading the same next_id and generating duplicate task IDs.
 	dir, err := resolveDir()
@@ -131,6 +135,11 @@ func resolveCreateTitle(cmd *cobra.Command, args []string) (string, error) {
 // buildCreateParams converts CLI flags into board.CreateParams.
 func buildCreateParams(cmd *cobra.Command, title string) (board.CreateParams, error) {
 	p := board.CreateParams{Title: title}
+	plan, err := parsePropertyPlan(cmd)
+	if err != nil {
+		return p, err
+	}
+	p.Properties = plan.sets
 
 	p.Status, _ = cmd.Flags().GetString("status")
 	p.Priority, _ = cmd.Flags().GetString("priority")

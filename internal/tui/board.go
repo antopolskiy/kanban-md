@@ -17,6 +17,7 @@ import (
 	"github.com/charmbracelet/glamour"
 	glamourstyles "github.com/charmbracelet/glamour/styles"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/x/ansi"
 
 	"github.com/antopolskiy/kanban-md/internal/board"
 	"github.com/antopolskiy/kanban-md/internal/config"
@@ -49,6 +50,7 @@ const (
 	keyDown     = "down"
 	keyUp       = "up"
 	keyEnter    = "enter"
+	keyTab      = "tab"
 	keyShiftTab = "shift+tab"
 	keyHome     = "home"
 	keyEnd      = "end"
@@ -103,13 +105,19 @@ type Board struct {
 	sortReverse bool   // true = descending order
 
 	// Search/filter.
-	filterQuery string          // active case-insensitive title filter; empty = no filter
+	filterQuery string          // active title/tag or ID filter; empty = no filter
 	searchInput textinput.Model // input shown while typing the query
 	searchReady bool
+	hierarchy   *taskHierarchy
+	activeByID  map[int]*task.Task
+	depthFilter *int // nil = all, unknownDepth = cyclic ancestry
 
 	// Detail view.
 	detailTask      *task.Task
 	detailScrollOff int
+	detailFocusID   int
+	detailHistory   []detailFrame
+	detailOriginID  int
 
 	// Move view.
 	moveStatuses []string
@@ -174,7 +182,7 @@ func (b *Board) SetMouseNow(fn func() time.Time) {
 func (b *Board) SetHideEmptyColumns(v bool) {
 	b.hideEmptyColumns = v
 	b.invalidatePointerState()
-	b.loadTasks()
+	b.reloadKeepingSelection()
 }
 
 // SetNarrowThreshold sets the terminal width below which the board renders in
@@ -232,7 +240,7 @@ func (b *Board) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return b, nil
 	case ReloadMsg:
 		b.invalidatePointerState()
-		b.loadTasks()
+		b.reloadKeepingSelection()
 		b.refreshDetailTask()
 		return b, nil
 	case TickMsg:
@@ -322,7 +330,7 @@ func (b *Board) handleBoardKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		b.view = viewHelp
 	case "h", keyLeft, "l", keyRight, "j", keyDown, "k", keyUp:
 		b.handleNavigation(msg.String())
-	case "tab":
+	case keyTab:
 		b.handleNavigation("l")
 	case "shift+tab":
 		b.handleNavigation("h")
@@ -358,12 +366,14 @@ func (b *Board) handleBoardActionKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "d":
 		b.handleDeleteStart()
 	case "r":
-		b.loadTasks()
+		b.reloadKeepingSelection()
 	case "s":
 		b.cycleSortField()
 	case "S":
 		b.sortReverse = !b.sortReverse
 		b.reloadKeepingSelection()
+	case "v":
+		b.cycleDepth()
 	case "/":
 		b.handleSearchStart()
 	case "ctrl+d":
@@ -397,19 +407,10 @@ func (b *Board) reloadKeepingSelection() {
 	if selectedID == 0 {
 		return
 	}
-	col := b.currentColumn()
-	if col != nil {
-		for i, ct := range col.tasks {
-			if ct.ID == selectedID {
-				b.activeRow = i
-				break
-			}
-		}
-	}
-	b.ensureVisible()
+	b.selectTaskByID(selectedID)
 }
 
-// handleSearchStart enters the live title-filter input mode, seeding the input
+// handleSearchStart enters the live search input mode, seeding the input
 // with any currently active filter.
 func (b *Board) handleSearchStart() {
 	if !b.searchReady {
@@ -431,7 +432,7 @@ func (b *Board) handleSearchKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		b.searchInput.Blur()
 		b.filterQuery = ""
 		b.view = viewBoard
-		b.loadTasks()
+		b.reloadKeepingSelection()
 		return b, nil
 	case keyEnter:
 		b.searchInput.Blur()
@@ -444,7 +445,7 @@ func (b *Board) handleSearchKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	// Store the raw value (not trimmed) so a trailing space in ID search mode
 	// remains significant; matchesFilter handles trimming/case per mode.
 	b.filterQuery = b.searchInput.Value()
-	b.loadTasks()
+	b.reloadKeepingSelection()
 	return b, cmd
 }
 
@@ -454,7 +455,7 @@ func (b *Board) handleSearchKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 // prefix-match the ID ("#12" matches #12, #121, ...), and a trailing space
 // ("#12 ") requires an exact ID match (only #12). A bare "#" (no digits yet)
 // matches everything. Any other query is a case-insensitive substring match
-// on the title.
+// on the title or any individual tag.
 func matchesFilter(t *task.Task, query string) bool {
 	if strings.HasPrefix(query, "#") {
 		rest := query[1:]
@@ -474,7 +475,15 @@ func matchesFilter(t *task.Task, query string) bool {
 	if needle == "" {
 		return true
 	}
-	return strings.Contains(strings.ToLower(t.Title), needle)
+	if strings.Contains(strings.ToLower(t.Title), needle) {
+		return true
+	}
+	for _, tag := range t.Tags {
+		if strings.Contains(strings.ToLower(tag), needle) {
+			return true
+		}
+	}
+	return false
 }
 
 func (b *Board) handleNavigation(k string) {
@@ -507,6 +516,9 @@ func (b *Board) handleEnter() {
 	if t := b.selectedTask(); t != nil {
 		b.detailTask = t
 		b.detailScrollOff = 0
+		b.detailFocusID = 0
+		b.detailHistory = nil
+		b.detailOriginID = t.ID
 		b.view = viewDetail
 		b.invalidatePointerState()
 	}
@@ -871,10 +883,16 @@ func (b *Board) selectTaskByID(id int) {
 
 func (b *Board) handleDetailKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
-	case "q", keyEsc, "backspace":
-		b.view = viewBoard
-		b.detailTask = nil
-		b.detailScrollOff = 0
+	case "q":
+		b.closeDetail()
+	case keyEsc, "backspace":
+		b.backDetail()
+	case keyTab:
+		b.focusRelation(false)
+	case keyShiftTab:
+		b.focusRelation(true)
+	case keyEnter:
+		b.openRelation(b.detailFocusID)
 	case "j", keyDown:
 		b.detailScrollOff++
 	case "k", keyUp:
@@ -933,32 +951,21 @@ func (b *Board) handleDebugKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 // loadTasks reads all tasks and organizes them into columns.
 func (b *Board) loadTasks() {
+	var selectedStatus string
+	scrollOffsets := make(map[string]int, len(b.columns))
+	if col := b.currentColumn(); col != nil {
+		selectedStatus = col.status
+	}
+	for _, col := range b.columns {
+		scrollOffsets[col.status] = col.scrollOff
+	}
 	tasks, _, err := task.ReadAllLenient(b.cfg.TasksPath())
 	if err != nil {
 		b.err = err
 		return
 	}
 	b.err = nil
-	b.allTasks = tasks
-
-	// Keep an unfiltered active-task collection for relationship context in
-	// detail views. The visible collection additionally applies board search.
-	var activeTasks []*task.Task
-	for _, t := range tasks {
-		if !b.cfg.IsArchivedStatus(t.Status) {
-			activeTasks = append(activeTasks, t)
-		}
-	}
-	b.unfilteredTasks = activeTasks
-
-	var visibleTasks []*task.Task
-	for _, t := range activeTasks {
-		if !matchesFilter(t, b.filterQuery) {
-			continue
-		}
-		visibleTasks = append(visibleTasks, t)
-	}
-	b.tasks = visibleTasks
+	visibleTasks := b.replaceTaskCollections(tasks)
 
 	// Sort tasks by the active sort key.
 	board.Sort(visibleTasks, b.sortField, b.sortReverse, b.cfg)
@@ -987,7 +994,10 @@ func (b *Board) loadTasks() {
 
 	b.columns = make([]column, len(displayStatuses))
 	for i, status := range displayStatuses {
-		b.columns[i] = column{status: status}
+		b.columns[i] = column{status: status, scrollOff: scrollOffsets[status]}
+		if status == selectedStatus {
+			b.activeCol = i
+		}
 	}
 
 	for _, t := range visibleTasks {
@@ -998,8 +1008,37 @@ func (b *Board) loadTasks() {
 			}
 		}
 	}
+	for i := range b.columns {
+		col := &b.columns[i]
+		col.scrollOff = max(0, min(col.scrollOff, len(col.tasks)-1))
+	}
 
 	b.clampRow()
+}
+
+// replaceTaskCollections keeps hierarchy and relation availability independent
+// of the search/depth predicate used for visible cards.
+func (b *Board) replaceTaskCollections(tasks []*task.Task) []*task.Task {
+	b.allTasks = tasks
+	b.hierarchy = newTaskHierarchy(tasks)
+	b.activeByID = make(map[int]*task.Task)
+	var activeTasks []*task.Task
+	for _, t := range tasks {
+		if !b.cfg.IsArchivedStatus(t.Status) {
+			activeTasks = append(activeTasks, t)
+			b.activeByID[t.ID] = t
+		}
+	}
+	b.unfilteredTasks = activeTasks
+	b.reconcileDepthFilter()
+	var visibleTasks []*task.Task
+	for _, t := range activeTasks {
+		if matchesFilter(t, b.filterQuery) && (b.depthFilter == nil || b.hierarchy.depths[t.ID] == *b.depthFilter) {
+			visibleTasks = append(visibleTasks, t)
+		}
+	}
+	b.tasks = visibleTasks
+	return visibleTasks
 }
 
 // refreshDetailTask updates the detail view task pointer after a reload.
@@ -1012,13 +1051,12 @@ func (b *Board) refreshDetailTask() {
 	for _, t := range b.unfilteredTasks {
 		if t.ID == id {
 			b.detailTask = t
+			b.refreshDetailFocus()
 			return
 		}
 	}
 	// Task no longer visible (deleted or archived) — close detail view.
-	b.view = viewBoard
-	b.detailTask = nil
-	b.detailScrollOff = 0
+	b.closeDetail()
 }
 
 func (b *Board) currentColumn() *column {
@@ -1760,10 +1798,14 @@ func compactNarrowControls(hasPrev, hasNext bool, current, total, width int) com
 	return layout
 }
 
-// renderSearchBar renders the live title-filter input line shown while the
+// renderSearchBar renders the live search input line shown while the
 // search input is focused.
 func (b *Board) renderSearchBar() string {
-	line := truncate(b.searchInput.View()+"  "+dimStyle.Render("enter:keep  esc:clear"), b.width)
+	prefix := ""
+	if b.showLevelState() {
+		prefix = b.levelState() + " | "
+	}
+	line := truncate(prefix+b.searchInput.View()+"  "+dimStyle.Render("enter:keep  esc:clear"), b.width)
 	return statusBarStyle.Render(line)
 }
 
@@ -1898,33 +1940,10 @@ func (b *Board) cardContentLines(t *task.Task, width int) []string {
 		cardWidth = 1
 	}
 
-	titleLines := b.cfg.TitleLines()
-	idStr := dimStyle.Render("#" + strconv.Itoa(t.ID))
-	idLen := len(strconv.Itoa(t.ID)) + 1    // "#" + digits
-	firstLineWidth := cardWidth - idLen - 1 // space after id
-	if firstLineWidth < 1 {
-		firstLineWidth = 1
-	}
+	contentLines := b.cardTitleLines(t, cardWidth)
 
-	var contentLines []string
-	if titleLines == 1 {
-		title := truncate(t.Title, firstLineWidth)
-		contentLines = append(contentLines, idStr+" "+title)
-	} else {
-		wrapped := wrapTitle2(t.Title, firstLineWidth, cardWidth, titleLines)
-		contentLines = append(contentLines, idStr+" "+wrapped[0])
-		for i := 1; i < len(wrapped); i++ {
-			contentLines = append(contentLines, wrapped[i])
-		}
-	}
-
-	// Priority + tags line.
-	var details []string
-	pStyle, ok := priorityStyles[t.Priority]
-	if !ok {
-		pStyle = dimStyle
-	}
-	details = append(details, pStyle.Render(t.Priority))
+	// Configured fields + tags line. The default keeps the existing priority style.
+	details := propertyCardFields(t, b.cfg, cardWidth)
 
 	if len(t.Tags) > 0 {
 		tagStr := strings.Join(t.Tags, ",")
@@ -1954,7 +1973,12 @@ func (b *Board) cardContentLines(t *task.Task, width int) []string {
 		details = append(details, b.ageStyle(ageDur).Render(age))
 	}
 
-	contentLines = append(contentLines, strings.Join(details, " "))
+	detailLine := strings.Join(details, " ")
+	fields := b.cfg.CardFields()
+	if len(fields) != 1 || fields[0] != "priority" {
+		detailLine = ansi.Truncate(detailLine, cardWidth, "...")
+	}
+	contentLines = append(contentLines, detailLine)
 
 	// Claim info on a dedicated line only for claimed tasks.
 	if t.ClaimedBy != "" {
@@ -2096,6 +2120,10 @@ func (b *Board) renderStatusBar() string {
 		cardLabel = "card"
 	}
 	parts := []statusBarPart{{text: fmt.Sprintf(" %d %s | ", total, cardLabel)}}
+	if b.showLevelState() {
+		parts = appendStatusShortcut(parts, "v", b.levelState())
+		parts = append(parts, statusBarPart{text: " | "})
+	}
 	parts = appendStatusShortcut(parts, "?", "help")
 	if b.mouseEnabled {
 		parts = append(parts, statusBarPart{text: " | mouse"})
@@ -2196,16 +2224,17 @@ func (b *Board) viewDetail() string {
 		return "No task selected."
 	}
 
-	lines := b.detailLines(t)
+	doc := b.detailDocument(t)
+	lines := doc.lines
 
 	// Reserve space for the blank separator line and the fixed status hint.
-	viewHeight := b.height - 2 //nolint:mnd // 2 = blank line + hint line
-	if viewHeight < 1 {
-		viewHeight = len(lines)
-	}
+	viewHeight := b.detailViewportHeight(len(lines))
 
 	// Build the status hint (always visible at bottom).
-	hint := "q/esc:back"
+	hint := "esc/backspace:back  q:board"
+	if len(doc.relations) > 0 {
+		hint += "  tab:relations  enter:open"
+	}
 	if len(lines) > viewHeight {
 		hint += "  j/k:scroll  g/G:top/bottom"
 	}
@@ -2229,7 +2258,7 @@ func (b *Board) viewDetail() string {
 
 	visible := strings.Join(lines[off:end], "\n")
 	if !b.mouseEnabled {
-		return visible + "\n\n" + dimStyle.Render(hint)
+		return visible + "\n\n" + dimStyle.Render(truncate(hint, b.width))
 	}
 
 	hint = "← Back  " + hint
@@ -2243,67 +2272,12 @@ func (b *Board) viewDetail() string {
 			rect: rect{x0: 0, y0: b.height - 1, x1: backWidth, y1: b.height},
 		}
 	}
+	b.captureRelationLayout(doc, off, end)
 	return visible + "\n\n" + dimStyle.Render(truncate(hint, b.width))
 }
 
 func (b *Board) detailLines(t *task.Task) []string {
-	parent := board.FindParent(b.allTasks, t)
-	children := board.SummarizeChildren(b.unfilteredTasks, t.ID, b.cfg, false)
-	return detailLinesWithRelations(t, parent, children, b.width)
-}
-
-func detailLinesWithRelations(
-	t *task.Task,
-	parent *board.ParentTask,
-	children board.ChildSummary,
-	width int,
-) []string {
-	var lines []string
-	header := fmt.Sprintf("Task #%d: %s", t.ID, t.Title)
-	// Word-wrap the header so long titles fit within the available terminal width.
-	boldStyle := lipgloss.NewStyle().Bold(true)
-	for _, l := range wrapTitle(header, width, noLineLimit) {
-		lines = append(lines, boldStyle.Render(l))
-	}
-	// Separator: as wide as the header, capped at terminal width.
-	sepWidth := lipgloss.Width(header)
-	if sepWidth > width {
-		sepWidth = width
-	}
-	lines = append(lines, strings.Repeat("─", sepWidth))
-	lines = append(lines, "")
-	lines = append(lines, detailLabelStyle.Render("Status:")+"  "+t.Status)
-	lines = append(lines, detailLabelStyle.Render("Priority:")+"  "+t.Priority)
-	lines = append(lines, detailMetadataLines(t)...)
-	lines = append(lines, detailTimestampLines(t)...)
-	if t.Blocked {
-		lines = append(lines, "")
-		lines = append(lines, errorStyle.Render("BLOCKED: "+t.BlockReason))
-	}
-	if t.Parent != nil {
-		lines = append(lines, "")
-		lines = append(lines, wrapTitle(parentRelationLine(*t.Parent, parent), width, noLineLimit)...)
-	}
-	if children.Total() > 0 {
-		lines = append(lines, "")
-		heading := fmt.Sprintf("Children (%d/%d done)", children.Done, children.Total())
-		lines = append(lines, lipgloss.NewStyle().Bold(true).Render(heading))
-		for i, child := range children.Children {
-			branch := "├─"
-			if i == len(children.Children)-1 {
-				branch = "└─"
-			}
-			line := fmt.Sprintf("%s #%d [%s] %s", branch, child.ID, child.Status, child.Title)
-			lines = append(lines, wrapTitle(line, width, noLineLimit)...)
-		}
-	}
-	if t.Body != "" {
-		lines = append(lines, "")
-		body := unescapeBody(t.Body)
-		rendered := renderMarkdown(body, width)
-		lines = append(lines, strings.Split(rendered, "\n")...)
-	}
-	return lines
+	return b.detailDocument(t).lines
 }
 
 // intraWordHyphen matches a hyphen between two word characters (inside compound
@@ -2394,13 +2368,6 @@ func detailMetadataLines(t *task.Task) []string {
 		lines = append(lines, detailLabelStyle.Render("Estimate:")+"  "+t.Estimate)
 	}
 	return lines
-}
-
-func parentRelationLine(parentID int, parent *board.ParentTask) string {
-	if parent == nil {
-		return fmt.Sprintf("↑ Parent  #%d", parentID)
-	}
-	return fmt.Sprintf("↑ Parent  #%d [%s] %s", parent.ID, parent.Status, parent.Title)
 }
 
 // detailTimestampLines renders timestamps and claim info.
@@ -2590,10 +2557,10 @@ func (b *Board) viewHelp() string {
 	help := []struct{ key, desc string }{
 		{"←/h", "Move to left column"},
 		{"→/l", "Move to right column"},
-		{"tab", "Next column (shift+tab: previous)"},
+		{"tab", "Next column; in detail, next relation (shift+tab reverses)"},
 		{"↓/j", "Move cursor down"},
 		{"↑/k", "Move cursor up"},
-		{"enter", "Show task detail"},
+		{"enter", "Board: show detail; details: open focused relation"},
 		{"c", "Create new task in column"},
 		{"e", "Edit selected task (same flow as create)"},
 		{"E", "Open selected task in $VISUAL, $EDITOR, or vi"},
@@ -2605,10 +2572,11 @@ func (b *Board) viewHelp() string {
 		{"d", "Delete task"},
 		{"s", "Cycle sort field (priority/created/updated/title)"},
 		{"S", "Reverse sort direction"},
-		{"/", "Search by title, or by ID with #12 (trailing space = exact)"},
+		{"/", "Title/tag search; #12 ID prefix, #12 + space exact"},
+		{"v", "Cycle exact hierarchy levels in board mode"},
 		{"r", "Refresh board"},
 		{"?", "Show this help"},
-		{"esc/q", "Quit"},
+		{"esc/q", "Quit; in detail, esc/backspace back, q returns to board"},
 		{"ctrl+c", "Force quit"},
 	}
 	if b.mouseEnabled {

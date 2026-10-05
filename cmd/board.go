@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
-	"slices"
 	"strings"
 	"syscall"
 	"time"
@@ -13,7 +12,6 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/antopolskiy/kanban-md/internal/board"
-	"github.com/antopolskiy/kanban-md/internal/clierr"
 	"github.com/antopolskiy/kanban-md/internal/config"
 	"github.com/antopolskiy/kanban-md/internal/output"
 	"github.com/antopolskiy/kanban-md/internal/task"
@@ -38,19 +36,17 @@ Press Ctrl+C to stop.`,
 func init() {
 	rootCmd.AddCommand(boardCmd)
 	boardCmd.Flags().BoolVarP(&flagWatch, "watch", "w", false, "live-update the board on file changes")
-	boardCmd.Flags().String("group-by", "", "group board by field ("+strings.Join(board.ValidGroupByFields(), ", ")+")")
+	boardCmd.Flags().String("group-by", "", "group board by field ("+strings.Join(board.ValidGroupByFields(), ", ")+", property:KEY)")
 }
 
 func runBoard(cmd *cobra.Command, _ []string) error {
+	groupBy, _ := cmd.Flags().GetString("group-by")
+	if err := validatePropertyGroup(groupBy, nil); err != nil {
+		return err
+	}
 	cfg, err := loadConfig()
 	if err != nil {
 		return err
-	}
-
-	groupBy, _ := cmd.Flags().GetString("group-by")
-	if groupBy != "" && !slices.Contains(board.ValidGroupByFields(), groupBy) {
-		return clierr.Newf(clierr.InvalidGroupBy, "invalid --group-by field %q; valid: %s",
-			groupBy, strings.Join(board.ValidGroupByFields(), ", "))
 	}
 
 	// Render once.

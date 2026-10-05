@@ -22,17 +22,20 @@ var (
 
 // Config represents the kanban board configuration.
 type Config struct {
-	Version      int            `yaml:"version"`
-	Board        BoardConfig    `yaml:"board"`
-	TasksDir     string         `yaml:"tasks_dir"`
-	Statuses     []StatusConfig `yaml:"statuses"`
-	Priorities   []string       `yaml:"priorities"`
-	Defaults     DefaultsConfig `yaml:"defaults"`
-	WIPLimits    map[string]int `yaml:"wip_limits,omitempty"`
-	ClaimTimeout string         `yaml:"claim_timeout,omitempty"`
-	Classes      []ClassConfig  `yaml:"classes,omitempty"`
-	TUI          TUIConfig      `yaml:"tui,omitempty"`
-	NextID       int            `yaml:"next_id"`
+	Version      int                 `yaml:"version"`
+	Board        BoardConfig         `yaml:"board"`
+	TasksDir     string              `yaml:"tasks_dir"`
+	Statuses     []StatusConfig      `yaml:"statuses"`
+	Priorities   []string            `yaml:"priorities"`
+	Defaults     DefaultsConfig      `yaml:"defaults"`
+	WIPLimits    map[string]int      `yaml:"wip_limits,omitempty"`
+	ClaimTimeout string              `yaml:"claim_timeout,omitempty"`
+	Classes      []ClassConfig       `yaml:"classes,omitempty"`
+	TUI          TUIConfig           `yaml:"tui,omitempty"`
+	Display      DisplayConfig       `yaml:"display,omitempty"`
+	Children     ChildrenConfig      `yaml:"children,omitempty"`
+	GroupOrders  PropertyGroupOrders `yaml:"group_orders,omitempty"`
+	NextID       int                 `yaml:"next_id"`
 
 	// dir is the absolute path to the kanban directory (not serialized).
 	dir string `yaml:"-"`
@@ -60,6 +63,7 @@ type AgeThreshold struct {
 
 // TUIConfig holds TUI-specific display settings.
 type TUIConfig struct {
+	CardFields       FieldList      `yaml:"card_fields,omitempty"`
 	TitleLines       int            `yaml:"title_lines,omitempty"`
 	AgeThresholds    []AgeThreshold `yaml:"age_thresholds,omitempty"`
 	HideEmptyColumns bool           `yaml:"hide_empty_columns,omitempty"`
@@ -120,10 +124,12 @@ func NewDefault(name string) *Config {
 		Classes:      append([]ClassConfig{}, DefaultClasses...),
 		ClaimTimeout: DefaultClaimTimeout,
 		TUI: TUIConfig{
+			CardFields:       FieldList{"priority"},
 			TitleLines:       DefaultTitleLines,
 			AgeThresholds:    append([]AgeThreshold{}, DefaultAgeThresholds...),
 			HideEmptyColumns: DefaultHideEmptyColumns,
 		},
+		Display: DisplayConfig{CompactFields: FieldList{"status", "priority"}},
 		Defaults: DefaultsConfig{
 			Status:   DefaultStatus,
 			Priority: DefaultPriority,
@@ -210,7 +216,7 @@ func (c *Config) Validate() error {
 	if err := c.validateClaimTimeout(); err != nil {
 		return err
 	}
-	if err := c.validateTUI(); err != nil {
+	if err := c.validateViews(); err != nil {
 		return err
 	}
 	if c.NextID < 1 {

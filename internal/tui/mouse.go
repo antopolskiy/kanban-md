@@ -4,6 +4,7 @@ import (
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 )
 
 const (
@@ -58,6 +59,11 @@ type backTarget struct {
 	rect rect
 }
 
+type relationTarget struct {
+	taskID int
+	rect   rect
+}
+
 type layoutSnapshot struct {
 	generation uint64
 	width      int
@@ -67,8 +73,9 @@ type layoutSnapshot struct {
 	columns    []columnTarget
 	// tabs are the narrow-mode tab-strip hit targets; tapping one switches
 	// the active column.
-	tabs []columnTarget
-	back *backTarget
+	tabs      []columnTarget
+	back      *backTarget
+	relations []relationTarget
 }
 
 type pointerTargetKind int
@@ -77,6 +84,7 @@ const (
 	pointerTargetNone pointerTargetKind = iota
 	pointerTargetCard
 	pointerTargetBack
+	pointerTargetRelation
 )
 
 type pointerState struct {
@@ -372,8 +380,15 @@ func (b *Board) handleDetailMouse(msg tea.MouseEvent) (tea.Model, tea.Cmd) {
 	case tea.MouseActionPress:
 		b.handleDetailPress(msg)
 	case tea.MouseActionMotion:
-		if b.pointer.pressed && !b.pointer.rect.contains(msg.X, msg.Y) {
-			b.clearGesture()
+		if b.pointer.pressed {
+			if b.pointer.kind == pointerTargetRelation {
+				target := b.relationAt(msg.X, msg.Y)
+				if target == nil || target.taskID != b.pointer.taskID {
+					b.clearGesture()
+				}
+			} else if !b.pointer.rect.contains(msg.X, msg.Y) {
+				b.clearGesture()
+			}
 		}
 	case tea.MouseActionRelease:
 		b.handleDetailRelease(msg)
@@ -383,6 +398,7 @@ func (b *Board) handleDetailMouse(msg tea.MouseEvent) (tea.Model, tea.Cmd) {
 }
 
 func (b *Board) handleDetailWheel(button tea.MouseButton) {
+	b.invalidatePointerState()
 	switch button {
 	case tea.MouseButtonWheelUp:
 		b.detailScrollOff -= detailWheelStep
@@ -401,10 +417,22 @@ func (b *Board) handleDetailPress(msg tea.MouseEvent) {
 		b.clearPendingClick()
 		return
 	}
+	if b.layout.generation != b.layoutGeneration || b.layout.view != viewDetail {
+		b.clearGesture()
+		return
+	}
 	if b.layout.back != nil && b.layout.back.rect.contains(msg.X, msg.Y) {
 		b.pointer.pressed = true
 		b.pointer.kind = pointerTargetBack
 		b.pointer.rect = b.layout.back.rect
+		b.pointer.generation = b.layout.generation
+		return
+	}
+	if target := b.relationAt(msg.X, msg.Y); target != nil {
+		b.pointer.pressed = true
+		b.pointer.kind = pointerTargetRelation
+		b.pointer.taskID = target.taskID
+		b.pointer.rect = target.rect
 		b.pointer.generation = b.layout.generation
 		return
 	}
@@ -417,18 +445,45 @@ func (b *Board) handleDetailRelease(msg tea.MouseEvent) {
 		b.clearGesture()
 		return
 	}
-	if b.pointer.pressed &&
-		b.pointer.kind == pointerTargetBack &&
-		b.pointer.generation == b.layout.generation &&
-		b.layout.generation == b.layoutGeneration &&
-		b.pointer.rect.contains(msg.X, msg.Y) {
-		b.view = viewBoard
-		b.detailTask = nil
-		b.detailScrollOff = 0
-		b.invalidatePointerState()
+	if !b.pointer.pressed || b.pointer.generation != b.layout.generation ||
+		b.layout.generation != b.layoutGeneration || b.layout.view != viewDetail {
+		b.clearGesture()
 		return
 	}
+	if b.pointer.kind == pointerTargetBack && b.pointer.rect.contains(msg.X, msg.Y) {
+		b.backDetail()
+		return
+	}
+	if b.pointer.kind == pointerTargetRelation {
+		if target := b.relationAt(msg.X, msg.Y); target != nil && target.taskID == b.pointer.taskID {
+			b.openRelation(target.taskID)
+		}
+	}
 	b.clearGesture()
+}
+
+func (b *Board) captureRelationLayout(doc detailDocument, off, end int) {
+	screen := rect{x0: 0, y0: 0, x1: b.width, y1: max(b.height-detailChrome, 0)}
+	for _, relation := range doc.relations {
+		for line := max(relation.start, off); line < min(relation.end, end); line++ {
+			target := rect{x0: 0, y0: line - off, x1: lipgloss.Width(doc.lines[line]), y1: line - off + 1}.intersect(screen)
+			if !target.empty() {
+				b.layout.relations = append(b.layout.relations, relationTarget{taskID: relation.taskID, rect: target})
+			}
+		}
+	}
+}
+
+func (b *Board) relationAt(x, y int) *relationTarget {
+	if b.layout.generation != b.layoutGeneration || b.layout.view != viewDetail {
+		return nil
+	}
+	for i := range b.layout.relations {
+		if b.layout.relations[i].rect.contains(x, y) {
+			return &b.layout.relations[i]
+		}
+	}
+	return nil
 }
 
 func isVerticalWheel(button tea.MouseButton) bool {

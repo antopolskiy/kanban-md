@@ -1,17 +1,18 @@
 package board
 
 import (
-	"sort"
-
 	"github.com/antopolskiy/kanban-md/internal/config"
+	"github.com/antopolskiy/kanban-md/internal/property"
 	"github.com/antopolskiy/kanban-md/internal/task"
 )
 
 // ChildTask is the stable, read-only child representation used by task-detail views.
 type ChildTask struct {
-	ID     int    `json:"id"`
-	Title  string `json:"title"`
-	Status string `json:"status"`
+	ID           int                        `json:"id"`
+	Title        string                     `json:"title"`
+	Status       string                     `json:"status"`
+	PropertyKeys []string                   `json:"-"`
+	Properties   map[string]property.Scalar `json:"-"`
 }
 
 // ParentTask is the resolved, read-only parent representation used by task-detail views.
@@ -47,7 +48,8 @@ func FindParent(tasks []*task.Task, current *task.Task) *ParentTask {
 	return nil
 }
 
-// SummarizeChildren returns direct children in ascending task-ID order.
+// SummarizeChildren returns direct children in configured numeric-property order,
+// or ascending task-ID order by default. Unsuitable values and ties use task ID.
 // Archived children are omitted unless includeArchived is true. Self-references
 // are ignored defensively; normal CLI mutations reject them before writing.
 func SummarizeChildren(
@@ -57,6 +59,7 @@ func SummarizeChildren(
 	includeArchived bool,
 ) ChildSummary {
 	summary := ChildSummary{Children: make([]ChildTask, 0)}
+	var candidates []*task.Task
 	for _, candidate := range tasks {
 		if candidate.ID == parentID || candidate.Parent == nil || *candidate.Parent != parentID {
 			continue
@@ -65,18 +68,24 @@ func SummarizeChildren(
 			continue
 		}
 
-		summary.Children = append(summary.Children, ChildTask{
+		candidates = append(candidates, candidate)
+	}
+	sortChildProperties(candidates, cfg.Children.DetailSort)
+	for _, candidate := range candidates {
+		child := ChildTask{
 			ID:     candidate.ID,
 			Title:  candidate.Title,
 			Status: candidate.Status,
-		})
+		}
+		if key, selected, err := property.SelectorKey(cfg.Children.DetailSort); selected && err == nil {
+			child.PropertyKeys = []string{key}
+			child.Properties = childPropertyValues(candidate, child.PropertyKeys)
+		}
+		summary.Children = append(summary.Children, child)
 		if cfg.IsTerminalStatus(candidate.Status) {
 			summary.Done++
 		}
 	}
 
-	sort.Slice(summary.Children, func(i, j int) bool {
-		return summary.Children[i].ID < summary.Children[j].ID
-	})
 	return summary
 }
