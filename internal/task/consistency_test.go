@@ -1,10 +1,12 @@
 package task
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -27,6 +29,82 @@ func TestEnsureConsistency_RepairsDuplicateMismatchAndNextID(t *testing.T) {
 	}
 	if len(report.Repairs) != 0 {
 		t.Fatalf("repairs on second run = %d, want 0", len(report.Repairs))
+	}
+}
+
+func TestEnsureConsistencyPreservesUnknownFrontmatter(t *testing.T) {
+	kanbanDir := t.TempDir()
+	cfg := config.NewDefault("Generic sample")
+	cfg.SetDir(kanbanDir)
+	if err := os.MkdirAll(cfg.TasksPath(), 0o750); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(cfg.TasksPath(), "099-mismatch.md")
+	content := `---
+id: 1
+title: Generic sample
+status: todo
+priority: medium
+created: 2026-08-12T10:00:00Z
+updated: 2026-08-12T10:00:00Z
+custom_value: retained
+---
+`
+	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := EnsureConsistency(cfg); err != nil {
+		t.Fatalf("EnsureConsistency() error: %v", err)
+	}
+	repairedPath := filepath.Join(cfg.TasksPath(), "001-generic-sample.md")
+	data, err := os.ReadFile(repairedPath) //nolint:gosec // test-owned temporary path
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(data), "custom_value: retained") {
+		t.Errorf("consistency repair lost custom_value:\n%s", data)
+	}
+}
+
+func TestEnsureConsistencyRefusesUnsafeRepairs(t *testing.T) {
+	for _, duplicate := range []bool{false, true} {
+		t.Run(fmt.Sprintf("duplicate=%t", duplicate), func(t *testing.T) {
+			cfg := config.NewDefault("Unsafe repair")
+			cfg.SetDir(t.TempDir())
+			if err := os.MkdirAll(cfg.TasksPath(), 0o750); err != nil {
+				t.Fatal(err)
+			}
+			if err := cfg.Save(); err != nil {
+				t.Fatal(err)
+			}
+			path := filepath.Join(cfg.TasksPath(), "099-mismatch.md")
+			content := []byte("---\n" + preservationCore + "estimate: &shared 4h\ncustom_copy: *shared\n---\n")
+			if err := os.WriteFile(path, content, 0o600); err != nil {
+				t.Fatal(err)
+			}
+			if duplicate {
+				keeper := filepath.Join(cfg.TasksPath(), "001-generic-sample.md")
+				if err := os.WriteFile(keeper, []byte("---\n"+preservationCore+"---\n"), 0o600); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if _, err := EnsureConsistency(cfg); err == nil || !strings.Contains(err.Error(), "rewriting task file") || !strings.Contains(err.Error(), "cannot preserve") {
+				t.Fatalf("EnsureConsistency error = %v, want actionable repair refusal", err)
+			}
+			assertFileUnchanged(t, path, content)
+			entries, err := os.ReadDir(cfg.TasksPath())
+			if err != nil {
+				t.Fatal(err)
+			}
+			want := 1
+			if duplicate {
+				want++
+			}
+			if len(entries) != want {
+				t.Errorf("refused repair created files: %v", entries)
+			}
+		})
 	}
 }
 

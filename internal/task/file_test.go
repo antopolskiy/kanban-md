@@ -99,6 +99,51 @@ func TestWriteNoBody(t *testing.T) {
 	}
 }
 
+func TestWritePreservesUnknownFrontmatterProperties(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "001-generic-sample.md")
+	content := `---
+id: 1
+title: Generic sample
+status: todo
+priority: medium
+created: 2026-08-12T10:00:00Z
+updated: 2026-08-12T10:00:00Z
+custom_scalar: sample-17
+custom_nested:
+  enabled: true
+---
+
+Body
+`
+	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	tk, err := Read(path)
+	if err != nil {
+		t.Fatalf("Read() error: %v", err)
+	}
+	tk.Priority = "high"
+	if err = Write(path, tk); err != nil {
+		t.Fatalf("Write() error: %v", err)
+	}
+
+	data, err := os.ReadFile(path) //nolint:gosec // test-owned temporary path
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := string(data)
+	for _, want := range []string{
+		"custom_scalar: sample-17",
+		"custom_nested:\n    enabled: true",
+	} {
+		if !strings.Contains(got, want) {
+			t.Errorf("written task does not contain preserved property %q:\n%s", want, got)
+		}
+	}
+}
+
 // ---------------------------------------------------------------------------
 // File protection: chmod behavior in Write/WriteAndRename
 // ---------------------------------------------------------------------------

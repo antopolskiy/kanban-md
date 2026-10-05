@@ -4,6 +4,8 @@ package task
 import (
 	"time"
 
+	"go.yaml.in/yaml/v3"
+
 	"github.com/antopolskiy/kanban-md/internal/date"
 )
 
@@ -34,4 +36,11 @@ type Task struct {
 
 	// File is the path to the task file (not in YAML).
 	File string `yaml:"-" json:"file,omitempty"`
+
+	// extraProperties retains opaque YAML pairs not owned by kanban-md. The
+	// node graph is private and immutable, including across copies of a Task.
+	extraProperties *yaml.Node
+	// preservationError prevents a write when regenerated canonical fields
+	// would change the meaning of retained frontmatter.
+	preservationError error
 }

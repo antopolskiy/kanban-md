@@ -28,6 +28,42 @@ func containsSubstring(haystack, needle string) bool {
 	return strings.Contains(haystack, needle)
 }
 
+func TestEditPreservesUnknownFrontmatterWhenRenaming(t *testing.T) {
+	cfg, _ := setupMutateBoard(t)
+	path := filepath.Join(cfg.TasksPath(), "001-generic-sample.md")
+	content := `---
+id: 1
+title: Generic sample
+status: todo
+priority: medium
+created: 2026-08-12T10:00:00Z
+updated: 2026-08-12T10:00:00Z
+custom_value: retained
+---
+`
+	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	result, err := board.Edit(cfg, 1, "", false, func(tk *task.Task) (bool, error) {
+		tk.Title = "Changed sample"
+		return true, nil
+	}, time.Now())
+	if err != nil {
+		t.Fatalf("Edit() error: %v", err)
+	}
+	if result.NewPath == path {
+		t.Fatal("Edit() did not rename the task file")
+	}
+	data, err := os.ReadFile(result.NewPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(data), "custom_value: retained") {
+		t.Errorf("renamed task lost custom_value:\n%s", data)
+	}
+}
+
 func TestHandoff_MoveAndBlock(t *testing.T) {
 	cfg, kanbanDir := setupMutateBoard(t)
 

@@ -2,6 +2,7 @@ package task
 
 import (
 	"path/filepath"
+	"reflect"
 	"testing"
 )
 
@@ -237,6 +238,70 @@ func TestCompatV1TaskWithClaimAndClass(t *testing.T) {
 	}
 	if tk.Class != "expedite" {
 		t.Errorf("Class = %q, want %q", tk.Class, "expedite")
+	}
+}
+
+func TestCompatV1TaskPreservesOpaqueProperties(t *testing.T) {
+	path := filepath.Join(v1FixtureDir, "007-with-extra-properties.md")
+	tk, err := Read(path)
+	if err != nil {
+		t.Fatalf("Read() v1 task with extra properties: %v", err)
+	}
+
+	tk.Priority = "high"
+	outputPath := filepath.Join(t.TempDir(), "007-with-extra-properties.md")
+	if err = Write(outputPath, tk); err != nil {
+		t.Fatalf("Write() v1 task with extra properties: %v", err)
+	}
+
+	values := readFrontmatterValues(t, outputPath)
+	want := map[string]any{"reference": frontmatterTestReference}
+	if got := values["custom_supported"]; !reflect.DeepEqual(got, want) {
+		t.Errorf("custom_supported = %#v, want %#v", got, want)
+	}
+	if got := values["priority"]; got != "high" {
+		t.Errorf("priority = %#v, want changed canonical value", got)
+	}
+	root := readFrontmatterNode(t, outputPath)
+	assertScalarNode(t, mappingValue(t, root, "custom_tagged"), "sample-17", "!integration")
+	source := mappingValue(t, root, "custom_source")
+	if mappingValue(t, root, "custom_copy").Alias != source {
+		t.Error("compatibility alias lost its binding")
+	}
+	assertScalarNode(t, mappingValue(t, mappingValue(t, root, "custom_non_string_mapping"), "1"), "unsupported", "!!str")
+}
+
+func TestCompatV1TaskPreservesExactNumericAndTaggedValues(t *testing.T) {
+	tk, err := Read(filepath.Join(v1FixtureDir, "008-exact-extra-values.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(t.TempDir(), "008-exact-extra-values.md")
+	for cycle := 0; cycle < 2; cycle++ {
+		if err = Write(path, tk); err != nil {
+			t.Fatal(err)
+		}
+		root := readFrontmatterNode(t, path)
+		assertScalarNode(t, mappingValue(t, root, "huge"), "18446744073709551617", preservationFloatTag)
+		assertScalarNode(t, mappingValue(t, root, "decimal"), "0.123456789012345678901234567890", preservationFloatTag)
+		assertScalarNode(t, mappingValue(t, mappingValue(t, root, "mixed"), "tagged"), "001", "!integration")
+		tk, err = Read(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
+func TestCompatV1TaskUnsafeAliasIsReadableButRefusesWrite(t *testing.T) {
+	tk, err := Read(filepath.Join(v1FixtureDir, "009-unsafe-extra-alias.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if tk.Estimate != "4h" {
+		t.Errorf("Estimate = %q, want 4h", tk.Estimate)
+	}
+	if err = Write(filepath.Join(t.TempDir(), "009-unsafe-extra-alias.md"), tk); err == nil {
+		t.Fatal("unsafe fixture write succeeded")
 	}
 }
 

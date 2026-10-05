@@ -1241,6 +1241,7 @@ func (b *Board) lowerPriority() (tea.Model, tea.Cmd) {
 
 func (b *Board) executePriorityChange(t *task.Task, newPriority string) (tea.Model, tea.Cmd) {
 	oldPriority := t.Priority
+	oldUpdated := t.Updated
 	taskID := t.ID
 	t.Priority = newPriority
 	t.Updated = time.Now()
@@ -1248,6 +1249,7 @@ func (b *Board) executePriorityChange(t *task.Task, newPriority string) (tea.Mod
 	if err := task.Write(t.File, t); err != nil {
 		b.err = fmt.Errorf("updating priority for task #%d: %w", taskID, err)
 		t.Priority = oldPriority // revert
+		t.Updated = oldUpdated
 		return b, nil
 	}
 

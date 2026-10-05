@@ -1744,6 +1744,45 @@ func TestBoard_RaisePriority(t *testing.T) {
 	_ = b.View()
 }
 
+func TestBoard_RaisePriorityPreservesUnknownFrontmatter(t *testing.T) {
+	_, cfg := setupTestBoard(t)
+	path, err := task.FindByID(cfg.TasksPath(), 1)
+	if err != nil {
+		t.Fatalf("finding task: %v", err)
+	}
+	data, err := os.ReadFile(path) //nolint:gosec // test-owned temporary path
+	if err != nil {
+		t.Fatal(err)
+	}
+	content := string(data)
+	closing := strings.LastIndex(content, "---\n")
+	if closing <= 0 {
+		t.Fatalf("task has no closing frontmatter delimiter:\n%s", content)
+	}
+	content = content[:closing] + "custom_value: retained\nhuge: 18446744073709551617\ncustom_tagged: !integration 001\n" + content[closing:]
+	if err = os.WriteFile(path, []byte(content), 0o600); err != nil { //nolint:gosec,nolintlint // test-owned temporary path
+		t.Fatal(err)
+	}
+
+	b := tui.NewBoard(cfg)
+	b.SetNow(testNow)
+	b.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
+	_ = sendKey(b, "+")
+
+	written, err := os.ReadFile(path) //nolint:gosec // test-owned temporary path
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(written), "custom_value: retained") {
+		t.Errorf("priority change removed custom_value:\n%s", written)
+	}
+	for _, want := range []string{"huge: 18446744073709551617", "custom_tagged: !integration 001"} {
+		if !strings.Contains(string(written), want) {
+			t.Errorf("priority change did not retain %q:\n%s", want, written)
+		}
+	}
+}
+
 func TestBoard_LowerPriority(t *testing.T) {
 	b, cfg := setupTestBoard(t)
 
