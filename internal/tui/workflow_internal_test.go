@@ -5,11 +5,13 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/x/ansi"
 
 	"github.com/antopolskiy/kanban-md/internal/config"
 	"github.com/antopolskiy/kanban-md/internal/task"
@@ -128,6 +130,71 @@ func TestWorkflowDepthCycleAndSearchComposition(t *testing.T) {
 	workflowKey(b, "esc")
 	if b.filterQuery != "" || *b.depthFilter != 1 {
 		t.Fatal("clearing text search should retain depth")
+	}
+}
+
+func TestWorkflowInactiveColumnOffsetsClampAfterRebuild(t *testing.T) {
+	for _, transition := range []string{"depth", "search", "reload"} {
+		t.Run(transition, func(t *testing.T) {
+			tasks := []*task.Task{
+				{ID: 1, Title: "Backlog root", Status: "backlog"},
+				{ID: 2, Title: "Unique level-one child", Status: "todo", Parent: parentID(1)},
+			}
+			for id := 3; id <= 22; id++ {
+				tasks = append(tasks, &task.Task{ID: id, Title: fmt.Sprintf("Todo root %d", id), Status: "todo"})
+			}
+			b, cfg := newWorkflowBoard(t, tasks)
+			b.SetMouseEnabled(true)
+			b.Update(tea.WindowSizeMsg{Width: 120, Height: 16})
+			last := b.columns[1].tasks[len(b.columns[1].tasks)-1]
+			b.selectTaskByID(last.ID)
+			offset := b.currentColumn().scrollOff
+			if offset == 0 {
+				t.Fatal("fixture did not scroll the todo column")
+			}
+			b.selectTaskByID(1)
+			b.loadTasks()
+			if b.columns[1].scrollOff != offset {
+				t.Fatal("rebuild must retain a still-valid inactive scroll position")
+			}
+			t.Logf("progress: %s reduces a todo column scrolled to %d", transition, offset)
+			reduceInactiveWorkflowColumn(t, b, cfg, transition)
+			if b.activeCol != 0 || len(b.columns[1].tasks) != 1 || b.columns[1].tasks[0].ID != 2 {
+				t.Fatal("fixture did not leave the sole child in an inactive todo column")
+			}
+			for _, col := range b.columns {
+				if col.scrollOff < 0 || col.scrollOff > max(0, len(col.tasks)-1) {
+					t.Fatalf("%s retained invalid offset %d for %d tasks", col.status, col.scrollOff, len(col.tasks))
+				}
+			}
+			view := ansi.Strip(b.View())
+			if !strings.Contains(view, "#2 L1 Unique") || !strings.Contains(view, "level-one child") {
+				t.Fatalf("the matching child's wrapped card is absent after the rebuild:\n%s", view)
+			}
+			if !slices.ContainsFunc(b.layout.cards, func(target cardTarget) bool { return target.taskID == 2 }) {
+				t.Fatal("the matching child has no mouse target after the rebuild")
+			}
+		})
+	}
+}
+
+func reduceInactiveWorkflowColumn(t *testing.T, b *Board, cfg *config.Config, transition string) {
+	t.Helper()
+	switch transition {
+	case "depth":
+		workflowKey(b, "v")
+		workflowKey(b, "v")
+	case "search":
+		workflowKey(b, "/")
+		for _, r := range "Unique level-one" {
+			workflowKey(b, string(r))
+		}
+		workflowKey(b, "enter")
+	case "reload":
+		for id := 3; id <= 22; id++ {
+			changeWorkflowTask(t, cfg, id, func(tk *task.Task) { tk.Status = workflowArchived })
+		}
+		b.Update(ReloadMsg{})
 	}
 }
 

@@ -7,7 +7,9 @@ import (
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/x/ansi"
+	"github.com/muesli/termenv"
 
 	"github.com/antopolskiy/kanban-md/internal/config"
 	"github.com/antopolskiy/kanban-md/internal/property"
@@ -144,5 +146,39 @@ func TestPropertyIntegrationLosslessDetailWrappingAndMouseReload(t *testing.T) {
 		requireDetailID(t, b, 2)
 		workflowKey(b, "esc")
 		_ = b.View()
+	}
+}
+
+func TestPropertyIntegrationColoredCardClipping(t *testing.T) {
+	previousProfile := lipgloss.ColorProfile()
+	t.Cleanup(func() { lipgloss.SetColorProfile(previousProfile) })
+	b, _ := newWorkflowBoard(t, []*task.Task{{
+		ID: 1, Title: "Example", Status: "todo", Priority: "medium", Tags: []string{"backend"},
+	}})
+	b.cfg.TUI.CardFields = config.FieldList{"property:kind"}
+	tk := b.activeTask(1)
+	setIntegrationProperty(t, tk, "kind", "chapter")
+	var plainWithoutColor string
+	for _, profile := range []termenv.Profile{termenv.Ascii, termenv.ANSI256} {
+		lipgloss.SetColorProfile(profile)
+		lines := b.cardContentLines(tk, 24)
+		line := lines[len(lines)-1]
+		plain := ansi.Strip(line)
+		if !strings.Contains(plain, `kind="chapter"`) {
+			t.Fatalf("fitting property lost when clipping profile %v: %q", profile, line)
+		}
+		if ansi.StringWidth(line) > 20 || !strings.HasSuffix(plain, "...") {
+			t.Fatalf("later metadata must clip within 20 cells: %q", line)
+		}
+		if profile == termenv.Ascii {
+			plainWithoutColor = plain
+			continue
+		}
+		if plain != plainWithoutColor || strings.ContainsRune(plain, '\x1b') {
+			t.Fatalf("ANSI formatting changed visible content: got %q, want %q", plain, plainWithoutColor)
+		}
+		if !strings.Contains(line, "\x1b[0m") {
+			t.Fatalf("clipping lost the style reset: %q", line)
+		}
 	}
 }

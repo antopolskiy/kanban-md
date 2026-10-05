@@ -17,6 +17,7 @@ import (
 	"github.com/charmbracelet/glamour"
 	glamourstyles "github.com/charmbracelet/glamour/styles"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/x/ansi"
 
 	"github.com/antopolskiy/kanban-md/internal/board"
 	"github.com/antopolskiy/kanban-md/internal/config"
@@ -1007,6 +1008,10 @@ func (b *Board) loadTasks() {
 			}
 		}
 	}
+	for i := range b.columns {
+		col := &b.columns[i]
+		col.scrollOff = max(0, min(col.scrollOff, len(col.tasks)-1))
+	}
 
 	b.clampRow()
 }
@@ -1971,7 +1976,7 @@ func (b *Board) cardContentLines(t *task.Task, width int) []string {
 	detailLine := strings.Join(details, " ")
 	fields := b.cfg.CardFields()
 	if len(fields) != 1 || fields[0] != "priority" {
-		detailLine = truncate(detailLine, cardWidth)
+		detailLine = ansi.Truncate(detailLine, cardWidth, "...")
 	}
 	contentLines = append(contentLines, detailLine)
 
