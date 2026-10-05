@@ -5,7 +5,11 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"go.yaml.in/yaml/v3"
 )
+
+const preservationClaimFlag = "--claim"
 
 // ---------------------------------------------------------------------------
 // Edit tests
@@ -129,7 +133,15 @@ func TestMutationsPreserveUnknownFrontmatter(t *testing.T) {
 	if closing <= 0 {
 		t.Fatalf("task has no closing frontmatter delimiter:\n%s", content)
 	}
-	content = content[:closing] + "custom_value: retained\n" + content[closing:]
+	content = content[:closing] + `custom_value: retained
+huge: 18446744073709551617
+mixed:
+  plain: retained
+  tagged: !integration 001
+  binary: !!binary aGVsbG8=
+  source: &source {17: retained}
+  copy: *source
+` + content[closing:]
 	if err = os.WriteFile(created.File, []byte(content), 0o600); err != nil { //nolint:gosec,nolintlint // test binary returned this task path
 		t.Fatal(err)
 	}
@@ -138,6 +150,9 @@ func TestMutationsPreserveUnknownFrontmatter(t *testing.T) {
 	for _, args := range [][]string{
 		{listCommand},
 		{"--compact", listCommand},
+		{"--json", listCommand},
+		{"--json", "show", "1"},
+		{"--json", "board"},
 	} {
 		r := runKanban(t, kanbanDir, args...)
 		if r.exitCode != 0 {
@@ -154,36 +169,31 @@ func TestMutationsPreserveUnknownFrontmatter(t *testing.T) {
 		t.Fatalf("edit failed: %s", r.stderr)
 	}
 	assertCustomValuePreserved(t, edited.File)
-
-	r = runKanban(t, kanbanDir, "move", "1", statusTodo)
-	if r.exitCode != 0 {
-		t.Fatalf("move failed: %s", r.stderr)
+	if strings.Contains(r.stdout, "custom_value") || strings.Contains(r.stdout, "mixed") || strings.Contains(r.stdout, "huge") {
+		t.Errorf("JSON edit exposed custom frontmatter:\n%s", r.stdout)
 	}
-	assertCustomValuePreserved(t, edited.File)
 
-	r = runKanban(t, kanbanDir, "pick", "--claim", claimTestAgent, "--status", statusTodo, "--no-body")
-	if r.exitCode != 0 {
-		t.Fatalf("pick failed: %s", r.stderr)
+	for _, args := range [][]string{
+		{"move", "1", statusTodo},
+		{"pick", preservationClaimFlag, claimTestAgent, "--status", statusTodo, "--no-body"},
+		{"edit", "1", "--release"},
+		{"pick", preservationClaimFlag, claimTestAgent, "--status", statusTodo, "--no-body"},
+		{"handoff", "1", preservationClaimFlag, claimTestAgent, "--note", "Ready for review"},
+		{"archive", "1", preservationClaimFlag, claimTestAgent},
+	} {
+		t.Run(strings.Join(args, " "), func(t *testing.T) {
+			if r = runKanban(t, kanbanDir, args...); r.exitCode != 0 {
+				t.Fatalf("%v failed: %s", args, r.stderr)
+			}
+			assertCustomValuePreserved(t, edited.File)
+		})
 	}
-	assertCustomValuePreserved(t, edited.File)
-
-	r = runKanban(t, kanbanDir, "handoff", "1", "--claim", claimTestAgent, "--note", "Ready for review")
-	if r.exitCode != 0 {
-		t.Fatalf("handoff failed: %s", r.stderr)
-	}
-	assertCustomValuePreserved(t, edited.File)
-
-	r = runKanban(t, kanbanDir, "archive", "1", "--claim", claimTestAgent)
-	if r.exitCode != 0 {
-		t.Fatalf("archive failed: %s", r.stderr)
-	}
-	assertCustomValuePreserved(t, edited.File)
 }
 
-func TestReleaseToleratesUnknownAliasToRemovedCanonicalField(t *testing.T) {
+func TestMutationsRefuseUnknownAliasToCanonicalField(t *testing.T) {
 	kanbanDir := initBoard(t)
 	created := mustCreateTask(t, kanbanDir, "Generic sample")
-	r := runKanban(t, kanbanDir, "edit", "1", "--claim", claimTestAgent)
+	r := runKanban(t, kanbanDir, "edit", "1", preservationClaimFlag, claimTestAgent)
 	if r.exitCode != 0 {
 		t.Fatalf("claim failed: %s", r.stderr)
 	}
@@ -207,17 +217,34 @@ func TestReleaseToleratesUnknownAliasToRemovedCanonicalField(t *testing.T) {
 	if err = os.WriteFile(created.File, []byte(content), 0o600); err != nil { //nolint:gosec,nolintlint // test binary returned this task path
 		t.Fatal(err)
 	}
-	r = runKanban(t, kanbanDir, "edit", "1", "--release")
-	if r.exitCode != 0 {
-		t.Fatalf("release failed: %s", r.stderr)
+	logPath := filepath.Join(kanbanDir, "activity.jsonl")
+	beforeLog, err := os.ReadFile(logPath) //nolint:gosec // test-owned activity log
+	if err != nil {
+		t.Fatal(err)
 	}
-	var released taskJSON
-	r = runKanbanJSON(t, kanbanDir, &released, "show", "1")
-	if r.exitCode != 0 {
-		t.Fatalf("show after release failed: %s", r.stderr)
+	for _, args := range [][]string{
+		{"edit", "1", "--release"},
+		{"edit", "1", preservationClaimFlag, claimTestAgent, "--title", "Changed sample"},
+	} {
+		r = runKanban(t, kanbanDir, args...)
+		if r.exitCode == 0 || !strings.Contains(r.stderr, "cannot preserve") {
+			t.Fatalf("%v result = %d %s, want preservation refusal", args, r.exitCode, r.stderr)
+		}
+		assertTaskBytes(t, created.File, []byte(content))
+		assertTaskBytes(t, logPath, beforeLog)
 	}
-	if released.ClaimedBy != "" {
-		t.Errorf("ClaimedBy = %q, want empty after release", released.ClaimedBy)
+	if _, err = os.Stat(filepath.Join(filepath.Dir(created.File), "001-changed-sample.md")); !os.IsNotExist(err) {
+		t.Errorf("refused CLI edit created destination: %v", err)
+	}
+	var unchanged taskJSON
+	r = runKanbanJSON(t, kanbanDir, &unchanged, "show", "1")
+	if r.exitCode != 0 || unchanged.ClaimedBy != claimTestAgent {
+		t.Fatalf("show after refusal: %s, ClaimedBy=%q", r.stderr, unchanged.ClaimedBy)
+	}
+	for _, command := range []string{"list", "board"} {
+		if r = runKanban(t, kanbanDir, command); r.exitCode != 0 {
+			t.Errorf("ordinary %s failed: %s", command, r.stderr)
+		}
 	}
 }
 
@@ -231,6 +258,41 @@ func assertCustomValuePreserved(t *testing.T, path string) {
 	if !strings.Contains(string(data), want) {
 		t.Errorf("%s does not contain %q:\n%s", path, want, data)
 	}
+	var document yaml.Node
+	frontmatter := strings.SplitN(string(data)[4:], "\n---", 2)[0]
+	if err = yaml.Unmarshal([]byte(frontmatter), &document); err != nil {
+		t.Fatal(err)
+	}
+	root := document.Content[0]
+	huge := extraYAMLValue(t, root, "huge")
+	if huge.Value != "18446744073709551617" || huge.ShortTag() != "!!float" {
+		t.Errorf("huge scalar changed to %q %s", huge.Value, huge.ShortTag())
+	}
+	mixed := extraYAMLValue(t, root, "mixed")
+	for _, wantScalar := range []struct{ key, value, tag string }{
+		{"plain", "retained", "!!str"},
+		{"tagged", "001", "!integration"},
+		{"binary", "aGVsbG8=", "!!binary"},
+	} {
+		node := extraYAMLValue(t, mixed, wantScalar.key)
+		if node.Value != wantScalar.value || node.ShortTag() != wantScalar.tag {
+			t.Errorf("mixed.%s changed to %q %s", wantScalar.key, node.Value, node.ShortTag())
+		}
+	}
+	if extraYAMLValue(t, mixed, "copy").Alias != extraYAMLValue(t, mixed, "source") {
+		t.Error("mixed alias lost its binding")
+	}
+}
+
+func extraYAMLValue(t *testing.T, mapping *yaml.Node, key string) *yaml.Node {
+	t.Helper()
+	for i := 0; i < len(mapping.Content); i += 2 {
+		if mapping.Content[i].Value == key {
+			return mapping.Content[i+1]
+		}
+	}
+	t.Fatalf("missing retained property %q", key)
+	return nil
 }
 
 func TestEditNoChanges(t *testing.T) {

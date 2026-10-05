@@ -9,7 +9,6 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
-	"strconv"
 	"strings"
 
 	"go.yaml.in/yaml/v3"
@@ -17,17 +16,16 @@ import (
 
 var errTaskFrontmatterNotMapping = errors.New("task frontmatter must be a YAML mapping")
 
-const yamlStringTag = "!!str"
-
 var canonicalTaskYAMLKeys = makeTaskYAMLKeys()
 
-// taskYAML avoids recursively invoking Task's YAML methods while encoding and
-// decoding kanban-md-owned fields.
+// taskYAML bypasses Task's YAML methods for kanban-md-owned fields.
 type taskYAML Task
 
-// UnmarshalYAML decodes kanban-md-owned fields and retains supported properties
-// kanban-md does not own.
+// UnmarshalYAML decodes canonical fields and retains unknown YAML without
+// interpreting its values. Unsafe-to-rewrite metadata remains readable.
 func (t *Task) UnmarshalYAML(value *yaml.Node) error {
+	t.extraProperties = nil
+	t.preservationError = nil
 	mapping, err := taskFrontmatterMapping(value)
 	if err != nil {
 		return err
@@ -36,109 +34,81 @@ func (t *Task) UnmarshalYAML(value *yaml.Node) error {
 		return err
 	}
 
-	t.extraProperties, err = decodeExtraProperties(mapping)
-	return err
+	extra := &yaml.Node{Kind: yaml.MappingNode, Tag: "!!map"}
+	if mapping.ShortTag() != "!!map" {
+		t.preservationError = preservationRefusal(mapping, "frontmatter", "a custom root tag applies to canonical fields too")
+	}
+	for i := 0; i < len(mapping.Content); i += 2 {
+		key := mapping.Content[i]
+		switch {
+		case key.Kind == yaml.AliasNode:
+			t.preservationError = preservationRefusal(key, key.Value, "a top-level alias key cannot be retained safely")
+		case key.ShortTag() == "!!merge":
+			t.preservationError = preservationRefusal(key, "<<", "a top-level YAML merge can supply canonical fields")
+		}
+		if key.Kind == yaml.ScalarNode {
+			if _, known := canonicalTaskYAMLKeys[key.Value]; known {
+				continue
+			}
+		}
+		extra.Content = append(extra.Content, key, mapping.Content[i+1])
+	}
+	t.extraProperties = extra
+	if t.preservationError == nil {
+		t.preservationError = validateRetainedAliases(extra)
+	}
+	return nil
 }
 
-// MarshalYAML encodes current kanban-md-owned values followed by the semantic
-// values of properties kanban-md does not own. YAML presentation details from
-// the input are intentionally not retained.
+// MarshalYAML regenerates authoritative canonical values, then appends the
+// immutable retained pairs. Refusal happens before task.Write touches a file.
 func (t Task) MarshalYAML() (any, error) {
+	if t.preservationError != nil {
+		return nil, t.preservationError
+	}
 	canonical, err := encodeCanonicalTask(&t)
 	if err != nil {
 		return nil, err
 	}
-	if len(t.extraProperties) == 0 {
-		return canonical, nil
+	if t.extraProperties != nil {
+		canonical.Content = append(canonical.Content, t.extraProperties.Content...)
 	}
-
-	extra, err := encodeExtraProperties(t.extraProperties)
-	if err != nil {
-		return nil, err
-	}
-	canonical.Content = append(canonical.Content, extra.Content...)
 	return canonical, nil
 }
 
-func decodeExtraProperties(mapping *yaml.Node) (map[string]any, error) {
-	decoded := make(map[string]any)
-	for i := 0; i < len(mapping.Content); i += 2 {
-		key := mapping.Content[i]
-		keyValue, supported := supportedExtraStringKey(key)
-		if !supported {
-			continue
+// validateRetainedAliases walks emission order without following Alias pointers.
+// Identity checks preserve ordering and rebinding, including repeated anchors.
+func validateRetainedAliases(extra *yaml.Node) error {
+	anchors := make(map[string]*yaml.Node)
+	var walk func(*yaml.Node, string) error
+	walk = func(node *yaml.Node, property string) error {
+		if node.Anchor != "" {
+			anchors[node.Anchor] = node
 		}
-		if _, known := canonicalTaskYAMLKeys[keyValue]; known {
-			continue
+		if node.Kind == yaml.AliasNode && (node.Alias == nil || anchors[node.Value] != node.Alias) {
+			return preservationRefusal(node, property, "alias *"+node.Value+" depends on an anchor outside retained properties or changes binding")
 		}
-		value := mapping.Content[i+1]
-		if !isSupportedExtraValue(value) {
-			continue
-		}
-		var decodedValue any
-		if err := value.Decode(&decodedValue); err != nil {
-			return nil, fmt.Errorf("decoding additional frontmatter property %s: %w", keyValue, err)
-		}
-		decoded[keyValue] = decodedValue
-	}
-	return decoded, nil
-}
-
-func supportedExtraStringKey(node *yaml.Node) (string, bool) {
-	if node == nil || node.Kind != yaml.ScalarNode || hasUnsupportedYAMLSyntax(node) {
-		return "", false
-	}
-	return node.Value, node.ShortTag() == yamlStringTag
-}
-
-func isSupportedExtraValue(node *yaml.Node) bool {
-	if node == nil || hasUnsupportedYAMLSyntax(node) {
-		return false
-	}
-	switch node.Kind {
-	case yaml.ScalarNode:
-		return true
-	case yaml.SequenceNode:
-		for _, item := range node.Content {
-			if !isSupportedExtraValue(item) {
-				return false
+		for _, child := range node.Content {
+			if err := walk(child, property); err != nil {
+				return err
 			}
 		}
-		return true
-	case yaml.MappingNode:
-		for i := 0; i < len(node.Content); i += 2 {
-			if _, supported := supportedExtraStringKey(node.Content[i]); !supported ||
-				!isSupportedExtraValue(node.Content[i+1]) {
-				return false
-			}
-		}
-		return true
-	default:
-		return false
+		return nil
 	}
+	for i := 0; i < len(extra.Content); i += 2 {
+		key := extra.Content[i]
+		if err := walk(key, key.Value); err != nil {
+			return err
+		}
+		if err := walk(extra.Content[i+1], key.Value); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
-func hasUnsupportedYAMLSyntax(node *yaml.Node) bool {
-	return node.Anchor != "" || node.Style&yaml.TaggedStyle != 0 ||
-		node.Tag != "" && !strings.HasPrefix(node.Tag, "!!") &&
-			!strings.HasPrefix(node.Tag, "tag:yaml.org,2002:")
-}
-
-func quoteLiteralMergeKeys(node *yaml.Node) {
-	if node.Kind == yaml.MappingNode {
-		for i := 0; i < len(node.Content); i += 2 {
-			key := node.Content[i]
-			if key.Value == "<<" {
-				key.Tag = yamlStringTag
-				key.Style = yaml.DoubleQuotedStyle
-			}
-			quoteLiteralMergeKeys(node.Content[i+1])
-		}
-		return
-	}
-	for _, child := range node.Content {
-		quoteLiteralMergeKeys(child)
-	}
+func preservationRefusal(node *yaml.Node, property, reason string) error {
+	return fmt.Errorf("cannot preserve frontmatter property %q at line %d: %s; edit the frontmatter manually before retrying", property, node.Line, reason)
 }
 
 func encodeCanonicalTask(t *Task) (*yaml.Node, error) {
@@ -147,59 +117,6 @@ func encodeCanonicalTask(t *Task) (*yaml.Node, error) {
 		return nil, err
 	}
 	return taskFrontmatterMapping(&encoded)
-}
-
-func encodeExtraProperties(extra map[string]any) (*yaml.Node, error) {
-	var encoded yaml.Node
-	if err := encoded.Encode(prepareExtraValue(extra)); err != nil {
-		return nil, fmt.Errorf("encoding additional frontmatter properties: %w", err)
-	}
-	mapping, err := taskFrontmatterMapping(&encoded)
-	if err != nil {
-		return nil, err
-	}
-	quoteLiteralMergeKeys(mapping)
-	return mapping, nil
-}
-
-func prepareExtraValue(value any) any {
-	switch typed := value.(type) {
-	case float64:
-		return preservedYAMLFloat(typed)
-	case []any:
-		prepared := make([]any, len(typed))
-		for i, item := range typed {
-			prepared[i] = prepareExtraValue(item)
-		}
-		return prepared
-	case map[string]any:
-		prepared := make(map[string]any, len(typed))
-		for key, item := range typed {
-			prepared[key] = prepareExtraValue(item)
-		}
-		return prepared
-	default:
-		return value
-	}
-}
-
-type preservedYAMLFloat float64
-
-func (value preservedYAMLFloat) MarshalYAML() (any, error) {
-	encoded := strconv.FormatFloat(float64(value), 'g', -1, 64)
-	switch encoded {
-	case "+Inf":
-		encoded = ".inf"
-	case "-Inf":
-		encoded = "-.inf"
-	case "NaN":
-		encoded = ".nan"
-	default:
-		if !strings.ContainsAny(encoded, ".eE") {
-			encoded += ".0"
-		}
-	}
-	return &yaml.Node{Kind: yaml.ScalarNode, Tag: "!!float", Value: encoded}, nil
 }
 
 func taskFrontmatterMapping(node *yaml.Node) (*yaml.Node, error) {

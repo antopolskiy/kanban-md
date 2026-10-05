@@ -88,7 +88,7 @@ Body
 	}
 }
 
-func TestWriteToleratesAdditionalPropertiesWithUnsupportedYAMLSyntax(t *testing.T) {
+func TestWritePreservesAdditionalPropertiesWithTaggedAndAliasedYAML(t *testing.T) {
 	path := writeRawTask(t, `---
 id: 1
 title: Generic sample
@@ -96,7 +96,8 @@ status: todo
 priority: medium
 created: 2026-08-12T10:00:00Z
 updated: 2026-08-12T10:00:00Z
-estimate: &shared 4h
+estimate: 4h
+custom_source: &shared 4h
 custom_copy: *shared
 custom_anchor: &extra anchored
 custom_tagged: !integration 001
@@ -129,7 +130,7 @@ custom_supported: retained # comments are discarded without dropping the value
 	}
 }
 
-func TestWriteToleratesTopLevelMergeValues(t *testing.T) {
+func TestWriteRefusesTopLevelMergeValues(t *testing.T) {
 	path := writeRawTask(t, `---
 defaults: &defaults
   external_reference: merged
@@ -150,16 +151,8 @@ external_reference: explicit
 		t.Fatalf("Read() error: %v", err)
 	}
 	tk.Priority = "high"
-	if err = Write(path, tk); err != nil {
-		t.Fatalf("Write() error: %v", err)
-	}
-
-	values := readFrontmatterValues(t, path)
-	if got := values["priority"]; got != "high" {
-		t.Errorf("priority = %#v, want changed canonical value", got)
-	}
-	if got := values["external_reference"]; got != "explicit" {
-		t.Errorf("external_reference = %#v, want explicit value to override merged value", got)
+	if err = Write(path, tk); err == nil || !strings.Contains(err.Error(), "top-level YAML merge") {
+		t.Fatalf("Write() error = %v, want merge refusal", err)
 	}
 }
 
@@ -199,7 +192,7 @@ defaults: &defaults
 	}
 }
 
-func TestWriteToleratesPropertiesWithUnsupportedKeySyntax(t *testing.T) {
+func TestWritePreservesPropertiesWithDecoratedKeySyntax(t *testing.T) {
 	path := writeRawTask(t, `---
 id: 1
 title: Generic sample
@@ -208,7 +201,6 @@ priority: medium
 created: 2026-08-12T10:00:00Z
 updated: 2026-08-12T10:00:00Z
 key_source: &key custom_alias_key
-*key: alias-key value
 !integration custom_tagged_key: tagged-key value
 &anchored_key custom_anchored_key: anchored-key value
 !!str custom_explicit_key: explicit-key value
@@ -234,6 +226,18 @@ custom_supported: retained
 	}
 	if got := values["custom_supported"]; got != frontmatterTestRetained {
 		t.Errorf("custom_supported = %#v, want retained", got)
+	}
+	root := readFrontmatterNode(t, path)
+	for _, want := range []struct{ key, value string }{
+		{"custom_tagged_key", "tagged-key value"},
+		{"custom_anchored_key", "anchored-key value"},
+		{"custom_explicit_key", "explicit-key value"},
+	} {
+		assertScalarNode(t, mappingValue(t, root, want.key), want.value, "!!str")
+	}
+	mapping := mappingValue(t, root, "custom_mapping")
+	if mapping.Content[0].Alias != mappingValue(t, root, "key_source") {
+		t.Error("nested alias key lost its binding")
 	}
 }
 
@@ -262,6 +266,17 @@ func TestWriteToleratesAdditionalAliasExpansion(t *testing.T) {
 	}
 	if rewritten.Title != frontmatterTestTitle {
 		t.Errorf("Title = %q, want changed canonical value", rewritten.Title)
+	}
+	sequence := mappingValue(t, readFrontmatterNode(t, path), "custom")
+	if len(sequence.Content) != 25 {
+		t.Fatalf("alias sequence has %d entries, want 25", len(sequence.Content))
+	}
+	for i := 1; i < len(sequence.Content); i++ {
+		for _, alias := range sequence.Content[i].Content {
+			if alias.Kind != yaml.AliasNode || alias.Alias != sequence.Content[i-1] {
+				t.Errorf("alias expansion level %d lost its original binding", i)
+			}
+		}
 	}
 }
 
@@ -329,6 +344,9 @@ custom_mapping:
 	if rewritten.Title != frontmatterTestTitle {
 		t.Errorf("Title = %q, want changed canonical value", rewritten.Title)
 	}
+	nested := mappingValue(t, mappingValue(t, readFrontmatterNode(t, path), "custom_mapping"), "nested")
+	assertScalarNode(t, nested.Content[0], "1", "!!int")
+	assertScalarNode(t, nested.Content[1], "unsupported", "!!str")
 }
 
 func TestWriteToleratesAdditionalPropertyWithNonStringKey(t *testing.T) {
@@ -358,6 +376,7 @@ updated: 2026-08-12T10:00:00Z
 	if rewritten.Title != frontmatterTestTitle {
 		t.Errorf("Title = %q, want changed canonical value", rewritten.Title)
 	}
+	assertScalarNode(t, mappingValue(t, readFrontmatterNode(t, path), "1"), "unsupported", "!!str")
 }
 
 func TestInMemoryTaskKeepsCanonicalYAMLAndAdditionalPropertiesOutOfJSON(t *testing.T) {
@@ -434,7 +453,7 @@ updated: 2026-08-12T10:00:00Z
 	}
 }
 
-func TestWriteToleratesAliasBackedDuplicateKey(t *testing.T) {
+func TestWriteRefusesAliasBackedDuplicateKey(t *testing.T) {
 	path := writeRawTask(t, `---
 id: 1
 title: Generic sample
@@ -453,15 +472,8 @@ custom_value: first
 		t.Fatalf("Read() error: %v", err)
 	}
 	tk.Priority = "high"
-	if err = Write(path, tk); err != nil {
-		t.Fatalf("Write() error: %v", err)
-	}
-	values := readFrontmatterValues(t, path)
-	if got := values["priority"]; got != "high" {
-		t.Errorf("priority = %#v, want changed canonical value", got)
-	}
-	if got := values["custom_value"]; got != "first" {
-		t.Errorf("custom_value = %#v, want first", got)
+	if err = Write(path, tk); err == nil || !strings.Contains(err.Error(), "top-level alias key") {
+		t.Fatalf("Write() error = %v, want alias-key refusal", err)
 	}
 }
 

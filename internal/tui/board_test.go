@@ -1759,7 +1759,7 @@ func TestBoard_RaisePriorityPreservesUnknownFrontmatter(t *testing.T) {
 	if closing <= 0 {
 		t.Fatalf("task has no closing frontmatter delimiter:\n%s", content)
 	}
-	content = content[:closing] + "custom_value: retained\n" + content[closing:]
+	content = content[:closing] + "custom_value: retained\nhuge: 18446744073709551617\ncustom_tagged: !integration 001\n" + content[closing:]
 	if err = os.WriteFile(path, []byte(content), 0o600); err != nil { //nolint:gosec,nolintlint // test-owned temporary path
 		t.Fatal(err)
 	}
@@ -1775,6 +1775,11 @@ func TestBoard_RaisePriorityPreservesUnknownFrontmatter(t *testing.T) {
 	}
 	if !strings.Contains(string(written), "custom_value: retained") {
 		t.Errorf("priority change removed custom_value:\n%s", written)
+	}
+	for _, want := range []string{"huge: 18446744073709551617", "custom_tagged: !integration 001"} {
+		if !strings.Contains(string(written), want) {
+			t.Errorf("priority change did not retain %q:\n%s", want, written)
+		}
 	}
 }
 

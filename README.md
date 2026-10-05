@@ -160,17 +160,25 @@ tags:
 Optional body with more detail, context, or notes.
 ```
 
-When kanban-md updates a task, it preserves the values of unrecognized YAML
-frontmatter properties composed of scalars, lists, and string-keyed maps. This
-lets other tools store their own metadata without kanban-md deleting it. These
-properties remain file-only and are not added to table, compact, or JSON output.
+When kanban-md updates a task, it retains unrecognized YAML frontmatter
+properties, including exact numeric text, tags, lists, and maps with non-string
+keys. Anchors, aliases, and nested YAML merges are retained when their bindings
+stay entirely within these properties. This lets other tools keep their metadata
+through task edits. Additional properties remain file-only and do not appear in
+table, compact, or JSON output. kanban-md's own fields remain authoritative,
+including fields you clear.
 
-kanban-md reserializes frontmatter as YAML after an update. Formatting,
-comments, and key order are not preserved. Additional properties that use
-anchors, aliases, YAML merges, explicit tags, non-string mapping keys, or other
-unsupported YAML syntax are outside the preservation boundary. They do not
-prevent kanban-md from loading or updating the task, but their representation
-after an update is not guaranteed.
+An update refuses before changing the task file if an extra property aliases a
+canonical field or another anchor that cannot be retained safely. Top-level YAML
+merges, top-level alias keys, and custom tags on the whole frontmatter mapping
+also require manual editing before an update. A quoted `"<<"` property is allowed.
+Otherwise valid tasks with this metadata remain readable. If startup needs to
+repair an inconsistent task ID or filename and cannot safely rewrite its
+metadata, the command fails with an error until you correct the task manually.
+
+kanban-md reserializes its own fields after an update. It does not guarantee
+comments, indentation, quote style, original key placement, or byte-for-byte
+formatting.
 
 The `config.yml` tracks board settings:
 
