@@ -37,4 +37,4 @@ Updated:        2026-01-15 10:00
   Body line 28 content here                                                                                           
   Body line 29 content here                                                                                           
 
-q/esc:back  j/k:scroll  g/G:top/bottom
+esc/backspace:back  q:board  j/k:scroll  g/G:top/bottom

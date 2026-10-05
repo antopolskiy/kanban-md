@@ -24,6 +24,8 @@ Multiple IDs can be provided as a comma-separated list.`,
 }
 
 func init() {
+	editCmd.Flags().StringArray("set-property", nil, "set a scalar property (KEY=LITERAL; repeatable, use JSON quotes for strings)")
+	editCmd.Flags().StringArray("clear-property", nil, "remove a property entirely (KEY; repeatable)")
 	editCmd.Flags().String("title", "", "new title")
 	editCmd.Flags().String("status", "", "new status")
 	editCmd.Flags().String("priority", "", "new priority")
@@ -53,6 +55,10 @@ func init() {
 }
 
 func runEdit(cmd *cobra.Command, args []string) error {
+	plan, err := parsePropertyPlan(cmd)
+	if err != nil {
+		return err
+	}
 	ids, err := parseIDs(args[0])
 	if err != nil {
 		return err
@@ -65,19 +71,27 @@ func runEdit(cmd *cobra.Command, args []string) error {
 
 	// Single ID: preserve exact current behavior.
 	if len(ids) == 1 {
-		return editSingleTask(cfg, ids[0], cmd)
+		return editSingleTaskWithPlan(cfg, ids[0], cmd, plan)
 	}
 
 	// Batch mode.
 	return runBatch(ids, func(id int) error {
-		_, _, err := executeEdit(cfg, id, cmd)
+		_, _, err := executeEditWithPlan(cfg, id, cmd, plan)
 		return err
 	})
 }
 
 // editSingleTask handles a single task edit with full output.
 func editSingleTask(cfg *config.Config, id int, cmd *cobra.Command) error {
-	t, newPath, err := executeEdit(cfg, id, cmd)
+	plan, err := parsePropertyPlan(cmd)
+	if err != nil {
+		return err
+	}
+	return editSingleTaskWithPlan(cfg, id, cmd, plan)
+}
+
+func editSingleTaskWithPlan(cfg *config.Config, id int, cmd *cobra.Command, plan propertyPlan) error {
+	t, newPath, err := executeEditWithPlan(cfg, id, cmd, plan)
 	if err != nil {
 		return err
 	}
@@ -93,13 +107,26 @@ func editSingleTask(cfg *config.Config, id int, cmd *cobra.Command) error {
 
 // executeEdit performs the core edit via board.Edit.
 // Returns the modified task and its new file path.
-func executeEdit(cfg *config.Config, id int, cmd *cobra.Command) (*task.Task, string, error) {
+func executeEdit(cfg *config.Config, id int, cmd *cobra.Command) (*task.Task, string, error) { //nolint:unparam // default adapter retained for command tests
+	plan, err := parsePropertyPlan(cmd)
+	if err != nil {
+		return nil, "", err
+	}
+	return executeEditWithPlan(cfg, id, cmd, plan)
+}
+
+func executeEditWithPlan(cfg *config.Config, id int, cmd *cobra.Command, plan propertyPlan) (*task.Task, string, error) {
 	claimant, _ := cmd.Flags().GetString("claim")
 	release, _ := cmd.Flags().GetBool("release")
 
 	result, err := board.Edit(cfg, id, claimant, release,
 		func(t *task.Task) (bool, error) {
-			return applyEditChanges(cmd, t, cfg, claimant, release)
+			propertiesChanged, err := plan.apply(t)
+			if err != nil {
+				return false, err
+			}
+			changed, err := applyEditChanges(cmd, t, cfg, claimant, release)
+			return propertiesChanged || changed, err
 		}, time.Now())
 	if err != nil {
 		return nil, "", err

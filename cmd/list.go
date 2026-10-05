@@ -2,13 +2,11 @@ package cmd
 
 import (
 	"os"
-	"slices"
 	"strings"
 
 	"github.com/spf13/cobra"
 
 	"github.com/antopolskiy/kanban-md/internal/board"
-	"github.com/antopolskiy/kanban-md/internal/clierr"
 	"github.com/antopolskiy/kanban-md/internal/config"
 	"github.com/antopolskiy/kanban-md/internal/output"
 	"github.com/antopolskiy/kanban-md/internal/task"
@@ -23,6 +21,8 @@ var listCmd = &cobra.Command{
 }
 
 func init() {
+	listCmd.Flags().StringArray("property", nil, "exact scalar property filter (KEY=LITERAL; repeatable, AND logic)")
+	listCmd.Flags().StringArray("show-property", nil, "include only this selected scalar property (KEY; repeatable)")
 	listCmd.Flags().StringSlice("status", nil, "filter by status (comma-separated)")
 	listCmd.Flags().StringSlice("priority", nil, "filter by priority (comma-separated)")
 	listCmd.Flags().String("assignee", "", "filter by assignee")
@@ -39,11 +39,16 @@ func init() {
 	listCmd.Flags().String("class", "", "filter by class of service")
 	listCmd.Flags().StringP("search", "s", "", "search tasks by title, body, or tags (case-insensitive)")
 	listCmd.Flags().Bool("archived", false, "show only archived tasks")
-	listCmd.Flags().String("group-by", "", "group results by field ("+strings.Join(board.ValidGroupByFields(), ", ")+")")
+	listCmd.Flags().String("group-by", "", "group results by field ("+strings.Join(board.ValidGroupByFields(), ", ")+", property:KEY)")
 	rootCmd.AddCommand(listCmd)
 }
 
 func runList(cmd *cobra.Command, _ []string) error {
+	propertyOptions, err := parseListPropertyOptions(cmd)
+	if err != nil {
+		return err
+	}
+	groupBy := propertyOptions.group
 	cfg, err := loadConfig()
 	if err != nil {
 		return err
@@ -70,15 +75,10 @@ func runList(cmd *cobra.Command, _ []string) error {
 	claimedBy, _ := cmd.Flags().GetString("claimed-by")
 	class, _ := cmd.Flags().GetString("class")
 	search, _ := cmd.Flags().GetString("search")
-	groupBy, _ := cmd.Flags().GetString("group-by")
 	archived, _ := cmd.Flags().GetBool("archived")
 
-	if groupBy != "" && !slices.Contains(board.ValidGroupByFields(), groupBy) {
-		return clierr.Newf(clierr.InvalidGroupBy, "invalid --group-by field %q; valid: %s",
-			groupBy, strings.Join(board.ValidGroupByFields(), ", "))
-	}
-
 	filter := board.FilterOptions{
+		Properties:   propertyOptions.tests,
 		Statuses:     statuses,
 		Priorities:   priorities,
 		Assignee:     assignee,
@@ -135,7 +135,7 @@ func runList(cmd *cobra.Command, _ []string) error {
 		return outputGroupedList(tasks, groupBy, cfg)
 	}
 
-	return outputTaskList(tasks)
+	return outputTaskListWithOptions(tasks, cfg, propertyOptions.keys)
 }
 
 func outputGroupedList(tasks []*task.Task, groupBy string, cfg *config.Config) error {

@@ -59,7 +59,7 @@ func runPick(cmd *cobra.Command, _ []string) error {
 		return err
 	}
 
-	return outputPickResult(picked, oldStatus, claimant, noBody)
+	return outputPickResultWithFields(picked, oldStatus, claimant, noBody, cfg.CompactFields())
 }
 
 func validatePickFlags(cfg *config.Config, statusFilter, moveTarget string) error {
@@ -90,7 +90,11 @@ func executePick(cfg *config.Config, claimant, statusFilter, moveTarget string, 
 	return picked, oldStatus, err
 }
 
-func outputPickResult(picked *task.Task, oldStatus, claimant string, noBody bool) error {
+func outputPickResult(picked *task.Task, oldStatus, claimant string, noBody bool) error { //nolint:unparam // default adapter retained for command tests
+	return outputPickResultWithFields(picked, oldStatus, claimant, noBody, nil)
+}
+
+func outputPickResultWithFields(picked *task.Task, oldStatus, claimant string, noBody bool, fields []string) error {
 	if outputFormat() == output.FormatJSON {
 		return output.JSON(os.Stdout, picked)
 	}
@@ -106,6 +110,10 @@ func outputPickResult(picked *task.Task, oldStatus, claimant string, noBody bool
 	}
 	if _, err := fmt.Fprintln(os.Stdout); err != nil {
 		return err
+	}
+	if outputFormat() == output.FormatCompact {
+		output.TaskDetailCompactWithOptions(os.Stdout, picked, board.ChildSummary{}, output.TaskViewOptions{CompactFields: fields})
+		return nil
 	}
 	return outputTaskDetail(picked)
 }

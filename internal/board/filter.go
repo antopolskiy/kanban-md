@@ -6,11 +6,13 @@ import (
 	"time"
 
 	"github.com/antopolskiy/kanban-md/internal/config"
+	"github.com/antopolskiy/kanban-md/internal/property"
 	"github.com/antopolskiy/kanban-md/internal/task"
 )
 
 // FilterOptions defines which tasks to include.
 type FilterOptions struct {
+	Properties      []property.Assignment // exact scalar matches, AND logic
 	Statuses        []string
 	ExcludeStatuses []string // statuses to exclude from results
 	Priorities      []string
@@ -93,6 +95,12 @@ func matchesSearch(t *task.Task, query string) bool {
 }
 
 func matchesExtendedFilter(t *task.Task, opts FilterOptions) bool {
+	for _, test := range opts.Properties {
+		value, state := t.PropertyScalar(test.Key)
+		if state != task.PropertySupported || !value.Equal(test.Value) {
+			return false
+		}
+	}
 	if opts.Search != "" && !matchesSearch(t, opts.Search) {
 		return false
 	}

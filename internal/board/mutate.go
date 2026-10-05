@@ -9,6 +9,7 @@ import (
 	"github.com/antopolskiy/kanban-md/internal/clierr"
 	"github.com/antopolskiy/kanban-md/internal/config"
 	"github.com/antopolskiy/kanban-md/internal/date"
+	"github.com/antopolskiy/kanban-md/internal/property"
 	"github.com/antopolskiy/kanban-md/internal/task"
 )
 
@@ -226,18 +227,19 @@ func countByClass(tasks []*task.Task, class string, excludeID int) int {
 // CreateParams contains the parameters for a Create operation.
 // Zero-value fields use config defaults (for Status, Priority, Class).
 type CreateParams struct {
-	Title     string
-	Status    string // empty = config default
-	Priority  string // empty = config default
-	Class     string // empty = config default
-	Assignee  string
-	Tags      []string
-	Body      string
-	Due       *date.Date
-	Estimate  string
-	Parent    *int
-	DependsOn []int
-	Claimant  string // if non-empty, sets claim on the task
+	Properties []property.Assignment
+	Title      string
+	Status     string // empty = config default
+	Priority   string // empty = config default
+	Class      string // empty = config default
+	Assignee   string
+	Tags       []string
+	Body       string
+	Due        *date.Date
+	Estimate   string
+	Parent     *int
+	DependsOn  []int
+	Claimant   string // if non-empty, sets claim on the task
 }
 
 // CreateResult is returned after a successful create.
@@ -299,6 +301,16 @@ func Create(cfg *config.Config, params CreateParams, now time.Time) (*CreateResu
 	return &CreateResult{Task: t, Path: path}, nil
 }
 
+// applyCreateProperties applies detached scalar assignments to a new task.
+func applyCreateProperties(t *task.Task, assignments []property.Assignment) error {
+	for _, assignment := range assignments {
+		if _, err := t.SetPropertyScalar(assignment.Key, assignment.Value); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // applyCreateParams applies non-zero CreateParams fields to the task.
 func applyCreateParams(cfg *config.Config, t *task.Task, p CreateParams, now time.Time) error {
 	if p.Status != "" {
@@ -344,7 +356,7 @@ func applyCreateParams(cfg *config.Config, t *task.Task, p CreateParams, now tim
 		t.ClaimedBy = p.Claimant
 		t.ClaimedAt = &now
 	}
-	return nil
+	return applyCreateProperties(t, p.Properties)
 }
 
 // validateDeps validates parent and dependency references for a task: every

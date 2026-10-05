@@ -119,3 +119,18 @@ func TestStatusBarHighlightsShortcutCharacters(t *testing.T) {
 		}
 	}
 }
+
+func TestStatusBarPrioritizesActiveDepth(t *testing.T) {
+	b, _ := newWorkflowBoard(t, workflowTasks())
+	b.width = 30
+	depth := 2
+	b.depthFilter = &depth
+	if got := b.renderStatusBar(); !strings.Contains(got, "level[2]") {
+		t.Fatalf("narrow status must retain active depth: %q", got)
+	}
+	b.width = 20
+	b.handleSearchStart()
+	if got := b.renderSearchBar(); !strings.HasPrefix(got, "level[2]") {
+		t.Fatalf("narrow search must retain active depth: %q", got)
+	}
+}

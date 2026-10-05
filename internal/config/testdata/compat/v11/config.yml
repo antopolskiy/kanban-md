@@ -1,0 +1,43 @@
+version: 11
+board:
+    name: Test Project v11
+    description: A project for testing v11 compatibility
+tasks_dir: tasks
+statuses:
+    - name: backlog
+      show_duration: false
+    - name: todo
+    - name: in-progress
+      require_claim: true
+    - name: review
+      require_claim: true
+    - name: done
+      show_duration: false
+    - name: archived
+      show_duration: false
+priorities: [low, medium, high, critical]
+defaults:
+    status: backlog
+    priority: medium
+    class: standard
+wip_limits:
+    in-progress: 3
+    review: 2
+claim_timeout: 2h
+classes:
+    - name: expedite
+      wip_limit: 1
+      bypass_column_wip: true
+    - name: fixed-date
+    - name: standard
+    - name: intangible
+tui:
+    title_lines: 3
+    hide_empty_columns: true
+    narrow_threshold: 86
+    age_thresholds:
+        - after: "0s"
+          color: "242"
+        - after: "48h"
+          color: "208"
+next_id: 2

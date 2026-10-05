@@ -52,6 +52,11 @@ func DisableColor() {
 
 // TaskTable renders a list of tasks as a formatted table.
 func TaskTable(w io.Writer, tasks []*task.Task) {
+	TaskTableWithProperties(w, tasks, nil)
+}
+
+// TaskTableWithProperties adds explicitly requested properties to task rows.
+func TaskTableWithProperties(w io.Writer, tasks []*task.Task, keys []string) {
 	if len(tasks) == 0 {
 		fmt.Fprintln(os.Stderr, "No tasks found.")
 		return
@@ -70,9 +75,11 @@ func TaskTable(w io.Writer, tasks []*task.Task) {
 	}
 
 	// Print header.
+	propertyWidths := tablePropertyWidths(tasks, keys)
 	header := fmt.Sprintf("%-*s %-*s %-*s %-*s %-*s %-*s %-*s",
 		idW, "ID", statusW, "STATUS", prioW, "PRIORITY",
 		titleW, "TITLE", claimW, "CLAIMED", tagsW, "TAGS", dueW, "DUE")
+	header += tablePropertySuffix(keys, propertyWidths)
 	fmt.Fprintln(w, headerStyle.Render(strings.TrimRight(header, " ")))
 
 	// Print rows.
@@ -100,6 +107,9 @@ func TaskTable(w io.Writer, tasks []*task.Task) {
 		} else {
 			due = dimStyle.Render(due)
 		}
+		if len(keys) > 0 {
+			due = padRight(due, dueW)
+		}
 
 		row := fmt.Sprintf("%-*d %s %s %s %s %s %s",
 			idW, t.ID,
@@ -109,6 +119,7 @@ func TaskTable(w io.Writer, tasks []*task.Task) {
 			padRight(claim, claimW),
 			padRight(tags, tagsW),
 			due)
+		row += tablePropertySuffix(tablePropertyCells(t, keys), propertyWidths)
 		fmt.Fprintln(w, strings.TrimRight(row, " "))
 	}
 }
@@ -134,12 +145,20 @@ func TaskDetailWithRelations(
 }
 
 func taskDetail(w io.Writer, t *task.Task, parent *board.ParentTask, children board.ChildSummary) {
+	TaskDetailWithProperties(w, t, parent, children, nil)
+}
+
+// TaskDetailWithProperties displays chosen values without selecting JSON output.
+func TaskDetailWithProperties(w io.Writer, t *task.Task, parent *board.ParentTask, children board.ChildSummary, keys []string) {
 	titleLine := fmt.Sprintf("Task #%d: %s", t.ID, t.Title)
 	fmt.Fprintln(w, lipgloss.NewStyle().Bold(true).Render(titleLine))
 	fmt.Fprintln(w, strings.Repeat("─", len(titleLine)))
 
 	printField(w, "Status", styledValue(t.Status, statusStyles))
 	printField(w, "Priority", styledValue(t.Priority, priorityStyles))
+	for _, key := range keys {
+		printField(w, key, strings.TrimPrefix(TaskPropertyTokens(t, []string{key}, 0)[0], key+"="))
+	}
 	if t.Class != "" {
 		printField(w, "Class", t.Class)
 	}
@@ -190,7 +209,7 @@ func taskDetail(w io.Writer, t *task.Task, parent *board.ParentTask, children bo
 			if i == len(children.Children)-1 {
 				branch = "└─"
 			}
-			fmt.Fprintf(w, "%s #%d [%s] %s\n", branch, child.ID, child.Status, child.Title)
+			fmt.Fprintf(w, "%s #%d [%s] %s%s\n", branch, child.ID, child.Status, child.Title, childPropertySuffix(child))
 		}
 	}
 
