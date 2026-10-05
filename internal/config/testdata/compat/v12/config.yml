@@ -1,0 +1,50 @@
+version: 12
+board:
+    name: Test Project v12
+    description: A project for testing v12 compatibility
+tasks_dir: tasks
+statuses:
+    - name: backlog
+      show_duration: false
+    - name: todo
+    - name: in-progress
+      require_claim: true
+    - name: review
+      require_claim: true
+    - name: done
+      show_duration: false
+    - name: archived
+      show_duration: false
+priorities: [low, medium, high, critical]
+defaults:
+    status: backlog
+    priority: medium
+    class: standard
+wip_limits:
+    in-progress: 3
+    review: 2
+claim_timeout: 2h
+classes:
+    - name: expedite
+      wip_limit: 1
+      bypass_column_wip: true
+    - name: fixed-date
+    - name: standard
+    - name: intangible
+tui:
+    card_fields: [property:type]
+    title_lines: 3
+    hide_empty_columns: true
+    narrow_threshold: 86
+    age_thresholds:
+        - after: "0s"
+          color: "242"
+        - after: "48h"
+          color: "208"
+display:
+    compact_fields: [status, property:type]
+children:
+    detail_sort: property:reading_order
+group_orders:
+    property:type: [epic, story]
+next_id: 2

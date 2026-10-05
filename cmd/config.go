@@ -174,6 +174,19 @@ func addExtendedConfigAccessors(accessors map[string]configAccessor) {
 		},
 		writable: true,
 	}
+	accessors["tui.show_levels"] = configAccessor{
+		get: func(c *config.Config) any { return c.TUI.ShowLevels },
+		set: func(c *config.Config, v string) error {
+			b, err := strconv.ParseBool(v)
+			if err != nil {
+				return clierr.Newf(clierr.InvalidInput,
+					"invalid tui.show_levels %q: must be true or false", v)
+			}
+			c.TUI.ShowLevels = b
+			return nil
+		},
+		writable: true,
+	}
 	accessors["tui.narrow_threshold"] = configAccessor{
 		get: func(c *config.Config) any { return c.TUI.NarrowThreshold },
 		set: func(c *config.Config, v string) error {
@@ -209,6 +222,7 @@ func allConfigKeys() []string {
 		"classes",
 		"tui.title_lines",
 		"tui.hide_empty_columns",
+		"tui.show_levels",
 		"tui.narrow_threshold",
 		"tui.age_thresholds",
 		"next_id",

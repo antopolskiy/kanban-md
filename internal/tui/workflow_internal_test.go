@@ -144,6 +144,7 @@ func TestWorkflowInactiveColumnOffsetsClampAfterRebuild(t *testing.T) {
 				tasks = append(tasks, &task.Task{ID: id, Title: fmt.Sprintf("Todo root %d", id), Status: "todo"})
 			}
 			b, cfg := newWorkflowBoard(t, tasks)
+			cfg.TUI.ShowLevels = true
 			b.SetMouseEnabled(true)
 			b.Update(tea.WindowSizeMsg{Width: 120, Height: 16})
 			last := b.columns[1].tasks[len(b.columns[1].tasks)-1]
@@ -214,8 +215,44 @@ func TestWorkflowFlatDefaultAndDepthReload(t *testing.T) {
 	}
 	changeWorkflowTask(t, cfg, 1, func(tk *task.Task) { tk.Parent = parentID(99) })
 	b.Update(ReloadMsg{})
-	if !strings.Contains(b.View(), "#1 L0") {
-		t.Fatal("invalid parent should enable an explanatory hierarchy cue")
+	if b.View() != before {
+		t.Fatal("a missing parent leaves every active card at level 0, so the board must stay flat")
+	}
+}
+
+func TestWorkflowLevelLabelsAreOptIn(t *testing.T) {
+	b, cfg := newWorkflowBoard(t, workflowTasks())
+	view := ansi.Strip(b.View())
+	if strings.Contains(view, "#1 L0") || strings.Contains(view, "#2 L1") {
+		t.Fatalf("level labels must be off by default:\n%s", view)
+	}
+	if !strings.Contains(view, "level[all]") {
+		t.Fatalf("a real hierarchy should keep the level filter visible:\n%s", view)
+	}
+	cfg.TUI.ShowLevels = true
+	view = ansi.Strip(b.View())
+	if !strings.Contains(view, "#1 L0") || !strings.Contains(view, "#2 L1") {
+		t.Fatalf("tui.show_levels should label cards:\n%s", view)
+	}
+}
+
+func TestWorkflowLevelCuesNeedActiveNonRootTask(t *testing.T) {
+	tasks := []*task.Task{
+		{ID: 1, Title: "Archived epic", Status: workflowArchived},
+		{ID: 2, Title: "Archived story", Status: workflowArchived, Parent: parentID(1)},
+		{ID: 3, Title: "Orphan", Status: "todo", Parent: parentID(99)},
+		{ID: 4, Title: "Self parent", Status: "todo", Parent: parentID(4)},
+		{ID: 5, Title: "Plain", Status: "backlog"},
+	}
+	b, cfg := newWorkflowBoard(t, tasks)
+	cfg.TUI.ShowLevels = true
+	view := ansi.Strip(b.View())
+	if strings.Contains(view, " L0") || strings.Contains(view, "level[") {
+		t.Fatalf("level cues must stay hidden while every active task is a root:\n%s", view)
+	}
+	workflowKey(b, "v")
+	if view = ansi.Strip(b.View()); !strings.Contains(view, "level[0]") || strings.Contains(view, " L0") {
+		t.Fatalf("an explicit level filter should be visible without card labels:\n%s", view)
 	}
 }
 
@@ -227,7 +264,8 @@ func TestWorkflowDepthUnknownAndSkippedLevels(t *testing.T) {
 		{ID: 4, Status: "todo", Priority: "medium", Parent: parentID(5)},
 		{ID: 5, Status: "todo", Priority: "low", Parent: parentID(4)},
 	}
-	b, _ := newWorkflowBoard(t, tasks)
+	b, cfg := newWorkflowBoard(t, tasks)
+	cfg.TUI.ShowLevels = true
 	workflowKey(b, "v")
 	if b.depthFilter == nil || *b.depthFilter != 2 || len(b.tasks) != 1 {
 		t.Fatal("cycle should skip absent active depths")

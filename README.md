@@ -200,10 +200,10 @@ comments, indentation, quote style, original key placement, or byte-for-byte
 formatting.
 
 The `config.yml` tracks board settings. A newly initialized board currently
-uses schema version 12:
+uses schema version 13:
 
 ```yaml
-version: 12
+version: 13
 board:
   name: My Project
 tasks_dir: tasks
@@ -590,6 +590,7 @@ Available keys:
 | `classes` | no | Class of service definitions |
 | `tui.title_lines` | yes | Number of title lines shown in TUI cards |
 | `tui.hide_empty_columns` | yes | Hide columns with zero tasks in TUI |
+| `tui.show_levels` | yes | Show hierarchy level labels (`L0`, `L1`, …) beside TUI card IDs; off by default |
 | `tui.narrow_threshold` | yes | Terminal width below which the single-column view is used; 0 is automatic |
 | `tui.age_thresholds` | no | TUI age color thresholds |
 | `next_id` | no | Next task ID |
@@ -665,10 +666,22 @@ than being repaired by navigation.
 ### Focus one hierarchy level
 
 In board mode, `v` cycles all tasks → the numeric levels present among active
-tasks → unknown depth, if present → all. Root tasks are `L0`, their children
-`L1`, and so on. Boards with hierarchy show these text labels beside task IDs
-and the active `level[...]` in the status line. Flat boards keep their usual
-cards by default. While typing a search, `v` is ordinary text.
+tasks → unknown depth, if present → all. Root tasks are level 0, their children
+level 1, and so on. The status line shows the active `level[...]` while a level
+filter is on, and `level[all]` when some active task is below level 0 or in a
+cycle. Boards where every active task is a root, including boards whose only
+parent links are archived or broken, keep their usual status line. While typing
+a search, `v` is ordinary text.
+
+Cards do not show levels by default. To label each card ID with its level
+(`#3 L1`, `#5 L2`, `L?` for cycles), opt in:
+
+```bash
+kanban-md config set tui.show_levels true
+```
+
+Even then, labels appear only when some active task is below level 0 or in a
+cycle. Restart an open TUI after changing the setting.
 
 Levels come from parent links, including archived ancestors, and are not task
 types or stored fields. Missing/self-parent links use an effective level-zero

@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"path/filepath"
+	"slices"
 	"testing"
 
 	"go.yaml.in/yaml/v3"
@@ -660,6 +661,34 @@ func TestCompatV10ConfigMigratesToV11(t *testing.T) {
 	}
 	if cfg.TUI.NarrowThreshold != 0 {
 		t.Errorf("TUI.NarrowThreshold = %d, want automatic default 0", cfg.TUI.NarrowThreshold)
+	}
+}
+
+func TestCompatV12ConfigMigratesToV13(t *testing.T) {
+	tmp := t.TempDir()
+	copyDir(t, filepath.Join("testdata", "compat", "v12"), tmp)
+
+	cfg, err := Load(tmp)
+	if err != nil {
+		t.Fatalf("Load() v12 fixture: %v", err)
+	}
+	if cfg.Version != CurrentVersion {
+		t.Errorf("Version = %d, want %d (after migration)", cfg.Version, CurrentVersion)
+	}
+	if cfg.Board.Name != "Test Project v12" {
+		t.Errorf("Board.Name = %q, want %q", cfg.Board.Name, "Test Project v12")
+	}
+	// v12→v13 introduces tui.show_levels; existing boards keep unlabeled cards.
+	if cfg.TUI.ShowLevels {
+		t.Error("TUI.ShowLevels = true, want false after migration")
+	}
+	if !slices.Equal(cfg.CardFields(), []string{"property:type"}) ||
+		!slices.Equal(cfg.CompactFields(), []string{"status", "property:type"}) ||
+		cfg.Children.DetailSort != "property:reading_order" || len(cfg.GroupOrders["property:type"]) != 2 {
+		t.Errorf("v12 property view settings lost: %#v", cfg)
+	}
+	if !cfg.TUI.HideEmptyColumns || cfg.TUI.NarrowThreshold != 86 || cfg.TitleLines() != 3 {
+		t.Errorf("v12 TUI settings lost: %#v", cfg.TUI)
 	}
 }
 

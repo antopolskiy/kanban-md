@@ -1,0 +1,40 @@
+ backlog (2)             todo (2)                in-progress (0)         review (0)              done (1)               
+╭──────────────────────╮╭──────────────────────╮  (empty)                 (empty)               ╭──────────────────────╮
+│ #1 L0 Epic Alpha     ││ #6 L2 Child of       │                                                │ #3 L1 Done child     │
+│ critical             ││ archived parent      │                                                │ medium               │
+╰──────────────────────╯│ medium 2h            │                                                ╰──────────────────────╯
+╭──────────────────────╮╰──────────────────────╯                                                                        
+│ #2 L1 Backlog child  │╭──────────────────────╮                                                                        
+│ low                  ││ #5 L2 Grandchild     │                                                                        
+╰──────────────────────╯│ medium 2h            │                                                                        
+                        ╰──────────────────────╯                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+ 5 cards | level[all] | ? help | create edit move +/- priority delete sort[priority↓] / search quit                     

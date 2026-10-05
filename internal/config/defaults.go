@@ -23,7 +23,7 @@ const (
 	ConfigFileName = "config.yml"
 
 	// CurrentVersion is the current config schema version.
-	CurrentVersion = 12
+	CurrentVersion = 13
 
 	// ArchivedStatus is the reserved status name for soft-deleted tasks.
 	ArchivedStatus = "archived"

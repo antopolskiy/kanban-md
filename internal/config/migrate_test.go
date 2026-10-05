@@ -236,3 +236,19 @@ func TestMigrateV10ToV11(t *testing.T) {
 		t.Errorf("NarrowThreshold = %d, want automatic default 0", cfg.TUI.NarrowThreshold)
 	}
 }
+
+func TestMigrateV12ToV13(t *testing.T) {
+	const wantVersion = 13
+	cfg := NewDefault("Test")
+	cfg.Version = 12
+
+	if err := migrateV12ToV13(cfg); err != nil {
+		t.Fatalf("migrate() v12→v13: %v", err)
+	}
+	if cfg.Version != wantVersion {
+		t.Errorf("Version = %d, want %d", cfg.Version, wantVersion)
+	}
+	if cfg.TUI.ShowLevels {
+		t.Error("ShowLevels = true, want card level labels off by default")
+	}
+}

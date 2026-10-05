@@ -67,6 +67,8 @@ type TUIConfig struct {
 	TitleLines       int            `yaml:"title_lines,omitempty"`
 	AgeThresholds    []AgeThreshold `yaml:"age_thresholds,omitempty"`
 	HideEmptyColumns bool           `yaml:"hide_empty_columns,omitempty"`
+	// ShowLevels opts in to hierarchy level labels beside card IDs.
+	ShowLevels bool `yaml:"show_levels,omitempty"`
 	// NarrowThreshold is the terminal width below which the TUI renders a
 	// single column at a time; 0 = automatic, 1 effectively disables it.
 	NarrowThreshold int `yaml:"narrow_threshold,omitempty"`

@@ -38,6 +38,7 @@ func TestAllConfigKeys_ExpectedCoverage(t *testing.T) {
 		"classes",
 		"tui.title_lines",
 		"tui.hide_empty_columns",
+		"tui.show_levels",
 		"tui.narrow_threshold",
 		"tui.age_thresholds",
 		"next_id",
@@ -204,6 +205,21 @@ func TestConfigAccessors_SetTUIHideEmptyColumns_Invalid(t *testing.T) {
 	err := accessors["tui.hide_empty_columns"].set(cfg, "nope")
 	if err == nil {
 		t.Fatal("expected error for non-boolean hide_empty_columns")
+	}
+}
+
+func TestConfigAccessors_SetTUIShowLevels(t *testing.T) {
+	accessors := configAccessors()
+	cfg := config.NewDefault("Test")
+
+	if err := accessors["tui.show_levels"].set(cfg, "true"); err != nil {
+		t.Fatal(err)
+	}
+	if !cfg.TUI.ShowLevels {
+		t.Error("tui.show_levels = false, want true")
+	}
+	if err := accessors["tui.show_levels"].set(cfg, "nope"); err == nil {
+		t.Fatal("expected error for non-boolean show_levels")
 	}
 }
 

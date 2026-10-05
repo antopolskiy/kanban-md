@@ -66,7 +66,7 @@ func TestCompatV11PropertyDefaultsAndHistoricalFixtures(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if cfg.Version != 12 || !slices.Equal(cfg.CompactFields(), []string{"status", "priority"}) || !slices.Equal(cfg.CardFields(), []string{"priority"}) || len(cfg.GroupOrders) != 0 || cfg.Children.DetailSort != "" {
+			if cfg.Version != CurrentVersion || !slices.Equal(cfg.CompactFields(), []string{"status", "priority"}) || !slices.Equal(cfg.CardFields(), []string{"priority"}) || len(cfg.GroupOrders) != 0 || cfg.Children.DetailSort != "" {
 				t.Fatalf("migration changed defaults: %#v", cfg)
 			}
 		})
@@ -95,7 +95,7 @@ func TestCompatV11PropertyMigrationPreservesSettingsAndTaskBytes(t *testing.T) {
 	if string(before) != string(after) {
 		t.Fatal("config migration rewrote task")
 	}
-	if again, err := Load(tmp); err != nil || again.Version != 12 {
+	if again, err := Load(tmp); err != nil || again.Version != CurrentVersion {
 		t.Fatalf("reload: %v", err)
 	}
 }

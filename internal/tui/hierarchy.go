@@ -14,9 +14,8 @@ const unknownDepth = -1
 
 // taskHierarchy is read-only, derived view state rebuilt after loading tasks.
 type taskHierarchy struct {
-	byID         map[int]*task.Task
-	depths       map[int]int
-	hasHierarchy bool
+	byID   map[int]*task.Task
+	depths map[int]int
 }
 
 func newTaskHierarchy(tasks []*task.Task) *taskHierarchy {
@@ -26,7 +25,6 @@ func newTaskHierarchy(tasks []*task.Task) *taskHierarchy {
 	}
 	for _, t := range tasks {
 		h.byID[t.ID] = t
-		h.hasHierarchy = h.hasHierarchy || t.Parent != nil
 	}
 	for _, t := range tasks {
 		h.resolveDepth(t.ID)
@@ -179,12 +177,12 @@ func (b *Board) levelState() string {
 }
 
 func (b *Board) showLevelState() bool {
-	return b.depthFilter != nil || b.hierarchy != nil && b.hierarchy.hasHierarchy
+	return b.depthFilter != nil || b.hasLevels
 }
 
 func (b *Board) cardTitleLines(t *task.Task, cardWidth int) []string {
 	idText := "#" + strconv.Itoa(t.ID)
-	if b.hierarchy != nil && b.hierarchy.hasHierarchy {
+	if b.cfg.TUI.ShowLevels && b.hasLevels {
 		idText += " L" + depthLabel(b.hierarchy.depths[t.ID])
 	}
 	idLen := lipgloss.Width(idText)

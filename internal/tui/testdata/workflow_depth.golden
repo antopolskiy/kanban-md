@@ -1,6 +1,6 @@
  backlog (1)     todo (0)        in-progress...  review (0)      done (1)       
 ╭──────────────╮  (empty)         (empty)         (empty)       ╭──────────────╮
-│ #2 L1 Bac... │                                                │ #3 L1 Done   │
+│ #2 Backlog   │                                                │ #3 Done      │
 │ child        │                                                │ child        │
 │ low          │                                                │ medium       │
 ╰──────────────╯                                                ╰──────────────╯

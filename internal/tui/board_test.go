@@ -1233,6 +1233,11 @@ func TestBoard_DetailShowsAllMetadata(t *testing.T) {
 
 func setupParentChildrenBoard(t *testing.T) *tui.Board {
 	t.Helper()
+	return setupParentChildrenBoardWithConfig(t, nil)
+}
+
+func setupParentChildrenBoardWithConfig(t *testing.T, configure func(*config.Config)) *tui.Board {
+	t.Helper()
 
 	dir := t.TempDir()
 	kanbanDir := filepath.Join(dir, "kanban")
@@ -1242,6 +1247,9 @@ func setupParentChildrenBoard(t *testing.T) *tui.Board {
 	}
 
 	cfg := config.NewDefault("Parent Children Board")
+	if configure != nil {
+		configure(cfg)
+	}
 	cfg.SetDir(kanbanDir)
 	if err := cfg.Save(); err != nil {
 		t.Fatalf("saving config: %v", err)

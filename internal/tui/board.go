@@ -109,6 +109,7 @@ type Board struct {
 	searchInput textinput.Model // input shown while typing the query
 	searchReady bool
 	hierarchy   *taskHierarchy
+	hasLevels   bool // an active task is not a root, so level cues carry information
 	activeByID  map[int]*task.Task
 	depthFilter *int // nil = all, unknownDepth = cyclic ancestry
 
@@ -1022,11 +1023,13 @@ func (b *Board) replaceTaskCollections(tasks []*task.Task) []*task.Task {
 	b.allTasks = tasks
 	b.hierarchy = newTaskHierarchy(tasks)
 	b.activeByID = make(map[int]*task.Task)
+	b.hasLevels = false
 	var activeTasks []*task.Task
 	for _, t := range tasks {
 		if !b.cfg.IsArchivedStatus(t.Status) {
 			activeTasks = append(activeTasks, t)
 			b.activeByID[t.ID] = t
+			b.hasLevels = b.hasLevels || b.hierarchy.depths[t.ID] != 0
 		}
 	}
 	b.unfilteredTasks = activeTasks

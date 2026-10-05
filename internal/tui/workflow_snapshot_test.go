@@ -5,6 +5,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
+	"github.com/antopolskiy/kanban-md/internal/config"
 	"github.com/antopolskiy/kanban-md/internal/task"
 	"github.com/antopolskiy/kanban-md/internal/tui"
 )
@@ -12,6 +13,11 @@ import (
 func TestSnapshot_WorkflowHierarchy(t *testing.T) {
 	b := setupParentChildrenBoard(t)
 	assertGolden(t, "workflow_hierarchy", b.View())
+}
+
+func TestSnapshot_WorkflowHierarchyLevels(t *testing.T) {
+	b := setupParentChildrenBoardWithConfig(t, func(cfg *config.Config) { cfg.TUI.ShowLevels = true })
+	assertGolden(t, "workflow_hierarchy_levels", b.View())
 }
 
 func TestSnapshot_WorkflowDepth(t *testing.T) {
@@ -45,6 +51,7 @@ func TestSnapshot_WorkflowRelationNarrow(t *testing.T) {
 
 func TestSnapshot_WorkflowDepthUnknown(t *testing.T) {
 	b, cfg := setupTestBoard(t)
+	cfg.TUI.ShowLevels = true
 	for _, id := range []int{1, 2} {
 		path, err := task.FindByID(cfg.TasksPath(), id)
 		if err != nil {

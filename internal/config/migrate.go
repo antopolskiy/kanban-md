@@ -48,6 +48,7 @@ var migrations = map[int]func(*Config) error{
 	9:  migrateV9ToV10,
 	10: migrateV10ToV11,
 	11: migrateV11ToV12,
+	12: migrateV12ToV13,
 }
 
 func migrateV11ToV12(cfg *Config) error { //nolint:unparam // migration signature
@@ -58,6 +59,12 @@ func migrateV11ToV12(cfg *Config) error { //nolint:unparam // migration signatur
 		cfg.TUI.CardFields = FieldList{"priority"}
 	}
 	cfg.Version = 12
+	return nil
+}
+
+// migrateV12ToV13 adds tui.show_levels (default false = no card level labels).
+func migrateV12ToV13(cfg *Config) error { //nolint:unparam // signature must match migrations map type
+	cfg.Version = 13
 	return nil
 }
 
