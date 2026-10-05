@@ -203,7 +203,6 @@ func TestTableFlagOutputMetrics(t *testing.T) {
 	}
 }
 
-//nolint:goconst // Command and flag names intentionally mirror literal README text.
 func TestREADMEDocumentsAllCommands(t *testing.T) {
 	readmePath := filepath.Join("..", "README.md")
 	data, err := os.ReadFile(readmePath) //nolint:gosec // test file
