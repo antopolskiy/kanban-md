@@ -48,6 +48,10 @@ linters:
         - "medium"
         - "low"
         - "critical"
+        - "status"
+        - "priority"
+        - "class"
+        - "!!map"
     gocyclo:
       min-complexity: 15
     govet:

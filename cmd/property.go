@@ -22,9 +22,10 @@ type propertyPlan struct {
 }
 
 type listPropertyOptions struct {
-	tests []property.Assignment
-	keys  []string
-	group string
+	tests     []property.Assignment
+	keys      []string
+	group     string
+	tableOpts output.TableOptions
 }
 
 func parseListPropertyOptions(cmd *cobra.Command) (listPropertyOptions, error) {
@@ -40,7 +41,11 @@ func parseListPropertyOptions(cmd *cobra.Command) (listPropertyOptions, error) {
 	if err = validatePropertyGroup(group, keys); err != nil {
 		return listPropertyOptions{}, err
 	}
-	return listPropertyOptions{tests: tests, keys: keys, group: group}, nil
+	tableOpts, err := parseTableOptions(cmd, group)
+	if err != nil {
+		return listPropertyOptions{}, err
+	}
+	return listPropertyOptions{tests: tests, keys: keys, group: group, tableOpts: tableOpts}, nil
 }
 
 func propertyFlagValues(cmd *cobra.Command, name string) []string {
@@ -129,7 +134,7 @@ func humanPropertyKeys(requested, fields []string, childSort string) []string {
 	return keys
 }
 
-func outputTaskListWithOptions(tasks []*task.Task, cfg *config.Config, keys []string) error {
+func outputTaskListWithOptions(tasks []*task.Task, cfg *config.Config, keys []string, tableOpts output.TableOptions) error {
 	if outputFormat() == output.FormatJSON {
 		if len(keys) == 0 {
 			return outputTaskList(tasks)
@@ -146,7 +151,7 @@ func outputTaskListWithOptions(tasks []*task.Task, cfg *config.Config, keys []st
 		output.TaskCompactWithOptions(os.Stdout, tasks, output.TaskViewOptions{CompactFields: cfg.CompactFields(), PropertyKeys: keys})
 		return nil
 	}
-	output.TaskTableWithProperties(os.Stdout, tasks, keys)
+	output.TaskTableWithProperties(os.Stdout, tasks, keys, tableOpts)
 	return nil
 }
 
@@ -200,6 +205,61 @@ func validatePropertyGroup(group string, keys []string) error {
 		return clierr.New(clierr.InvalidInput, "--show-property requires an ungrouped task list")
 	}
 	return nil
+}
+
+func parseTableOptions(cmd *cobra.Command, group string) (output.TableOptions, error) {
+	columnsRaw, _ := cmd.Flags().GetString("columns")
+	widthChanged := cmd.Flags().Changed("title-width")
+	columnsActive := columnsRaw != ""
+	if !columnsActive && !widthChanged {
+		return output.TableOptions{}, nil
+	}
+
+	fmtMode := outputFormat()
+	if fmtMode == output.FormatJSON {
+		return output.TableOptions{}, clierr.New(clierr.InvalidInput, "--columns and --title-width are only valid with table output")
+	}
+	if fmtMode == output.FormatCompact {
+		return output.TableOptions{}, clierr.New(clierr.InvalidInput, "--columns and --title-width are only valid with table output")
+	}
+	if group != "" {
+		return output.TableOptions{}, clierr.New(clierr.InvalidInput, "--columns and --title-width cannot be used with --group-by")
+	}
+
+	var opts output.TableOptions
+
+	if columnsActive {
+		raw, _ := cmd.Flags().GetString("columns")
+		parts := strings.Split(raw, ",")
+		seen := make(map[string]bool, len(parts))
+		for _, name := range parts {
+			if name == "" {
+				return output.TableOptions{}, clierr.Newf(clierr.InvalidInput,
+					"--columns: empty column name; valid: %s", strings.Join(output.ValidTableColumns, ", "))
+			}
+			if !slices.Contains(output.ValidTableColumns, name) {
+				return output.TableOptions{}, clierr.Newf(clierr.InvalidInput,
+					"--columns: unknown column %q; valid: %s", name, strings.Join(output.ValidTableColumns, ", "))
+			}
+			if seen[name] {
+				return output.TableOptions{}, clierr.Newf(clierr.InvalidInput,
+					"--columns: duplicate column %q", name)
+			}
+			seen[name] = true
+		}
+		opts.Columns = parts
+	}
+
+	if widthChanged {
+		w, _ := cmd.Flags().GetInt("title-width")
+		if w <= 0 {
+			return output.TableOptions{}, clierr.Newf(clierr.InvalidInput,
+				"--title-width must be a positive integer, got %d", w)
+		}
+		opts.TitleWidth = w
+	}
+
+	return opts, nil
 }
 
 func printPropertyWarnings(warnings []string) {

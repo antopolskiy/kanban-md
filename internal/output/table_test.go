@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/x/ansi"
 	"github.com/muesli/termenv"
 
 	"github.com/antopolskiy/kanban-md/internal/board"
@@ -633,5 +634,147 @@ func TestGroupedTableEmpty(t *testing.T) {
 	// "No groups found." is written to stderr, not the writer.
 	if buf.String() != "" {
 		t.Errorf("GroupedTable empty output to writer = %q, want empty", buf.String())
+	}
+}
+
+// --- TableOptions tests ---
+
+func TestTableOptionsDefaultBehaviorUnchanged(t *testing.T) {
+	// Zero TableOptions must produce identical output to TaskTable.
+	disableColorForTest(t)
+	now := time.Now()
+	tasks := []*task.Task{
+		{ID: 1, Title: "Alpha", Status: "todo", Priority: "high", Created: now, Updated: now},
+		{ID: 2, Title: "Beta", Status: "done", Priority: "low", Created: now, Updated: now},
+	}
+
+	var a, b strings.Builder
+	TaskTable(&a, tasks)
+	TaskTableWithProperties(&b, tasks, nil, TableOptions{})
+	if a.String() != b.String() {
+		t.Errorf("TaskTable and TaskTableWithProperties(TableOptions{}) differ:\nTaskTable:\n%s\nWithOptions:\n%s",
+			a.String(), b.String())
+	}
+}
+
+func TestTableOptionsColumnSelection(t *testing.T) {
+	disableColorForTest(t)
+	now := time.Now()
+	tasks := []*task.Task{
+		{
+			ID: 1, Title: "My task", Status: "todo", Priority: "high",
+			Tags: []string{"x"}, Created: now, Updated: now,
+		},
+	}
+
+	var buf strings.Builder
+	TaskTableWithProperties(&buf, tasks, nil, TableOptions{Columns: []string{"id", "status", "priority", "title"}})
+	out := buf.String()
+
+	// Selected columns present.
+	for _, want := range []string{"ID", "STATUS", "PRIORITY", "TITLE", "My task"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("expected %q in output:\n%s", want, out)
+		}
+	}
+	// Omitted columns absent.
+	for _, absent := range []string{"CLAIMED", "TAGS", "DUE"} {
+		if strings.Contains(out, absent) {
+			t.Errorf("expected %q to be absent from output:\n%s", absent, out)
+		}
+	}
+}
+
+func TestTableOptionsColumnOrdering(t *testing.T) {
+	disableColorForTest(t)
+	now := time.Now()
+	tasks := []*task.Task{
+		{ID: 1, Title: "T", Status: "todo", Priority: "low", Created: now, Updated: now},
+	}
+
+	var buf strings.Builder
+	TaskTableWithProperties(&buf, tasks, nil, TableOptions{Columns: []string{"priority", "id", "title"}})
+	header := strings.SplitN(buf.String(), "\n", 2)[0]
+	header = ansi.Strip(header)
+
+	prioIdx := strings.Index(header, "PRIORITY")
+	idIdx := strings.Index(header, "ID")
+	titleIdx := strings.Index(header, "TITLE")
+	if prioIdx >= idIdx || idIdx >= titleIdx {
+		t.Errorf("column order wrong: PRIORITY=%d ID=%d TITLE=%d in header %q",
+			prioIdx, idIdx, titleIdx, header)
+	}
+}
+
+func TestTableOptionsTitleWidthTruncates(t *testing.T) {
+	disableColorForTest(t)
+	now := time.Now()
+	long := strings.Repeat("a", 60)
+	tasks := []*task.Task{
+		{ID: 1, Title: long, Status: "todo", Priority: "low", Created: now, Updated: now},
+	}
+
+	var buf strings.Builder
+	TaskTableWithProperties(&buf, tasks, nil, TableOptions{TitleWidth: 20})
+	lines := strings.Split(strings.TrimRight(buf.String(), "\n"), "\n")
+	if len(lines) < 2 {
+		t.Fatalf("expected at least 2 lines, got:\n%s", buf.String())
+	}
+	dataRow := ansi.Strip(lines[1])
+	// The title cell should not exceed TitleWidth display cells.
+	// Find where the title starts (after the ID column).
+	if strings.Contains(dataRow, long) {
+		t.Errorf("title was not truncated; row: %q", dataRow)
+	}
+	if !strings.Contains(dataRow, "...") {
+		t.Errorf("expected ellipsis in truncated title; row: %q", dataRow)
+	}
+}
+
+func TestTableOptionsTitleWidthWideUnicode(t *testing.T) {
+	// Wide CJK characters are 2 display cells each; truncation must count cells, not bytes.
+	disableColorForTest(t)
+	now := time.Now()
+	// 10 wide chars = 20 display cells.
+	wide := strings.Repeat("中", 10)
+	tasks := []*task.Task{
+		{ID: 1, Title: wide, Status: "todo", Priority: "low", Created: now, Updated: now},
+	}
+
+	var buf strings.Builder
+	// TitleWidth=12 means only 5 wide chars (10 cells) + "..." fits.
+	TaskTableWithProperties(&buf, tasks, nil, TableOptions{TitleWidth: 12})
+	lines := strings.Split(strings.TrimRight(buf.String(), "\n"), "\n")
+	if len(lines) < 2 {
+		t.Fatalf("expected at least 2 lines, got:\n%s", buf.String())
+	}
+	dataRow := ansi.Strip(lines[1])
+	if strings.Contains(dataRow, wide) {
+		t.Errorf("wide title was not truncated; row: %q", dataRow)
+	}
+	if !strings.Contains(dataRow, "...") {
+		t.Errorf("expected ellipsis in truncated wide title; row: %q", dataRow)
+	}
+}
+
+func TestTableOptionsColorsPreservedWithColumnSelection(t *testing.T) {
+	// Color ANSI codes must survive column filtering.
+	oldStatus := statusStyles
+	t.Cleanup(func() { statusStyles = oldStatus })
+	lipgloss.SetColorProfile(termenv.ANSI256)
+	statusStyles = map[string]lipgloss.Style{
+		"todo": lipgloss.NewStyle().Foreground(lipgloss.Color("252")),
+	}
+
+	now := time.Now()
+	tasks := []*task.Task{
+		{ID: 1, Title: "Task", Status: "todo", Priority: "low", Created: now, Updated: now},
+	}
+
+	var buf strings.Builder
+	TaskTableWithProperties(&buf, tasks, nil, TableOptions{Columns: []string{"id", "status", "title"}})
+	out := buf.String()
+	if !strings.Contains(out, "\x1b[") {
+		t.Errorf("expected ANSI codes in column-filtered output, got:\n%s", out)
 	}
 }

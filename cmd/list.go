@@ -40,6 +40,8 @@ func init() {
 	listCmd.Flags().StringP("search", "s", "", "search tasks by title, body, or tags (case-insensitive)")
 	listCmd.Flags().Bool("archived", false, "show only archived tasks")
 	listCmd.Flags().String("group-by", "", "group results by field ("+strings.Join(board.ValidGroupByFields(), ", ")+", property:KEY)")
+	listCmd.Flags().String("columns", "", "table columns to display in order ("+strings.Join(output.ValidTableColumns, ", ")+")")
+	listCmd.Flags().Int("title-width", 0, "maximum title column width in display cells (table output only)")
 	rootCmd.AddCommand(listCmd)
 }
 
@@ -135,7 +137,7 @@ func runList(cmd *cobra.Command, _ []string) error {
 		return outputGroupedList(tasks, groupBy, cfg)
 	}
 
-	return outputTaskListWithOptions(tasks, cfg, propertyOptions.keys)
+	return outputTaskListWithOptions(tasks, cfg, propertyOptions.keys, propertyOptions.tableOpts)
 }
 
 func outputGroupedList(tasks []*task.Task, groupBy string, cfg *config.Config) error {

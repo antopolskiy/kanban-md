@@ -61,7 +61,7 @@ func TestPropertyTableColumnsAlign(t *testing.T) {
 		t.Fatal(err)
 	}
 	var rendered bytes.Buffer
-	TaskTableWithProperties(&rendered, []*task.Task{&tk}, []string{"type", "rank"})
+	TaskTableWithProperties(&rendered, []*task.Task{&tk}, []string{"type", "rank"}, TableOptions{})
 	lines := strings.Split(ansi.Strip(rendered.String()), "\n")
 	if strings.Index(lines[0], "type") != strings.Index(lines[1], `"story"`) || strings.Index(lines[0], "rank") != strings.Index(lines[1], "20") {
 		t.Fatalf("columns misaligned:\n%s", rendered.String())

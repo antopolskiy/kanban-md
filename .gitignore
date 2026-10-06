@@ -42,6 +42,9 @@ dist/
 # GoLand and IntelliJ IDEA files
 .idea/
 
+# Serena (semantic retrieval)
+.serena/
+
 # env files that usually contain secrets or local config
 .env
 .envrc
