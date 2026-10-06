@@ -1008,3 +1008,203 @@ func TestResolveDir_NotFound(t *testing.T) {
 }
 
 // findProjectRoot tests are in skill_extended_test.go.
+
+// resetListCmdFilterFlags clears the Changed state of list filter flags that
+// other tests may have set and whose cleanup only resets the value, not Changed.
+// This prevents ordering-dependent test failures caused by the shared listCmd.
+func resetListCmdFilterFlags(t *testing.T) {
+	t.Helper()
+	for _, name := range []string{"parent", "blocked", "not-blocked", "unclaimed", "claimed-by", "class"} {
+		if f := listCmd.Flags().Lookup(name); f != nil {
+			f.Changed = false
+		}
+	}
+}
+
+func TestRunList_ColumnsFlag(t *testing.T) {
+	resetListCmdFilterFlags(t)
+	kanbanDir := setupBoard(t)
+	cfg, err := config.Load(kanbanDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	createTaskFile(t, cfg.TasksPath(), 1, "col-task")
+
+	oldFlagDir := flagDir
+	flagDir = kanbanDir
+	t.Cleanup(func() { flagDir = oldFlagDir })
+
+	setFlags(t, false, true, false)
+	setFlag(t, listCmd, "columns", "id,status,title")
+	t.Cleanup(func() { _ = listCmd.Flags().Set("columns", "") })
+
+	r, w := captureStdout(t)
+	err = runList(listCmd, nil)
+	got := drainPipe(t, r, w)
+
+	if err != nil {
+		t.Fatalf("runList error: %v", err)
+	}
+	if !containsSubstring(got, "ID") || !containsSubstring(got, "STATUS") || !containsSubstring(got, "TITLE") {
+		t.Errorf("expected selected columns in output, got:\n%s", got)
+	}
+	if containsSubstring(got, "CLAIMED") || containsSubstring(got, "TAGS") || containsSubstring(got, "DUE") {
+		t.Errorf("expected omitted columns absent from output, got:\n%s", got)
+	}
+}
+
+func TestRunList_TitleWidthFlag(t *testing.T) {
+	resetListCmdFilterFlags(t)
+	kanbanDir := setupBoard(t)
+	cfg, err := config.Load(kanbanDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	createTaskFile(t, cfg.TasksPath(), 1, "a very long task title that should be truncated by the flag")
+
+	oldFlagDir := flagDir
+	flagDir = kanbanDir
+	t.Cleanup(func() { flagDir = oldFlagDir })
+
+	setFlags(t, false, true, false)
+	setFlag(t, listCmd, "title-width", "15")
+	t.Cleanup(func() { _ = listCmd.Flags().Set("title-width", "0") })
+
+	r, w := captureStdout(t)
+	err = runList(listCmd, nil)
+	got := drainPipe(t, r, w)
+
+	if err != nil {
+		t.Fatalf("runList error: %v", err)
+	}
+	if !containsSubstring(got, "...") {
+		t.Errorf("expected title truncation with ellipsis, got:\n%s", got)
+	}
+}
+
+func TestRunList_InvalidColumns(t *testing.T) {
+	kanbanDir := setupBoard(t)
+
+	oldFlagDir := flagDir
+	flagDir = kanbanDir
+	t.Cleanup(func() { flagDir = oldFlagDir })
+
+	setFlags(t, false, true, false)
+	setFlag(t, listCmd, "columns", "id,bogus")
+	t.Cleanup(func() { _ = listCmd.Flags().Set("columns", "") })
+
+	err := runList(listCmd, nil)
+	if err == nil {
+		t.Fatal("expected error for unknown column name")
+	}
+	if !containsSubstring(err.Error(), "bogus") {
+		t.Errorf("expected column name in error, got: %v", err)
+	}
+}
+
+func TestRunList_DuplicateColumn(t *testing.T) {
+	kanbanDir := setupBoard(t)
+
+	oldFlagDir := flagDir
+	flagDir = kanbanDir
+	t.Cleanup(func() { flagDir = oldFlagDir })
+
+	setFlags(t, false, true, false)
+	setFlag(t, listCmd, "columns", "id,status,id")
+	t.Cleanup(func() { _ = listCmd.Flags().Set("columns", "") })
+
+	err := runList(listCmd, nil)
+	if err == nil {
+		t.Fatal("expected error for duplicate column")
+	}
+}
+
+func TestRunList_ColumnsRejectedForJSON(t *testing.T) {
+	kanbanDir := setupBoard(t)
+
+	oldFlagDir := flagDir
+	flagDir = kanbanDir
+	t.Cleanup(func() { flagDir = oldFlagDir })
+
+	setFlags(t, true, false, false)
+	setFlag(t, listCmd, "columns", "id,title")
+	t.Cleanup(func() { _ = listCmd.Flags().Set("columns", "") })
+
+	err := runList(listCmd, nil)
+	if err == nil {
+		t.Fatal("expected error when --columns used with --json")
+	}
+}
+
+func TestRunList_ColumnsRejectedForCompact(t *testing.T) {
+	kanbanDir := setupBoard(t)
+
+	oldFlagDir := flagDir
+	flagDir = kanbanDir
+	t.Cleanup(func() { flagDir = oldFlagDir })
+
+	setFlags(t, false, false, true)
+	setFlag(t, listCmd, "columns", "id,title")
+	t.Cleanup(func() { _ = listCmd.Flags().Set("columns", "") })
+
+	err := runList(listCmd, nil)
+	if err == nil {
+		t.Fatal("expected error when --columns used with --compact")
+	}
+}
+
+func TestRunList_TitleWidthRejectedForJSON(t *testing.T) {
+	kanbanDir := setupBoard(t)
+
+	oldFlagDir := flagDir
+	flagDir = kanbanDir
+	t.Cleanup(func() { flagDir = oldFlagDir })
+
+	setFlags(t, true, false, false)
+	setFlag(t, listCmd, "title-width", "20")
+	t.Cleanup(func() { _ = listCmd.Flags().Set("title-width", "0") })
+
+	err := runList(listCmd, nil)
+	if err == nil {
+		t.Fatal("expected error when --title-width used with --json")
+	}
+}
+
+func TestRunList_InvalidTitleWidth(t *testing.T) {
+	kanbanDir := setupBoard(t)
+
+	oldFlagDir := flagDir
+	flagDir = kanbanDir
+	t.Cleanup(func() { flagDir = oldFlagDir })
+
+	setFlags(t, false, true, false)
+	setFlag(t, listCmd, "title-width", "-5")
+	t.Cleanup(func() { _ = listCmd.Flags().Set("title-width", "0") })
+
+	err := runList(listCmd, nil)
+	if err == nil {
+		t.Fatal("expected error for negative title-width")
+	}
+}
+
+func TestRunList_ColumnsRejectedWithGroupBy(t *testing.T) {
+	resetListCmdFilterFlags(t)
+	kanbanDir := setupBoard(t)
+
+	oldFlagDir := flagDir
+	flagDir = kanbanDir
+	t.Cleanup(func() { flagDir = oldFlagDir })
+
+	setFlags(t, false, true, false)
+	setFlag(t, listCmd, "columns", "id,title")
+	setFlag(t, listCmd, "group-by", "status")
+	t.Cleanup(func() {
+		_ = listCmd.Flags().Set("columns", "")
+		_ = listCmd.Flags().Set("group-by", "")
+	})
+
+	err := runList(listCmd, nil)
+	if err == nil {
+		t.Fatal("expected error when --columns used with --group-by")
+	}
+}

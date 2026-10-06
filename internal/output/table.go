@@ -4,15 +4,31 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/x/ansi"
 
 	"github.com/antopolskiy/kanban-md/internal/board"
 	"github.com/antopolskiy/kanban-md/internal/task"
 )
+
+// ValidTableColumns is the ordered set of column names accepted by TableOptions.
+var ValidTableColumns = []string{"id", "status", "priority", "title", "claimed", "tags", "due"}
+
+// TableOptions controls column selection and title width for TaskTableWithProperties.
+// Zero value means "use defaults": all columns, standard title width cap.
+type TableOptions struct {
+	// Columns lists column names to display in the specified order.
+	// nil or empty means all columns in default order.
+	Columns []string
+	// TitleWidth is the maximum display-cell width for the title column.
+	// 0 means use the default cap.
+	TitleWidth int
+}
 
 var (
 	headerStyle = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("244"))
@@ -52,43 +68,130 @@ func DisableColor() {
 
 // TaskTable renders a list of tasks as a formatted table.
 func TaskTable(w io.Writer, tasks []*task.Task) {
-	TaskTableWithProperties(w, tasks, nil)
+	TaskTableWithProperties(w, tasks, nil, TableOptions{})
 }
 
-// TaskTableWithProperties adds explicitly requested properties to task rows.
-func TaskTableWithProperties(w io.Writer, tasks []*task.Task, keys []string) {
+// TaskTableWithProperties adds explicitly requested properties to task rows
+// and applies column selection and title-width constraints from opts.
+// tableColWidths holds the computed display widths for each fixed column.
+type tableColWidths struct {
+	id, status, priority, title, claimed, tags, due int
+}
+
+const (
+	tableDefaultMaxTitle = 50
+	tableDefaultMaxTags  = 30
+	tableColPad          = 2
+
+	// Minimum column widths (header label width + padding).
+	colMinID       = 4
+	colMinStatus   = 8
+	colMinPriority = 10
+	colMinTitle    = 5
+	colMinClaimed  = 9
+	colMinTags     = 6
+	colMinDue      = 12
+)
+
+func computeColWidths(tasks []*task.Task, cols []string, maxTitle int) tableColWidths {
+	w := tableColWidths{id: colMinID, status: colMinStatus, priority: colMinPriority, title: colMinTitle, claimed: colMinClaimed, tags: colMinTags, due: colMinDue}
+	for _, t := range tasks {
+		if slices.Contains(cols, "id") {
+			w.id = max(w.id, len(strconv.Itoa(t.ID))+tableColPad)
+		}
+		if slices.Contains(cols, "status") {
+			w.status = max(w.status, ansi.StringWidth(t.Status)+tableColPad)
+		}
+		if slices.Contains(cols, "priority") {
+			w.priority = max(w.priority, ansi.StringWidth(t.Priority)+tableColPad)
+		}
+		if slices.Contains(cols, "title") {
+			w.title = max(w.title, min(ansi.StringWidth(t.Title)+tableColPad, maxTitle))
+		}
+		if slices.Contains(cols, "claimed") {
+			w.claimed = max(w.claimed, ansi.StringWidth(claimDisplay(t))+tableColPad)
+		}
+		if slices.Contains(cols, "tags") {
+			w.tags = max(w.tags, min(ansi.StringWidth(strings.Join(t.Tags, ","))+tableColPad, tableDefaultMaxTags))
+		}
+	}
+	return w
+}
+
+func buildHeaderParts(cols []string, w tableColWidths) []string {
+	headers := map[string]string{
+		"id":       fmt.Sprintf("%-*s", w.id, "ID"),
+		"status":   fmt.Sprintf("%-*s", w.status, "STATUS"),
+		"priority": fmt.Sprintf("%-*s", w.priority, "PRIORITY"),
+		"title":    fmt.Sprintf("%-*s", w.title, "TITLE"),
+		"claimed":  fmt.Sprintf("%-*s", w.claimed, "CLAIMED"),
+		"tags":     fmt.Sprintf("%-*s", w.tags, "TAGS"),
+		"due":      fmt.Sprintf("%-*s", w.due, "DUE"),
+	}
+	parts := make([]string, 0, len(cols))
+	for _, col := range cols {
+		if h, ok := headers[col]; ok {
+			parts = append(parts, h)
+		}
+	}
+	return parts
+}
+
+func buildRowParts(t *task.Task, cols []string, w tableColWidths, title, claim, tags, due string, hasExtraKeys bool) []string {
+	parts := make([]string, 0, len(cols))
+	for _, col := range cols {
+		switch col {
+		case "id":
+			parts = append(parts, fmt.Sprintf("%-*d", w.id, t.ID))
+		case "status":
+			parts = append(parts, padRight(styledValue(t.Status, statusStyles), w.status))
+		case "priority":
+			parts = append(parts, padRight(styledValue(t.Priority, priorityStyles), w.priority))
+		case "title":
+			parts = append(parts, padRight(title, w.title))
+		case "claimed":
+			parts = append(parts, padRight(claim, w.claimed))
+		case "tags":
+			parts = append(parts, padRight(tags, w.tags))
+		case "due":
+			if hasExtraKeys {
+				parts = append(parts, padRight(due, w.due))
+			} else {
+				parts = append(parts, due)
+			}
+		}
+	}
+	return parts
+}
+
+// TaskTableWithProperties adds explicitly requested properties to task rows
+// and applies column selection and title-width constraints from opts.
+func TaskTableWithProperties(w io.Writer, tasks []*task.Task, keys []string, opts TableOptions) {
 	if len(tasks) == 0 {
 		fmt.Fprintln(os.Stderr, "No tasks found.")
 		return
 	}
 
-	// Calculate column widths.
-	const pad = 2
-	idW, statusW, prioW, titleW, claimW, tagsW, dueW := 4, 8, 10, 5, 9, 6, 12
-	for _, t := range tasks {
-		idW = max(idW, len(strconv.Itoa(t.ID))+pad)
-		statusW = max(statusW, len(t.Status)+pad)
-		prioW = max(prioW, len(t.Priority)+pad)
-		titleW = max(titleW, min(len(t.Title)+pad, 50)) //nolint:mnd // max title column width
-		claimW = max(claimW, len(claimDisplay(t))+pad)
-		tagsW = max(tagsW, min(len(strings.Join(t.Tags, ","))+pad, 30)) //nolint:mnd // max tags column width
+	cols := opts.Columns
+	if len(cols) == 0 {
+		cols = ValidTableColumns
 	}
+
+	maxTitle := tableDefaultMaxTitle
+	if opts.TitleWidth > 0 {
+		maxTitle = opts.TitleWidth
+	}
+
+	cw := computeColWidths(tasks, cols, maxTitle)
 
 	// Print header.
 	propertyWidths := tablePropertyWidths(tasks, keys)
-	header := fmt.Sprintf("%-*s %-*s %-*s %-*s %-*s %-*s %-*s",
-		idW, "ID", statusW, "STATUS", prioW, "PRIORITY",
-		titleW, "TITLE", claimW, "CLAIMED", tagsW, "TAGS", dueW, "DUE")
+	header := strings.Join(buildHeaderParts(cols, cw), " ")
 	header += tablePropertySuffix(keys, propertyWidths)
 	fmt.Fprintln(w, headerStyle.Render(strings.TrimRight(header, " ")))
 
 	// Print rows.
 	for _, t := range tasks {
-		title := t.Title
-		const maxTitle = 48
-		if len(title) > maxTitle {
-			title = title[:maxTitle-3] + "..."
-		}
 		claim := claimDisplay(t)
 		if claim == "" {
 			claim = dimStyle.Render("--")
@@ -107,18 +210,10 @@ func TaskTableWithProperties(w io.Writer, tasks []*task.Task, keys []string) {
 		} else {
 			due = dimStyle.Render(due)
 		}
-		if len(keys) > 0 {
-			due = padRight(due, dueW)
-		}
+		// Truncate title using display-cell width to handle wide Unicode and ANSI.
+		title := ansi.Truncate(t.Title, maxTitle-tableColPad, "...")
 
-		row := fmt.Sprintf("%-*d %s %s %s %s %s %s",
-			idW, t.ID,
-			padRight(styledValue(t.Status, statusStyles), statusW),
-			padRight(styledValue(t.Priority, priorityStyles), prioW),
-			padRight(title, titleW),
-			padRight(claim, claimW),
-			padRight(tags, tagsW),
-			due)
+		row := strings.Join(buildRowParts(t, cols, cw, title, claim, tags, due, len(keys) > 0), " ")
 		row += tablePropertySuffix(tablePropertyCells(t, keys), propertyWidths)
 		fmt.Fprintln(w, strings.TrimRight(row, " "))
 	}
