@@ -230,6 +230,7 @@ func TestREADMEDocumentsAllCommands(t *testing.T) {
 		"config":     "### `config`",
 		"context":    "### `context`",
 		"tui":        "## Interactive TUI",
+		"web":        "## Local web UI",
 		"completion": "## Shell completions",
 		"skill":      "## Agent skills",
 	}
@@ -259,6 +260,7 @@ func TestREADMEDocumentsAllCommands(t *testing.T) {
 		"metrics": {"--since"},
 		"log":     {"--since", "--limit", "--action", "--task"},
 		"tui":     {"--hide-empty-columns", "--show-empty-columns", "--mouse", "--narrow"},
+		"web":     {"--port", "--no-browser", "--hide-empty-columns", "--show-empty-columns"},
 	}
 	for cmd, flags := range requiredFlags {
 		for _, flag := range flags {

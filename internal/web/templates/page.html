@@ -1,0 +1,189 @@
+{{define "page"}}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>{{.Title}} · {{.BoardName}}</title>
+  <link rel="stylesheet" href="/static/pico.classless.min.css">
+  <link rel="stylesheet" href="/static/board.css">
+  <script src="/static/theme.js"></script>
+</head>
+<body data-csrf="{{.CSRF}}" data-create="{{.CreateHref}}" data-sort="{{.Sort}}" data-dir="{{.Dir}}" data-level="{{.Level}}" data-levels="{{.LevelValues}}">
+  <header>
+    <nav>
+      <a href="{{.BoardHref}}">{{.BoardName}}</a>
+      <a href="{{.HelpHref}}">Help</a>
+      {{if .CreateHref}}<a href="{{.CreateHref}}">New task</a>{{end}}
+      <button type="button" id="theme-toggle">Theme</button>
+    </nav>
+    <form method="get" action="/">
+      {{range .Hidden}}<input type="hidden" name="{{.Name}}" value="{{.Value}}">{{end}}
+      <input type="hidden" name="csrf" value="{{.CSRF}}">
+      <input type="search" name="q" value="{{.Search}}" placeholder="Search title, tag, or #id" aria-label="Search">
+      <button type="submit">Search</button>
+    </form>
+  </header>
+  {{if .Error}}<p role="alert">{{.Error}}</p>{{end}}
+  {{if .Notice}}<p role="status">{{.Notice}}</p>{{end}}
+  <main>
+    {{if eq .Kind "board"}}{{template "board" .}}{{end}}
+    {{if eq .Kind "detail"}}{{template "detail" .}}{{end}}
+    {{if eq .Kind "form"}}{{template "form" .}}{{end}}
+    {{if eq .Kind "confirm"}}{{template "confirm" .}}{{end}}
+    {{if eq .Kind "help"}}{{template "help" .}}{{end}}
+  </main>
+  <script src="/static/app.js"></script>
+</body>
+</html>
+{{end}}
+
+{{define "toolbar"}}
+<nav class="toolbar" aria-label="Board view">
+  {{range .SortLinks}}<a href="{{.Href}}"{{if .Active}} aria-current="page"{{end}}>{{.Label}}</a>{{end}}
+  <a href="{{.DirLink.Href}}">{{.DirLink.Label}}</a>
+  {{range .LevelLinks}}<a href="{{.Href}}"{{if .Active}} aria-current="page"{{end}}>{{.Label}}</a>{{end}}
+  <a href="{{.EmptyLink.Href}}">{{.EmptyLink.Label}}</a>
+  {{if .Tag}}<span>Tag: {{.Tag}}</span> <a href="{{.ClearTagHref}}">Clear tag</a>{{end}}
+</nav>
+{{end}}
+
+{{define "board"}}
+{{template "toolbar" .}}
+<p class="summary">{{range .Summary}}<span>{{.}}</span>{{end}}</p>
+<nav class="tabs" aria-label="Columns">
+  {{range .Tabs}}<a href="{{.Href}}"{{if .Active}} aria-current="page"{{end}}>{{.Label}}</a>{{end}}
+</nav>
+<div class="board" id="board">
+  {{range .Columns}}
+  <section class="column{{if .Active}} active{{end}}" data-column="{{.Name}}">
+    <h2{{if .OverWIP}} class="over-wip"{{end}}>{{.Heading}}</h2>
+    <p><a href="{{.CreateHref}}">Add</a></p>
+    {{range .Cards}}
+    <article class="card{{if .Selected}} selected{{end}}" draggable="true" data-card data-id="{{.ID}}" data-priority="{{.Priority}}"{{if .Selected}} data-selected="true"{{end}}>
+      <p class="meta">{{.IDLabel}} · {{.Priority}}</p>
+      <h3><a href="{{.Href}}" title="{{.Title}}">{{.Title}}</a></h3>
+      {{if .Body}}<p class="description" title="{{.Body}}">{{.Body}}</p>{{end}}
+      {{if .Meta}}<p class="meta">{{.Meta}}</p>{{end}}
+      {{if .Blocked}}<p class="blocked">{{.Blocked}}</p>{{end}}
+      {{if .Overdue}}<p class="overdue">overdue</p>{{end}}
+      {{if .Tags}}<p class="tags">{{range .Tags}}<a href="{{.Href}}"{{if .Active}} aria-current="page"{{end}}>{{.Label}}</a> {{end}}</p>{{end}}
+    </article>
+    {{else}}
+    <p class="meta">No tasks</p>
+    {{end}}
+  </section>
+  {{end}}
+</div>
+<details>
+  <summary>Recent activity</summary>
+  {{if .Activity}}
+  <ul>{{range .Activity}}<li>{{.}}</li>{{end}}</ul>
+  {{else}}
+  <p>No activity yet.</p>
+  {{end}}
+</details>
+{{end}}
+
+{{define "detail"}}
+<p><a href="{{.BoardHref}}">Back to board</a></p>
+{{if .Detail.Archived}}
+<h1>#{{.Detail.ID}} {{.Detail.Title}}</h1>
+<p>This task is archived. It stays on disk and is not opened from the board.</p>
+{{else}}
+<article>
+  <p class="meta">#{{.Detail.ID}} · {{.Detail.Priority}}</p>
+  <h1>{{.Detail.Title}}</h1>
+  <ul class="meta">{{range .Detail.Meta}}<li>{{.}}</li>{{end}}</ul>
+  {{if .Detail.File}}<p class="meta">{{.Detail.File}}</p>{{end}}
+  {{if .Detail.EmptyBody}}<p>No description.</p>{{else}}<div class="content">{{.Detail.Body}}</div>{{end}}
+  {{if or .Detail.Ancestors .Detail.AncestorNote}}
+  <h2>Ancestors</h2>
+  {{if .Detail.AncestorNote}}<p>{{.Detail.AncestorNote}}</p>{{end}}
+  <ul>{{range .Detail.Ancestors}}<li>{{template "link" .}}</li>{{end}}</ul>
+  {{end}}
+  {{if .Detail.Children}}
+  <h2>Children{{if .Detail.ChildRollup}} ({{.Detail.ChildRollup}}){{end}}</h2>
+  <ul>{{range .Detail.Children}}<li>{{template "link" .}}</li>{{end}}</ul>
+  {{end}}
+  {{if .Detail.Dependencies}}
+  <h2>Dependencies</h2>
+  <ul>{{range .Detail.Dependencies}}<li>{{template "link" .}}</li>{{end}}</ul>
+  {{end}}
+  <h2>Move</h2>
+  <form method="post" action="/tasks/{{.Detail.ID}}/move">
+    <input type="hidden" name="csrf" value="{{.CSRF}}">
+    <input type="hidden" name="return" value="{{.Detail.Return}}">
+    <select name="status" aria-label="Status">
+      {{range .Detail.Statuses}}<option value="{{.Name}}"{{if .Current}} selected{{end}}>{{.Name}}</option>{{end}}
+    </select>
+    <button type="submit">Move</button>
+  </form>
+  <form method="post" action="/tasks/{{.Detail.ID}}/priority">
+    <input type="hidden" name="csrf" value="{{.CSRF}}">
+    <input type="hidden" name="return" value="{{.Detail.Return}}">
+    <input type="hidden" name="direction" value="up">
+    <button type="submit"{{if not .Detail.CanRaise}} disabled{{end}}>Raise priority</button>
+  </form>
+  <form method="post" action="/tasks/{{.Detail.ID}}/priority">
+    <input type="hidden" name="csrf" value="{{.CSRF}}">
+    <input type="hidden" name="return" value="{{.Detail.Return}}">
+    <input type="hidden" name="direction" value="down">
+    <button type="submit"{{if not .Detail.CanLower}} disabled{{end}}>Lower priority</button>
+  </form>
+  <p><a href="{{.Detail.EditHref}}">Edit</a> · <a href="{{.Detail.ArchiveHref}}">Archive</a></p>
+</article>
+{{end}}
+{{end}}
+
+{{define "link"}}
+{{if .Href}}<a href="{{.Href}}">{{.Label}}</a>{{else}}<span>{{.Label}}</span>{{end}}
+{{end}}
+
+{{define "form"}}
+<h1>{{.Form.Heading}}</h1>
+<form method="post" action="{{.Form.Action}}">
+  <input type="hidden" name="csrf" value="{{.CSRF}}">
+  <input type="hidden" name="return" value="{{.Form.Return}}">
+  {{if .Form.IsCreate}}<input type="hidden" name="status" value="{{.Form.Status}}">{{end}}
+  <label>Title <input name="title" value="{{.Form.Title}}" required></label>
+  <label>Description <textarea name="body" rows="8">{{.Form.Body}}</textarea></label>
+  <label>Priority
+    <select name="priority">
+      {{range .Form.Priorities}}<option value="{{.}}"{{if eq . $.Form.Priority}} selected{{end}}>{{.}}</option>{{end}}
+    </select>
+  </label>
+  <label>Tags <input name="tags" value="{{.Form.Tags}}" placeholder="comma-separated"></label>
+  <button type="submit">Save</button>
+  <a href="{{.Form.Return}}">Cancel</a>
+</form>
+{{end}}
+
+{{define "confirm"}}
+<h1>{{.Confirm.Heading}}</h1>
+<form method="post" action="{{.Confirm.Action}}">
+  <input type="hidden" name="csrf" value="{{.CSRF}}">
+  <input type="hidden" name="return" value="{{.Confirm.Return}}">
+  <button type="submit">Archive</button>
+  <a href="{{.Confirm.Return}}">Cancel</a>
+</form>
+{{end}}
+
+{{define "help"}}
+<h1>Help</h1>
+<p>The page reads and writes the same Markdown files as the CLI and TUI. Drag a card onto another column to move it. The board reloads when files change, unless a form has been edited.</p>
+<ul>
+  <li><kbd>/</kbd> search</li>
+  <li><kbd>c</kbd> create in the active column</li>
+  <li><kbd>e</kbd> edit the selected card</li>
+  <li><kbd>d</kbd> archive the selected card</li>
+  <li><kbd>Enter</kbd> open the selected card</li>
+  <li><kbd>n</kbd> / <kbd>p</kbd> next / previous status</li>
+  <li><kbd>+</kbd> / <kbd>-</kbd> raise / lower priority</li>
+  <li><kbd>s</kbd> / <kbd>S</kbd> cycle sort field / direction</li>
+  <li><kbd>v</kbd> cycle hierarchy level</li>
+  <li><kbd>?</kbd> this help</li>
+</ul>
+<p><a href="{{.BoardHref}}">Back to board</a></p>
+{{end}}
