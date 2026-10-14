@@ -2,9 +2,7 @@ package cmd
 
 import (
 	"errors"
-	"fmt"
 	"os"
-	"path/filepath"
 	"strings"
 	"time"
 
@@ -14,7 +12,6 @@ import (
 	"github.com/antopolskiy/kanban-md/internal/board"
 	"github.com/antopolskiy/kanban-md/internal/clierr"
 	"github.com/antopolskiy/kanban-md/internal/date"
-	"github.com/antopolskiy/kanban-md/internal/filelock"
 	"github.com/antopolskiy/kanban-md/internal/output"
 	"github.com/antopolskiy/kanban-md/internal/task"
 )
@@ -67,9 +64,9 @@ func runCreate(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	unlock, err := filelock.Lock(filepath.Join(dir, ".lock"))
+	unlock, err := board.LockBoard(dir)
 	if err != nil {
-		return fmt.Errorf("acquiring lock: %w", err)
+		return err
 	}
 	defer unlock() //nolint:errcheck // best-effort unlock on exit
 

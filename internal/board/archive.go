@@ -16,6 +16,12 @@ type ArchiveResult struct {
 
 // Archive soft-deletes a task by moving it to the archived status.
 func Archive(cfg *config.Config, id int, claimant string, now time.Time) (*ArchiveResult, error) {
+	unlock, err := LockBoard(cfg.Dir())
+	if err != nil {
+		return nil, err
+	}
+	defer unlock() //nolint:errcheck // best-effort unlock on exit
+
 	path, err := task.FindByID(cfg.TasksPath(), id)
 	if err != nil {
 		return nil, err
