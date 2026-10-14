@@ -992,6 +992,12 @@ well-behaved agents exclude tasks with active claims from selection. Claims
 expire after the configured timeout (default: 1 hour). They reduce collisions,
 but they are not a security boundary or a transactional distributed lock.
 
+`pick`, `edit`, `move`, `delete`, `archive`, and `handoff` hold `.lock` across
+the read and the write, so two of those commands cannot claim the same task.
+`create` holds the same lock before it reads `next_id`. On macOS that lock is
+`flock(2)`. `fcntl(2)` documents `flock` for a whole-file advisory lock that
+must stay held while a write opens and closes the task file.
+
 On Unix-like systems, kanban-md also makes actively claimed task files read-only. Commands from the current claimant temporarily unlock the file while updating it, then restore read-only permissions; releasing or expiring the claim makes the file writable again. This protects against accidental direct edits by another process running as the same user, but it is not a security boundary: that user can still change permissions, rename, or delete the file.
 
 Statuses with `require_claim: true` (default: `in-progress` and `review`) enforce that every `move` or `edit` includes `--claim <name>`. This prevents accidental anonymous moves in multi-agent environments.

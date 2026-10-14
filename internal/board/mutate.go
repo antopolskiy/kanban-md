@@ -23,6 +23,12 @@ type DeleteResult struct {
 // collects warnings about dependent tasks. The operation is idempotent —
 // archiving an already-archived task is a no-op.
 func Delete(cfg *config.Config, id int, claimant string, now time.Time) (*DeleteResult, error) {
+	unlock, err := LockBoard(cfg.Dir())
+	if err != nil {
+		return nil, err
+	}
+	defer unlock() //nolint:errcheck // best-effort unlock on exit
+
 	path, err := task.FindByID(cfg.TasksPath(), id)
 	if err != nil {
 		return nil, err
@@ -80,7 +86,13 @@ type MoveResult struct {
 // for the target status. The operation is idempotent — moving to the current
 // status is a no-op.
 func Move(cfg *config.Config, params MoveParams, now time.Time) (*MoveResult, error) {
-	if err := task.ValidateStatus(params.NewStatus, cfg.StatusNames()); err != nil {
+	unlock, err := LockBoard(cfg.Dir())
+	if err != nil {
+		return nil, err
+	}
+	defer unlock() //nolint:errcheck // best-effort unlock on exit
+
+	if err = task.ValidateStatus(params.NewStatus, cfg.StatusNames()); err != nil {
 		return nil, err
 	}
 
@@ -421,6 +433,12 @@ type EditResult struct {
 func Edit(cfg *config.Config, id int, claimant string, release bool,
 	applyFn func(t *task.Task) (changed bool, err error), now time.Time,
 ) (*EditResult, error) {
+	unlock, err := LockBoard(cfg.Dir())
+	if err != nil {
+		return nil, err
+	}
+	defer unlock() //nolint:errcheck // best-effort unlock on exit
+
 	path, err := task.FindByID(cfg.TasksPath(), id)
 	if err != nil {
 		return nil, err
@@ -528,6 +546,12 @@ type HandoffParams struct {
 //
 //nolint:gocyclo // Handoff coordinates validation, mutation, persistence, and audit logging in one operation.
 func Handoff(cfg *config.Config, params HandoffParams, now time.Time) (*task.Task, error) {
+	unlock, err := LockBoard(cfg.Dir())
+	if err != nil {
+		return nil, err
+	}
+	defer unlock() //nolint:errcheck // best-effort unlock on exit
+
 	if params.Claimant == "" {
 		return nil, clierr.New(clierr.InvalidInput, "claim name is required")
 	}
@@ -633,24 +657,41 @@ type PickAndClaimParams struct {
 	Parent       *int
 }
 
-// PickAndClaim finds the highest-priority task and claims it in one operation.
-// Claims are cooperative leases; concurrent callers are not serialized here.
-// Any warnings from reading malformed task files are returned so the caller can
-// surface them.
-func PickAndClaim(cfg *config.Config, params PickAndClaimParams, now time.Time) (*task.Task, string, []task.ReadWarning, error) {
+// beforeClaimPersist, when set by tests, runs after a claim is chosen and
+// before it is written so tests can overlap two claimers.
+var beforeClaimPersist func()
+
+func validatePickAndClaimParams(cfg *config.Config, params PickAndClaimParams) error {
 	if params.Claimant == "" {
-		return nil, "", nil, clierr.New(clierr.InvalidInput, "claim name is required")
+		return clierr.New(clierr.InvalidInput, "claim name is required")
 	}
 	if params.StatusFilter != "" {
 		if err := task.ValidateStatus(params.StatusFilter, cfg.StatusNames()); err != nil {
-			return nil, "", nil, err
+			return err
 		}
 	}
 	if params.MoveTarget != "" {
 		if err := task.ValidateStatus(params.MoveTarget, cfg.StatusNames()); err != nil {
-			return nil, "", nil, err
+			return err
 		}
 	}
+	return nil
+}
+
+// PickAndClaim finds the highest-priority task and claims it in one operation.
+// The read, selection, and write hold the board lock so concurrent callers
+// cannot claim the same task. Any warnings from reading malformed task files
+// are returned so the caller can surface them.
+func PickAndClaim(cfg *config.Config, params PickAndClaimParams, now time.Time) (*task.Task, string, []task.ReadWarning, error) {
+	if err := validatePickAndClaimParams(cfg, params); err != nil {
+		return nil, "", nil, err
+	}
+
+	unlock, err := LockBoard(cfg.Dir())
+	if err != nil {
+		return nil, "", nil, err
+	}
+	defer unlock() //nolint:errcheck // best-effort unlock on exit
 
 	allTasks, warnings, err := task.ReadAllLenient(cfg.TasksPath())
 	if err != nil {
@@ -687,6 +728,13 @@ func PickAndClaim(cfg *config.Config, params PickAndClaimParams, now time.Time) 
 	}
 
 	picked.Updated = now
+
+	// Test seam: runs while the board lock is held, so only one claimer can
+	// be here at a time. The concurrent test uses the wait to prove a second
+	// claimer stays blocked until the first write finishes.
+	if beforeClaimPersist != nil {
+		beforeClaimPersist()
+	}
 
 	// Write the task back.
 	path, err := task.FindByID(cfg.TasksPath(), picked.ID)

@@ -4,7 +4,6 @@ package tui
 import (
 	"fmt"
 	"os"
-	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -21,7 +20,6 @@ import (
 
 	"github.com/antopolskiy/kanban-md/internal/board"
 	"github.com/antopolskiy/kanban-md/internal/config"
-	"github.com/antopolskiy/kanban-md/internal/filelock"
 	"github.com/antopolskiy/kanban-md/internal/task"
 )
 
@@ -761,9 +759,9 @@ func (b *Board) executeCreate() (tea.Model, tea.Cmd) {
 
 	// Acquire exclusive lock to prevent concurrent creates from
 	// reading the same next_id and generating duplicate task IDs.
-	unlock, err := filelock.Lock(filepath.Join(b.cfg.Dir(), ".lock"))
+	unlock, err := board.LockBoard(b.cfg.Dir())
 	if err != nil {
-		b.err = fmt.Errorf("acquiring lock: %w", err)
+		b.err = err
 		b.resetCreateState()
 		b.view = viewBoard
 		return b, nil
@@ -1278,20 +1276,41 @@ func (b *Board) lowerPriority() (tea.Model, tea.Cmd) {
 }
 
 func (b *Board) executePriorityChange(t *task.Task, newPriority string) (tea.Model, tea.Cmd) {
-	oldPriority := t.Priority
-	oldUpdated := t.Updated
 	taskID := t.ID
-	t.Priority = newPriority
-	t.Updated = time.Now()
 
-	if err := task.Write(t.File, t); err != nil {
-		b.err = fmt.Errorf("updating priority for task #%d: %w", taskID, err)
-		t.Priority = oldPriority // revert
-		t.Updated = oldUpdated
+	unlock, err := board.LockBoard(b.cfg.Dir())
+	if err != nil {
+		b.err = err
 		return b, nil
 	}
+	release := func() {
+		if unlock == nil {
+			return
+		}
+		_ = unlock() // best-effort; the file lock also drops when the process exits
+		unlock = nil
+	}
+	defer release()
 
-	board.LogMutation(b.cfg.Dir(), "priority", taskID, oldPriority+" -> "+newPriority)
+	// Re-read under the lock so this write cannot replace a claim that landed
+	// after the card was loaded. Release before the activity log and reload so
+	// the UI goroutine is not stuck in flock while every task file is parsed.
+	fresh, err := task.Read(t.File)
+	if err != nil {
+		b.err = fmt.Errorf("updating priority for task #%d: %w", taskID, err)
+		return b, nil
+	}
+	fromPriority := fresh.Priority
+	fresh.Priority = newPriority
+	fresh.Updated = b.now()
+
+	if err := task.Write(fresh.File, fresh); err != nil {
+		b.err = fmt.Errorf("updating priority for task #%d: %w", taskID, err)
+		return b, nil
+	}
+	release()
+
+	board.LogMutation(b.cfg.Dir(), "priority", taskID, fromPriority+" -> "+newPriority)
 	b.loadTasks()
 
 	// After re-sort, find the task at its new position and follow it.
