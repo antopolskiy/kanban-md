@@ -57,10 +57,12 @@ claude "add ticket: there is a bug on the login page when the user enters an inv
 5. Start the `kanban-based-development` skill with one agent. It will claim a
    task, create an isolated worktree, implement and verify the change, merge it,
    release the claim, and mark the task done. Once the workflow fits your
-   project, run more agents and supervise their progress in the TUI.
+   project, run more agents and supervise their progress in the TUI or the
+   local web board.
 
 ```bash
 kanban-md tui
+kanban-md web
 ```
 
 6. Adapt the local skill or `AGENTS.md` to the repository's own build, review,
@@ -83,7 +85,7 @@ Project management tools are designed for humans clicking buttons. kanban-md is 
 - **No service dependency.** A single binary owns the local workflow; there is
   no database server, background daemon, or remote configuration service.
 - **Skills included.** Pre-written skills for using the CLI tool and a multi-agent development workflow. Installable via `kanban-md skill install`.
-- **TUI for observation.** A full interactive terminal board with keyboard navigation. It auto-refreshes when task files change on disk.
+- **TUI for observation.** A full interactive terminal board with keyboard navigation. It auto-refreshes when task files change on disk. `kanban-md web` opens the same board in a browser on localhost.
 
 ```bash
 kanban-md tui
@@ -766,6 +768,34 @@ terminal-dependent; use the terminal's normal selection shortcut or omit
 | `?` | Show help |
 | `q` | Quit from the board; close the whole detail chain from details |
 | `Ctrl+C` | Quit |
+
+## Local web UI
+
+`kanban-md web` serves the current board on `127.0.0.1` and opens it in a browser. It is a foreground process in the same binary, not a background service. Task files stay authoritative.
+
+```bash
+kanban-md web
+kanban-md web --port 5741
+kanban-md web --no-browser
+kanban-md web --dir PATH
+kanban-md web --hide-empty-columns
+kanban-md web --show-empty-columns
+```
+
+| Flag | Description |
+|------|-------------|
+| `--port` | Localhost port (default `5741`) |
+| `--no-browser` | Print the URL without opening a browser |
+| `--hide-empty-columns` | Hide empty columns for this run, overriding config |
+| `--show-empty-columns` | Show empty columns for this run, overriding config |
+
+If no board exists, `kanban-md web` offers to create one, the same way `kanban-md tui` does.
+
+The page shows columns, cards, search, sort, hierarchy levels, and task details, including ancestors, children, and dependencies. Create, edit, move, priority, and archive use the same mutations as the CLI. Drag a card to another column to move it. The page reloads when task files change, unless a form has been edited.
+
+It also shows the board summary and recent activity. Choosing a tag filters the board. Columns share the window width, and long card text is truncated. Hover a title or description to read the full text. A theme control switches between light and dark; until it is used, the page follows the browser color scheme.
+
+Status moves keep an existing claim. An unclaimed task that enters a status with `require_claim` is claimed as `web@hostname`.
 
 ## Global flags
 
