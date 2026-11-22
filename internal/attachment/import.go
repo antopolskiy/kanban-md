@@ -32,7 +32,7 @@ func Import(boardDir, tasksDir string, img Image) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("resolving board directory: %w", err)
 	}
-	tasksPath, err := directoryPath(tasksDir)
+	_, err = directoryPath(tasksDir)
 	if err != nil {
 		return "", fmt.Errorf("resolving tasks directory: %w", err)
 	}
@@ -41,7 +41,7 @@ func Import(boardDir, tasksDir string, img Image) (string, error) {
 		ext = ".jpg"
 	}
 	name := "screenshot-" + rand.Text() + ext
-	relative, err := filepath.Rel(tasksPath, filepath.Join(boardPath, attachmentDir, name))
+	reference, err := relativeReference(boardDir, tasksDir, name)
 	if err != nil {
 		return "", fmt.Errorf("creating attachment reference: %w", err)
 	}
@@ -60,6 +60,24 @@ func Import(boardDir, tasksDir string, img Image) (string, error) {
 		return "", fmt.Errorf("creating image attachment: %w", err)
 	}
 	if err := writeImage(attachments, name, f, img.Data); err != nil {
+		return "", err
+	}
+	return reference, nil
+}
+
+// Link addresses use the caller-visible task path, just like task.File. Keep
+// this separate from canonicalizing and rooting the storage directory.
+func relativeReference(boardDir, tasksDir, name string) (string, error) {
+	boardPath, err := filepath.Abs(boardDir)
+	if err != nil {
+		return "", err
+	}
+	tasksPath, err := filepath.Abs(tasksDir)
+	if err != nil {
+		return "", err
+	}
+	relative, err := filepath.Rel(tasksPath, filepath.Join(boardPath, attachmentDir, name))
+	if err != nil {
 		return "", err
 	}
 	destination := (&url.URL{Path: filepath.ToSlash(relative)}).String()

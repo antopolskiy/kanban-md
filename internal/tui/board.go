@@ -822,6 +822,14 @@ func (b *Board) executeCreate() (tea.Model, tea.Cmd) {
 
 	result, createErr := board.Create(b.cfg, params, b.now())
 	if createErr != nil {
+		if b.cfg.NextID != freshCfg.NextID {
+			// The task was written before saving the ID counter failed. Show
+			// that task instead of offering another create with its stale ID.
+			b.resetCreateState()
+			b.view = viewBoard
+			b.loadTasks()
+			b.selectTaskByID(freshCfg.NextID)
+		}
 		b.err = fmt.Errorf("creating task: %w", createErr)
 		return b, nil
 	}

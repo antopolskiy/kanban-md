@@ -346,10 +346,8 @@ func TestBoundary_ExecuteCreate_ConfigSaveError(t *testing.T) {
 	}
 	b = sendSpecialKey(b, tea.KeyEnter)
 
-	// The error from cfg.Save() is set but cleared by the subsequent
-	// loadTasks() call. The task file was still created on disk (the write
-	// succeeded), but the config wasn't updated. Verify the config on disk
-	// still has the old NextID (because Save failed).
+	// The task file was created, but config.Save failed. Verify the disk
+	// counter is unchanged and the persisted task remains visible.
 	_ = os.Chmod(cfgPath, 0o600)
 	reloaded, err := config.Load(kanbanDir)
 	if err != nil {

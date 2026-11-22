@@ -15,7 +15,16 @@ import (
 )
 
 func TestE2E_TUI_ImageReferencesSurviveRenameArchiveAndRelocation(t *testing.T) {
+	t.Run("regular tasks", func(t *testing.T) { checkImageReferenceLifecycle(t, false) })
+	t.Run("symlinked tasks", func(t *testing.T) { checkImageReferenceLifecycle(t, true) })
+}
+
+func checkImageReferenceLifecycle(t *testing.T, symlinked bool) {
+	t.Helper()
 	boardDir := initBoard(t)
+	if symlinked {
+		useSymlinkedTasks(t, boardDir)
+	}
 	var data bytes.Buffer
 	if err := png.Encode(&data, image.NewRGBA(image.Rect(0, 0, 2, 2))); err != nil {
 		t.Fatal(err)
@@ -68,6 +77,20 @@ func TestE2E_TUI_ImageReferencesSurviveRenameArchiveAndRelocation(t *testing.T) 
 	verifyTaskImages(t, relocated, data.Bytes())
 	if relocated.Body != created.Body {
 		t.Fatal("rename/archive/relocation changed the image reference")
+	}
+}
+
+func useSymlinkedTasks(t *testing.T, boardDir string) {
+	t.Helper()
+	target := filepath.Join(boardDir, "actual", "deep")
+	if err := os.MkdirAll(filepath.Dir(target), 0o750); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Rename(filepath.Join(boardDir, "tasks"), target); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(filepath.Join("actual", "deep"), filepath.Join(boardDir, "tasks")); err != nil {
+		t.Skipf("symlinks unavailable: %v", err)
 	}
 }
 

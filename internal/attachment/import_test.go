@@ -153,6 +153,23 @@ func TestImportRelativeDirectoryArguments(t *testing.T) {
 	}
 }
 
+func TestImportReferenceUsesReportedSymlinkTasksPath(t *testing.T) {
+	board := t.TempDir()
+	actualTasks := makeDirectory(t, filepath.Join(board, "actual", "deep"))
+	tasks := filepath.Join(board, "tasks")
+	if err := os.Symlink(actualTasks, tasks); err != nil {
+		t.Skipf("symlinks unavailable: %v", err)
+	}
+	img := Image{Data: encodedImage(t, formatPNG), Format: formatPNG}
+	reference, err := Import(board, tasks, img)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(readFile(t, referenceFile(t, tasks, reference)), img.Data) {
+		t.Fatal("reference did not resolve from the task's reported file directory")
+	}
+}
+
 func TestImportRejectsInvalidImagesWithoutFiles(t *testing.T) {
 	pngData := encodedImage(t, formatPNG)
 	tests := []struct {
@@ -398,7 +415,7 @@ func TestImportWithSymlinkedDirectoryArguments(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !bytes.Equal(readFile(t, referenceFile(t, tasks, reference)), img.Data) {
+	if !bytes.Equal(readFile(t, referenceFile(t, tasksLink, reference)), img.Data) {
 		t.Fatal("symlink aliases produced a broken relative reference")
 	}
 }

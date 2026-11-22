@@ -1,6 +1,9 @@
 package tui
 
 import (
+	"os"
+	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -40,5 +43,36 @@ func TestClaimRefusalKeepsEditDraft(t *testing.T) {
 	}
 	if b.err == nil || !strings.Contains(b.View(), "another-agent") {
 		t.Fatalf("claim refusal did not show the error in the wizard: %v", b.err)
+	}
+}
+
+func TestPartialCreateFailureDoesNotOfferDuplicateDraftRetry(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("file permission checks differ on Windows")
+	}
+	b, cfg := newWorkflowBoard(t, nil)
+	b.handleCreateStart()
+	b.createTitleInput.SetValue("Partially saved task")
+	path := cfg.ConfigPath()
+	if err := os.Chmod(path, 0o400); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(path, 0o600) })
+	imageKey(b, tea.KeyEnter)
+	if b.view != viewBoard || b.selectedTask() == nil || b.selectedTask().ID != 1 {
+		t.Fatal("a persisted task remained an unsaved create draft after partial failure")
+	}
+	if b.err == nil || !strings.Contains(b.View(), "saving config") {
+		t.Fatal("partial create error was cleared while returning to the saved task")
+	}
+	if err := os.Chmod(path, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	// The old draft must no longer be submittable as a second filename for #1.
+	b.createTitleInput.SetValue("Changed after failure")
+	imageKey(b, tea.KeyEnter)
+	entries, err := filepath.Glob(filepath.Join(cfg.TasksPath(), "001-*.md"))
+	if err != nil || len(entries) != 1 {
+		t.Fatalf("partial create retry produced duplicate IDs: %v, %v", entries, err)
 	}
 }

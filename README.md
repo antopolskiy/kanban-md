@@ -813,9 +813,11 @@ preserve the original image bytes. The TUI displays the reference as text. Title
 references use the same space and wrapping rules as the rest of the title.
 
 The image is saved immediately; the task reference is saved when you submit the
-task. A failed save keeps the editing draft for retry. Successfully imported
-images remain after canceling an edit, removing a link, or archiving a task, so
-unused images can accumulate. kanban-md does not delete them automatically.
+task. Save errors keep unsaved drafts for retry. If the task was already written
+before a later save step failed, the TUI returns to that task on the board and
+displays the error. Successfully imported images remain after canceling an edit,
+removing a link, or archiving a task, so unused images can accumulate. kanban-md
+does not delete them automatically.
 
 Image links are relative to the containing task file, including when `tasks_dir`
 or `--dir` is customized. They survive task renames and moving the complete board
