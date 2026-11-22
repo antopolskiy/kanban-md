@@ -54,6 +54,8 @@ const (
 	keyShiftTab = "shift+tab"
 	keyHome     = "home"
 	keyEnd      = "end"
+	keyCtrlV    = "ctrl+v"
+	keyCtrlO    = "ctrl+o"
 
 	tagMaxFraction = 2 // tags get at most 1/N of card width
 	boardChrome    = 2 // blank line + status bar below the column area
@@ -138,6 +140,13 @@ type Board struct {
 	createTitleInput  textinput.Model
 	createBodyInput   textarea.Model
 	createTagsInput   textinput.Model
+
+	// Clipboard operations are fenced to the input that initiated them.
+	paste          pasteState
+	clipboardRead  clipboardReader
+	imagePrompt    bool
+	imagePathInput textinput.Model
+	imageNotice    string
 }
 
 // column groups tasks belonging to a single status.
@@ -250,6 +259,8 @@ func (b *Board) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		b.invalidatePointerState()
 		b.err = msg.err
 		return b, nil
+	case pasteFinishedMsg:
+		return b.finishPaste(msg)
 	case externalEditorFinishedMsg:
 		b.invalidatePointerState()
 		b.loadTasks()
@@ -298,7 +309,15 @@ func (b *Board) View() string {
 func (b *Board) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	// Global keys.
 	if key.Matches(msg, key.NewBinding(key.WithKeys("ctrl+c"))) {
+		b.cancelPaste()
 		return b, tea.Quit
+	}
+	if b.paste.pending {
+		if msg.Type != tea.KeyEscape {
+			return b, nil
+		}
+		b.cancelPaste()
+		b.imageNotice = ""
 	}
 
 	switch b.view {
@@ -414,6 +433,7 @@ func (b *Board) reloadKeepingSelection() {
 // handleSearchStart enters the live search input mode, seeding the input
 // with any currently active filter.
 func (b *Board) handleSearchStart() {
+	b.cancelPaste()
 	if !b.searchReady {
 		b.searchInput = textinput.New()
 		b.searchInput.Prompt = "/"
@@ -429,6 +449,8 @@ func (b *Board) handleSearchStart() {
 // clears the filter, Enter keeps it, any other key updates the live filter.
 func (b *Board) handleSearchKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
+	case keyCtrlV:
+		return b, b.pasteClipboard(false)
 	case keyEsc:
 		b.searchInput.Blur()
 		b.filterQuery = ""
@@ -599,6 +621,9 @@ func (b *Board) defaultPriorityIndex() int {
 }
 
 func (b *Board) resetCreateState() {
+	b.cancelPaste()
+	b.imagePrompt = false
+	b.imageNotice = ""
 	b.createIsEdit = false
 	b.createEditID = 0
 	b.createTitleInput.SetValue("")
@@ -610,6 +635,12 @@ func (b *Board) resetCreateState() {
 }
 
 func (b *Board) handleCreateKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	if b.imagePrompt {
+		return b.handleImagePromptKey(msg)
+	}
+	if cmd, handled := b.handleCreateAttachmentKey(msg); handled {
+		return b, cmd
+	}
 	// Esc always cancels the entire wizard.
 	if msg.Type == tea.KeyEscape {
 		b.resetCreateState()
@@ -693,6 +724,9 @@ func (b *Board) handleCreateTags(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 func (b *Board) initCreateInputs() {
+	b.cancelPaste()
+	b.imagePrompt = false
+	b.imageNotice = ""
 	b.createTitleInput = textinput.New()
 	b.createTitleInput.Prompt = ""
 	b.createTagsInput = textinput.New()
@@ -765,8 +799,6 @@ func (b *Board) executeCreate() (tea.Model, tea.Cmd) {
 	unlock, err := filelock.Lock(filepath.Join(b.cfg.Dir(), ".lock"))
 	if err != nil {
 		b.err = fmt.Errorf("acquiring lock: %w", err)
-		b.resetCreateState()
-		b.view = viewBoard
 		return b, nil
 	}
 	defer unlock() //nolint:errcheck // best-effort unlock
@@ -776,8 +808,6 @@ func (b *Board) executeCreate() (tea.Model, tea.Cmd) {
 	freshCfg, err := config.Load(b.cfg.Dir())
 	if err != nil {
 		b.err = fmt.Errorf("reloading config: %w", err)
-		b.resetCreateState()
-		b.view = viewBoard
 		return b, nil
 	}
 	b.cfg.NextID = freshCfg.NextID
@@ -791,16 +821,15 @@ func (b *Board) executeCreate() (tea.Model, tea.Cmd) {
 	}
 
 	result, createErr := board.Create(b.cfg, params, b.now())
+	if createErr != nil {
+		b.err = fmt.Errorf("creating task: %w", createErr)
+		return b, nil
+	}
 
 	b.resetCreateState()
 	b.view = viewBoard
 	b.loadTasks()
-
-	if createErr != nil {
-		b.err = fmt.Errorf("creating task: %w", createErr)
-	} else {
-		b.selectTaskByID(result.Task.ID)
-	}
+	b.selectTaskByID(result.Task.ID)
 	return b, nil
 }
 
@@ -825,16 +854,15 @@ func (b *Board) executeEdit() (tea.Model, tea.Cmd) {
 			t.Tags = tags
 			return true, nil // TUI edit always has changes (user confirmed)
 		}, b.now())
+	if editErr != nil {
+		b.err = fmt.Errorf("editing task #%d: %w", editID, editErr)
+		return b, nil
+	}
 
 	b.resetCreateState()
 	b.view = viewBoard
 	b.loadTasks()
-
-	if editErr != nil {
-		b.err = fmt.Errorf("editing task #%d: %w", editID, editErr)
-	} else {
-		b.selectTaskByID(editID)
-	}
+	b.selectTaskByID(editID)
 	return b, nil
 }
 
@@ -2434,6 +2462,9 @@ func (b *Board) viewDeleteConfirm() string {
 }
 
 func (b *Board) viewCreateDialog() string {
+	if b.imagePrompt {
+		return dialogStyle.Render(b.viewImagePrompt())
+	}
 	headerText := "Create task in " + b.createStatus
 	if b.createIsEdit {
 		headerText = fmt.Sprintf("Edit task #%d in %s", b.createEditID, b.createStatus)
@@ -2457,7 +2488,7 @@ func (b *Board) viewCreateDialog() string {
 	hint := b.createHint()
 
 	content := header + stepLabel + "\n\n" + body + "\n\n" + dimStyle.Render(hint)
-	return dialogStyle.Render(content)
+	return dialogStyle.Render(b.imageFeedback(content))
 }
 
 func (b *Board) stepName() string {
@@ -2483,9 +2514,9 @@ func (b *Board) createHint() string {
 
 	switch b.createStep {
 	case stepTitle:
-		return fmt.Sprintf("tab:next  enter:%s  esc:cancel", action)
+		return fmt.Sprintf("ctrl+v:paste  ctrl+o:image file\ntab:next  enter:%s  esc:cancel", action)
 	case stepBody:
-		return fmt.Sprintf("tab:next  shift+tab:back  enter:%s  esc:cancel", action)
+		return fmt.Sprintf("ctrl+v:paste  ctrl+o:image file\ntab:next  shift+tab:back  enter:%s  esc:cancel", action)
 	case stepPriority:
 		return fmt.Sprintf("↑/↓:select  tab:next  shift+tab:back  enter:%s  esc:cancel", action)
 	case stepTags:
@@ -2567,6 +2598,8 @@ func (b *Board) viewHelp() string {
 		{"c", "Create new task in column"},
 		{"e", "Edit selected task (same flow as create)"},
 		{"E", "Open selected task in $VISUAL, $EDITOR, or vi"},
+		{keyCtrlV, "In title/body: paste clipboard image or text (macOS images)"},
+		{keyCtrlO, "In title/body: import a local image file"},
 		{"m", "Move task (status picker)"},
 		{"n", "Move task to next status"},
 		{"p", "Move task to previous status"},

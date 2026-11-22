@@ -35,6 +35,17 @@ Each task is a `.md` file in `kanban/tasks/`. The CLI is `kanban-md`
 - Default statuses: backlog, todo, in-progress, review, done, archived.
 - Default priorities: low, medium, high, critical.
 
+## Image references
+
+Task titles and bodies can contain ordinary Markdown links to local images, such
+as `[screenshot](../attachments/image-123456.png)`. Read them with `kanban-md show
+ID`. Resolve each destination relative to the containing task file, rather than
+your working directory; `show ID --json` includes the task's `file` path when a
+machine-readable path is needed. Use your existing image/file tools to inspect
+the image. Keep references intact during edits and copy/sync the board's
+`attachments/` directory with task files when moving between checkouts or hosts.
+Images remain after references are removed or tasks are archived.
+
 ## Decision Tree
 
 | User wants to...                        | Command                                                          |

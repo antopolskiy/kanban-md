@@ -765,6 +765,8 @@ terminal-dependent; use the terminal's normal selection shortcut or omit
 | `c` | Create task in current column |
 | `e` | Edit selected task (same 4-step flow as create) |
 | `E` | Open the selected task's Markdown file in `$VISUAL`, then `$EDITOR`, then `vi` when available |
+| `Ctrl+V` in title/body | Paste a clipboard image on macOS, or clipboard text |
+| `Ctrl+O` in title/body | Import a local PNG, JPEG, or GIF image and insert a reference |
 | `m` | Move task to a different status (picker dialog) |
 | `n` / `p` | Move task to next / previous status |
 | `d` | Soft-delete (archive) task with confirmation |
@@ -779,6 +781,48 @@ terminal-dependent; use the terminal's normal selection shortcut or omit
 | `?` | Show help |
 | `q` | Quit from the board; close the whole detail chain from details |
 | `Ctrl+C` | Quit |
+
+### Image references
+
+While creating or editing a task, place the cursor anywhere in its title or body
+and press **Control-V** to paste an image from the macOS clipboard. kanban-md uses
+the system's built-in scripting runtime and clipboard APIs; no Homebrew package,
+Xcode, or separate clipboard utility is required. If the clipboard contains text,
+the shortcut pastes that text. Terminal-native paste, such as **Command-V** on
+macOS, continues to paste text and does not trigger image import.
+
+On any platform, press **Control-O** in the title or body to open the image-path
+prompt. Enter a path to an existing PNG, JPEG, or GIF, then press `Enter`. Paths
+can be absolute, relative to the directory where you launched the TUI, or start
+with `~/`. Spaces are accepted literally. `Esc` closes the prompt and returns to
+the editing draft. When using SSH, the image file must already be on the machine
+running kanban-md. Images are limited to 20 MiB, 16,384 pixels per side, and
+33,554,432 decoded pixels. GIFs share that pixel budget across at most 1,024
+frames. Tags and search accept text.
+
+Both methods save the image in the selected board's `attachments/` directory and
+insert an ordinary Markdown link at the cursor:
+
+```markdown
+See the alignment issue [screenshot](../attachments/image-123456.png).
+```
+
+The directory is created when needed, filenames are unique, and the link label
+can be edited as normal text. Clipboard images are saved as PNG; file imports
+preserve the original image bytes. The TUI displays the reference as text. Title
+references use the same space and wrapping rules as the rest of the title.
+
+The image is saved immediately; the task reference is saved when you submit the
+task. A failed save keeps the editing draft for retry. Successfully imported
+images remain after canceling an edit, removing a link, or archiving a task, so
+unused images can accumulate. kanban-md does not delete them automatically.
+
+Image links are relative to the containing task file, including when `tasks_dir`
+or `--dir` is customized. They survive task renames and moving the complete board
+directory. Agents can read the link through `kanban-md show ID`; JSON output also
+provides the task's `file` path for resolving it. Copy or synchronize the
+`attachments/` directory along with the task files when sharing a board with
+another machine or checkout. Existing Git ignore choices remain in effect.
 
 ## Global flags
 

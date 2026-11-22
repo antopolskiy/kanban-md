@@ -406,6 +406,10 @@ func encodeKey(name string) string {
 		return "\x7f"
 	case "ctrl+c":
 		return "\x03"
+	case "ctrl+o":
+		return "\x0f"
+	case "ctrl+v":
+		return "\x16"
 	default:
 		return name
 	}
