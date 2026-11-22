@@ -18,9 +18,10 @@ import (
 )
 
 const (
-	imageTestTitle = "title"
-	imageTestBody  = "body"
-	imageTestPath  = "path"
+	imageTestTitle  = "title"
+	imageTestBody   = "body"
+	imageTestPath   = "path"
+	imageTestSearch = "search"
 )
 
 func imageTestPNG(t *testing.T) []byte {
@@ -192,7 +193,7 @@ func TestImageImportFailureKeepsPromptAndDraft(t *testing.T) {
 }
 
 func TestTextPasteInEditorSearchAndPathPrompt(t *testing.T) {
-	for _, target := range []string{imageTestTitle, imageTestBody, "tags", "search", imageTestPath} {
+	for _, target := range []string{imageTestTitle, imageTestBody, "tags", imageTestSearch, imageTestPath} {
 		t.Run(target, func(t *testing.T) {
 			b, cfg := newWorkflowBoard(t, nil)
 			b.handleCreateStart()
@@ -201,7 +202,7 @@ func TestTextPasteInEditorSearchAndPathPrompt(t *testing.T) {
 				b.createStep = stepBody
 			case "tags":
 				b.createStep = stepTags
-			case "search":
+			case imageTestSearch:
 				b.handleSearchStart()
 			case imageTestPath:
 				b.openImagePrompt()

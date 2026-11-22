@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"github.com/charmbracelet/bubbles/textinput"
@@ -15,6 +16,10 @@ import (
 
 	"github.com/antopolskiy/kanban-md/internal/attachment"
 )
+
+// cmux materializes clipboard images as these files before pasting their paths.
+// Keep ordinary pasted file paths and prose as text.
+var terminalImageFilename = regexp.MustCompile(`(?i)^clipboard-[0-9]{4}-[0-9]{2}-[0-9]{2}-[0-9]{6}-[a-f0-9]{8}\.(png|jpe?g|gif|webp|heic|heif|tiff?|bmp)$`)
 
 type pasteState struct {
 	id      uint64
@@ -72,6 +77,11 @@ func (b *Board) pasteClipboard(images bool) tea.Cmd {
 
 func (b *Board) handleCreateAttachmentKey(msg tea.KeyMsg) (tea.Cmd, bool) {
 	images := b.createStep == stepTitle || b.createStep == stepBody
+	if images && msg.Paste && msg.Type == tea.KeyRunes {
+		if path, ok := terminalImagePath(string(msg.Runes)); ok {
+			return b.pasteImagePath(path), true
+		}
+	}
 	switch msg.String() {
 	case keyCtrlV:
 		if b.createStep != stepPriority {
@@ -84,6 +94,41 @@ func (b *Board) handleCreateAttachmentKey(msg tea.KeyMsg) (tea.Cmd, bool) {
 		}
 	}
 	return nil, false
+}
+
+func terminalImagePath(text string) (string, bool) {
+	text = strings.TrimSpace(text)
+	// Terminal-generated macOS paths are absolute POSIX paths. This is not
+	// a shell parser: remove backslash quoting without evaluating any input.
+	if !strings.HasPrefix(text, "/") || strings.ContainsAny(text, "\n\r\x00") {
+		return "", false
+	}
+	var path strings.Builder
+	escaped := false
+	for _, r := range text {
+		switch {
+		case escaped:
+			path.WriteRune(r)
+			escaped = false
+		case r == '\\':
+			escaped = true
+		case r == ' ' || r == '\t':
+			// cmux backslash-escapes spaces inside a single path. Unescaped
+			// separators indicate multiple paths or prose, which stay text.
+			return "", false
+		default:
+			path.WriteRune(r)
+		}
+	}
+	value := path.String()
+	return value, !escaped && terminalImageFilename.MatchString(filepath.Base(value))
+}
+
+func (b *Board) pasteImagePath(path string) tea.Cmd {
+	return b.beginPaste(func(ctx context.Context) (clipboardContent, error) {
+		data, err := readImagePath(ctx, path)
+		return clipboardContent{image: data}, err
+	})
 }
 
 func (b *Board) finishPaste(msg pasteFinishedMsg) (tea.Model, tea.Cmd) {
@@ -191,11 +236,7 @@ func (b *Board) handleImagePromptKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case keyCtrlV:
 		return b, b.pasteClipboard(false)
 	case keyEnter:
-		path := b.imagePathInput.Value()
-		return b, b.beginPaste(func(ctx context.Context) (clipboardContent, error) {
-			data, err := readImagePath(ctx, path)
-			return clipboardContent{image: data}, err
-		})
+		return b, b.pasteImagePath(b.imagePathInput.Value())
 	default:
 		b.imagePathInput, _ = b.imagePathInput.Update(msg)
 		return b, nil

@@ -788,8 +788,13 @@ While creating or editing a task, place the cursor anywhere in its title or body
 and press **Control-V** to paste an image from the macOS clipboard. kanban-md uses
 the system's built-in scripting runtime and clipboard APIs; no Homebrew package,
 Xcode, or separate clipboard utility is required. If the clipboard contains text,
-the shortcut pastes that text. Terminal-native paste, such as **Command-V** on
-macOS, continues to paste text and does not trigger image import.
+the shortcut pastes that text. **Command-V in cmux** also works: when cmux sends
+the path of a generated `clipboard-YYYY-MM-DD-HHMMSS-XXXXXXXX` image file as a
+terminal paste, kanban-md copies it into the board's `attachments/` directory and
+inserts a link. The reference continues to work after cmux removes its temporary
+file. Backslash-escaped spaces in the supplied path are supported. Ordinary text,
+manually typed paths, and other pasted file paths remain text; use Control-O to
+import other image files. Tags, search, and the file-path prompt remain text-only.
 
 On any platform, press **Control-O** in the title or body to open the image-path
 prompt. Enter a path to an existing PNG, JPEG, or GIF, then press `Enter`. Paths

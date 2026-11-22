@@ -19,6 +19,56 @@ func TestE2E_TUI_ImageReferencesSurviveRenameArchiveAndRelocation(t *testing.T) 
 	t.Run("symlinked tasks", func(t *testing.T) { checkImageReferenceLifecycle(t, true) })
 }
 
+func TestE2E_TUI_TerminalImagePasteCopiesIntoBoard(t *testing.T) {
+	boardDir := initBoard(t)
+	var data bytes.Buffer
+	if err := png.Encode(&data, image.NewRGBA(image.Rect(0, 0, 2, 2))); err != nil {
+		t.Fatal(err)
+	}
+	source := filepath.Join(t.TempDir(), "clipboard-2026-11-22-162239-C8CD00A5.png")
+	if err := os.WriteFile(source, data.Bytes(), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	session := startTUIProcess(t, boardDir)
+	session.waitForOutput(tuiBoardStatus)
+	session.pressKeys("c")
+	session.waitForOutput("Create task in")
+	session.typeText("Terminal evidence ")
+	pasteTerminalImage(t, session, source)
+	session.typeText(" huh")
+	session.pressKeys("tab")
+	session.waitForOutput("Step 2/4")
+	session.typeText("Observed: ")
+	pasteTerminalImage(t, session, source)
+	if err := os.Remove(source); err != nil {
+		t.Fatal(err)
+	}
+	session.pressKeys("enter")
+	session.waitForOutput(tuiBoardStatus)
+	session.pressKeys("q")
+	session.waitForExit()
+	var created taskJSON
+	r := runKanbanJSON(t, boardDir, &created, "show", "1")
+	if r.exitCode != 0 {
+		t.Fatalf("show task failed: %s", r.stderr)
+	}
+	if strings.Contains(created.Title+created.Body, source) || !strings.HasSuffix(created.Title, " huh") {
+		t.Fatalf("temporary path or lost following text in task: %#v", created)
+	}
+	verifyTaskImages(t, created, data.Bytes())
+}
+
+func pasteTerminalImage(t *testing.T, session *tuiSession, source string) {
+	t.Helper()
+	checkpoint := session.checkpoint()
+	if err := session.writeRaw([]byte("\x1b[200~" + source + "\x1b[201~")); err != nil {
+		t.Fatal(err)
+	}
+	// A title's horizontal viewport may hide the link label, and an unchanged
+	// confirmation may be omitted. The new attachment filename stays visible.
+	session.waitForOutputSince(checkpoint, "screenshot-")
+}
+
 func checkImageReferenceLifecycle(t *testing.T, symlinked bool) {
 	t.Helper()
 	boardDir := initBoard(t)
