@@ -72,6 +72,32 @@ func TestWriteAndRead(t *testing.T) {
 	}
 }
 
+func TestReadCRLFFrontmatter(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "003-crlf-task.md")
+	content := "---\r\nid: 3\r\ntitle: CRLF task\r\nstatus: todo\r\n---\r\n\r\nBody line\r\nSecond line\r\n"
+	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	loaded, err := Read(path)
+	if err != nil {
+		t.Fatalf("Read() error: %v", err)
+	}
+	if loaded.ID != 3 {
+		t.Errorf("ID = %d, want 3", loaded.ID)
+	}
+	if loaded.Title != "CRLF task" {
+		t.Errorf("Title = %q, want %q", loaded.Title, "CRLF task")
+	}
+	if loaded.Status != "todo" {
+		t.Errorf("Status = %q, want %q", loaded.Status, "todo")
+	}
+	if loaded.Body != "Body line\r\nSecond line\r\n" {
+		t.Errorf("Body = %q", loaded.Body)
+	}
+}
+
 func TestWriteNoBody(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "002-no-body.md")

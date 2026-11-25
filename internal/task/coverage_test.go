@@ -37,8 +37,22 @@ func TestSplitFrontmatter_ClosingAtEOF(t *testing.T) {
 	if err != nil {
 		t.Fatalf("splitFrontmatter error: %v", err)
 	}
-	if string(fm) != "title: test\n" {
-		t.Errorf("frontmatter = %q, want %q", string(fm), "title: test\n")
+	if string(fm) != "title: test" {
+		t.Errorf("frontmatter = %q, want %q", string(fm), "title: test")
+	}
+	if body != "" {
+		t.Errorf("body = %q, want empty", body)
+	}
+}
+
+func TestSplitFrontmatter_CRLFClosingAtEOF(t *testing.T) {
+	data := []byte("---\r\ntitle: test\r\n---")
+	fm, body, err := splitFrontmatter(data)
+	if err != nil {
+		t.Fatalf("splitFrontmatter error: %v", err)
+	}
+	if string(fm) != "title: test" {
+		t.Errorf("frontmatter = %q, want %q", string(fm), "title: test")
 	}
 	if body != "" {
 		t.Errorf("body = %q, want empty", body)
