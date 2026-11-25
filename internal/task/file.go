@@ -77,35 +77,53 @@ func Write(path string, t *Task) error {
 }
 
 // splitFrontmatter splits a markdown file into YAML frontmatter and body.
-// The file must start with "---\n". Returns frontmatter bytes and body string.
+// The file must start with a "---" line. Returns frontmatter bytes and body string.
 func splitFrontmatter(data []byte) ([]byte, string, error) {
 	content := string(data)
 
-	if !strings.HasPrefix(content, "---\n") {
+	openingLen := 0
+	switch {
+	case strings.HasPrefix(content, "---\r\n"):
+		openingLen = len("---\r\n")
+	case strings.HasPrefix(content, "---\n"):
+		openingLen = len("---\n")
+	default:
 		return nil, "", errors.New("file does not start with YAML frontmatter (---)")
 	}
 
-	// Find the closing ---.
-	rest := content[4:] // skip opening ---\n
-	idx := strings.Index(rest, "\n---\n")
-	if idx < 0 {
-		// Check if file ends with \n---\n or \n--- at EOF.
-		closingLen := len("---")
-		if strings.HasSuffix(rest, "\n---") {
-			idx = len(rest) - closingLen
-		} else {
-			return nil, "", errors.New("unclosed frontmatter (missing closing ---)")
+	fmStart := openingLen
+	for pos := openingLen; pos < len(content); {
+		lineStart := pos
+		lineEnd := len(content)
+		next := len(content)
+		if newline := strings.IndexByte(content[pos:], '\n'); newline >= 0 {
+			lineEnd = pos + newline
+			next = lineEnd + 1
 		}
+
+		line := strings.TrimSuffix(content[lineStart:lineEnd], "\r")
+		if line == "---" {
+			fmEnd := lineStart
+			if fmEnd > fmStart && content[fmEnd-1] == '\n' {
+				fmEnd--
+				if fmEnd > fmStart && content[fmEnd-1] == '\r' {
+					fmEnd--
+				}
+			}
+
+			body := ""
+			if next < len(content) {
+				body = strings.TrimLeft(content[next:], "\r\n")
+			}
+			return []byte(content[fmStart:fmEnd]), body, nil
+		}
+		if next == len(content) {
+			break
+		}
+		pos = next
 	}
 
-	fm := rest[:idx]
-	body := ""
-	closingEnd := idx + len("\n---\n")
-	if closingEnd < len(rest) {
-		body = strings.TrimLeft(rest[closingEnd:], "\n")
-	}
-
-	return []byte(fm), body, nil
+	return nil, "", errors.New("unclosed frontmatter (missing closing ---)")
 }
 
 // WriteAndRename writes the task to disk and renames the file if the title
